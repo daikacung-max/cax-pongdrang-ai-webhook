@@ -247,25 +247,23 @@ def zalo_webhook():
 @app.route("/zalo/ai", methods=["GET", "POST"])
 def zalo_ai():
 
-    body = request.get_json(silent=True) or {}
+    # Bản thử nghiệm:
+    # lấy câu hỏi mới nhất vừa nhận được từ Zalo Webhook
+    item = None
 
-    # Bản thử nghiệm: lấy câu hỏi mới nhất vừa nhận từ Zalo Webhook
-item = None
+    if latest_questions:
+        item = max(
+            latest_questions.values(),
+            key=lambda x: x.get("time", 0)
+        )
 
-if latest_questions:
-    item = max(
-        latest_questions.values(),
-        key=lambda x: x.get("time", 0)
-    )
     if not item:
-
         return chatbot_response(
             "Anh/chị vui lòng nhập lại nội dung cần hỗ trợ."
         )
 
-    # Không lấy câu hỏi quá cũ
+    # Không sử dụng câu hỏi quá cũ
     if time.time() - item.get("time", 0) > 120:
-
         return chatbot_response(
             "Anh/chị vui lòng gửi lại câu hỏi để hệ thống hỗ trợ."
         )
@@ -273,18 +271,15 @@ if latest_questions:
     question = item.get("text", "").strip()
 
     if not question:
-
         return chatbot_response(
             "Anh/chị vui lòng nhập nội dung cần hỗ trợ."
         )
 
     try:
-
         answer = ask_groq(question)
 
         print(
-            "GROQ ANSWER:",
-            "SUCCESS",
+            "GROQ ANSWER: SUCCESS",
             flush=True
         )
 
@@ -329,12 +324,6 @@ if latest_questions:
             "Hệ thống trợ lý đang tạm thời gián đoạn. "
             "Anh/chị vui lòng thử lại."
         )
-
-
-# =========================================================
-# FORMAT TRẢ VỀ CHO ZALO CHATBOT
-# =========================================================
-
 def chatbot_response(text):
 
     return jsonify({
