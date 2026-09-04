@@ -5,7 +5,16 @@ import requests
 
 app = Flask(__name__)
 
-ZALO_ACCESS_TOKEN = os.getenv("ZALO_ACCESS_TOKEN")
+ZALO_ACCESS_TOKEN = "".join(
+    (os.getenv("ZALO_ACCESS_TOKEN") or "").split()
+)
+print(
+    "TOKEN LOADED:",
+    bool(ZALO_ACCESS_TOKEN),
+    "LENGTH:",
+    len(ZALO_ACCESS_TOKEN),
+    flush=True
+)
 
 
 @app.route("/", methods=["GET"])
