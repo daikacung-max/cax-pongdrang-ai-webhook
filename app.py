@@ -249,26 +249,14 @@ def zalo_ai():
 
     body = request.get_json(silent=True) or {}
 
-    uid = str(
-        request.args.get("uid")
-        or body.get("uid")
-        or body.get("user_id")
-        or ""
-    ).strip()
+    # Bản thử nghiệm: lấy câu hỏi mới nhất vừa nhận từ Zalo Webhook
+item = None
 
-    item = None
-
-    # Chờ rất ngắn nếu Dynamic API đến trước Webhook
-    for _ in range(3):
-
-        if uid:
-            item = latest_questions.get(uid)
-
-        if item:
-            break
-
-        time.sleep(0.07)
-
+if latest_questions:
+    item = max(
+        latest_questions.values(),
+        key=lambda x: x.get("time", 0)
+    )
     if not item:
 
         return chatbot_response(
