@@ -35,7 +35,9 @@ class QuestionCorpusTests(unittest.TestCase):
                     # câu fallback an toàn; không biến corpus thành câu trả lời luật.
                     answer = grounded_dynamic_fallback(case.question, [])
                     self.assertTrue(
-                        "không tự đoán" in answer.lower() or "mỗi trường hợp có giấy tờ khác nhau" in answer.lower(),
+                        "chưa có nguồn đã duyệt" in answer.lower()
+                        or "không tự đoán" in answer.lower()
+                        or "mỗi trường hợp có giấy tờ khác nhau" in answer.lower(),
                         case.question,
                     )
                     self.assertNotRegex(answer, re.compile(r"(?<!\d)(?:113|114|115)(?!\d)"))

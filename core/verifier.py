@@ -2,6 +2,7 @@ import re
 import unicodedata
 
 from config import UNIT_NAME, HOTLINE
+from core.clarification import clarification_for_unverified_topic
 
 
 def norm(text):
@@ -238,6 +239,9 @@ def verify_dynamic_text(answer, retrieved_units, question=""):
 
 def grounded_dynamic_fallback(question, retrieved_units):
     if not retrieved_units:
+        topical_reply = clarification_for_unverified_topic(question)
+        if topical_reply:
+            return topical_reply
         if "dang ky" in norm(question):
             return (
                 "Anh/chị muốn đăng ký tạm trú, thường trú, xe máy mới, sang tên xe hay VNeID? "

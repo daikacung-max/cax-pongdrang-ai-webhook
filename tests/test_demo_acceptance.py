@@ -48,7 +48,7 @@ class DemoAcceptanceTests(unittest.TestCase):
             ("Tôi muốn trình báo bị đe dọa", "intake_requested", "needs_information", "Sự việc xảy ra khi nào"),
             ("Có được bảo mật người tố giác không?", "advice_only", "not_requested", "giữ bí mật"),
             ("Tôi cần xác nhận cư trú", "advice_only", "not_requested", "nguồn"),
-            ("Tôi muốn hỏi về giấy phép xây dựng", "advice_only", "not_requested", "Anh/chị cần tôi hỗ trợ"),
+            ("Tôi muốn hỏi về giấy phép xây dựng", "advice_only", "not_requested", "Anh/chị đang hỏi về xây dựng"),
         )
         forbidden_phone = ("113", "114", "115")
 

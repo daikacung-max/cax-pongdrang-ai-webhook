@@ -3,6 +3,7 @@ import unicodedata
 
 from config import LEGAL_TOP_K
 from core import db
+from core.clarification import unverified_topic_key
 
 DOCUMENT_ALIASES = {
     "blhs": "BLHS_2025",
@@ -91,6 +92,11 @@ def _detect_domain_in_text(text):
         return "residence", ["RESIDENCE_GUIDANCE_2026", "RESIDENCE_PERMANENT_2026", "TTHC_TEMP_RESIDENCE_2026"]
     if any(x in q for x in ["to giac", "tin bao toi pham", "trinh bao toi pham"]):
         return "crime_report", ["CRIME_REPORT_GUIDANCE_2025"]
+    # Những lĩnh vực có vẻ pháp lý nhưng chưa có nguồn nghiệp vụ được duyệt
+    # phải dừng tại đây. Không cho FTS kéo một Điều luật chung rồi trả lời
+    # nhầm thành tư vấn thủ tục/điều tra cụ thể.
+    if unverified_topic_key(q) is not None:
+        return "unverified_topic", []
     if any(x in q for x in ["toi pham", "bo luat hinh su", "blhs", "bi danh", "danh nguoi", "nguoi khac danh", "hanh hung", "camera", "thuong tich", "dung dao", "hung khi", "trom", "lua dao", "bi lua chuyen khoan", "lam dung tin nhiem", "gay roi", "huy hoai", "de doa giet"]):
         return "criminal", ["BLHS_2025"]
     return None, None
@@ -205,7 +211,7 @@ def retrieve(plan, question):
 
     # Không có nguồn đúng phạm vi thì fail-closed. Danh sách rỗng trong SQLite
     # không phải filter, nên phải dừng rõ ràng tại đây.
-    if domain in ("identity_unverified", "vehicle_unverified"):
+    if domain in ("identity_unverified", "vehicle_unverified", "unverified_topic"):
         return []
 
     for pos, unit_id in enumerate(_priority_unit_ids(domain, question)):

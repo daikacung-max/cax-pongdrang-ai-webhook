@@ -92,6 +92,9 @@ LEGAL_HINTS = [
     "dang ky xe", "sang ten", "chuyen nhuong", "thu hoi", "can cuoc", "to giac", "thuong tich", "bi thuong", "bi danh", "nguoi khac danh", "hanh hung", "camera", "dung dao", "hung khi",
     "bi lua", "bi lua chuyen khoan", "nguoi lua dao", "chuyen tien", "chuyen khoan", "bi scam", "trom", "ma tuy", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid",
     "dinh danh dien tu", "tai khoan dinh danh", "xe mo to", "xe may", "xe gan may", "bien so xe", "ho khau", "nhap khau",
+    # Các cụm dưới đây vẫn đi vào cổng fail-closed nếu chưa có nguồn được duyệt;
+    # chúng không cho phép model tự trả lời chi tiết bằng kiến thức nền.
+    "ho chieu", "xuat nhap canh", "thi thuc", "ly lich tu phap", "khieu nai", "to cao", "don thu", "khoi kien", "toa an", "thi hanh an", "trieu tap", "dieu tra", "luat su", "dat dai", "tranh chap dat", "nha o", "thue nha", "ly hon", "thua ke", "hop dong", "vay tien", "no tien", "lao dong", "bao hiem xa hoi", "bhxh", "thue", "hoa don", "khai sinh", "khai tu", "ket hon", "ho tich", "tai khoan bi hack", "mat zalo", "mat facebook", "o nhiem", "tieng on", "xay dung", "phong chay", "chua chay", "pccc", "co bac", "bao luc gia dinh", "xam hai tre em", "mat nguoi", "that lac nguoi", "vu khi", "cong cu ho tro", "phao", "phat giao thong", "phat nguoi", "giay phep lai xe",
 ]
 
 

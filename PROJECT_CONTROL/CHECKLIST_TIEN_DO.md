@@ -9,8 +9,8 @@ Quy ước: `[x]` chỉ dùng khi có bằng chứng ghi ở cột ghi chú. `[ 
 - [x] Retrieval FTS5 và verifier fail-closed.
 - [x] Lịch sử HMAC + giới hạn số tin/ngày lưu.
 - [x] Log timing không chứa nội dung người dân.
-- [x] 57 kiểm tra tự động đạt tại thời điểm cập nhật, gồm ranh giới nguồn, bảo mật lịch sử, chính sách số điện thoại, cách xưng hô, lỗi gõ VNeID, corpus 1.000 câu và adapter Zalo.
-- [x] Corpus 1.000 câu giả lập có nhãn nguồn/fail-closed: 500 câu thuộc phạm vi nguồn đã duyệt phải retrieve đúng nguồn; 500 câu lĩnh vực chưa có nguồn riêng chỉ được phép fail-closed.
+- [x] 60 kiểm tra tự động đạt tại thời điểm cập nhật, gồm ranh giới nguồn, bảo mật lịch sử, chính sách số điện thoại, cách xưng hô, lỗi gõ VNeID, corpus 1.000 câu và adapter Zalo.
+- [x] Corpus 1.000 câu giả lập có nhãn nguồn/fail-closed: 250 câu thuộc phạm vi nguồn đã duyệt phải retrieve đúng nguồn; 750 câu thuộc 30 lĩnh vực chưa có nguồn riêng chỉ được phép fail-closed hoặc hỏi làm rõ theo chủ đề.
 - [x] Đã đo Groq Dynamic bằng dữ liệu giả lập, không chứa dữ liệu cá nhân: 30 lượt nóng và 10 lượt trong process mới.
 - [ ] Dynamic đạt ngưỡng vận hành mặc định: fallback dưới 5% và p95 còn cách deadline Zalo ít nhất 300 ms.
 - [ ] OA thật đã kiểm thử hai chiều.
@@ -26,7 +26,7 @@ Quy ước: `[x]` chỉ dùng khi có bằng chứng ghi ở cột ghi chú. `[ 
 - [x] Có demo cục bộ tách production: chat văn bản, chỉ tư vấn/tiếp nhận theo yêu cầu, lịch sử tách theo phiên và không gửi dữ liệu ra ngoài.
 - [x] Nhớ dữ kiện qua chuỗi 4 lượt hành hung/thương tích/dao/camera trong demo cục bộ.
 - [x] Khi thiếu dữ kiện, luồng demo chỉ hỏi một dữ kiện tiếp theo của nhóm nghiệp vụ; chưa thay cho bước rà soát nghiệp vụ của cán bộ.
-- [ ] Khi không có nguồn thì nói rõ giới hạn và chuyển người thật.
+- [x] Khi không có nguồn, demo nói rõ giới hạn, không tự nêu thủ tục hoặc kết luận pháp lý, và hỏi một câu làm rõ theo chủ đề; chưa chuyển hồ sơ thật.
 
 ## C. Tiếp nhận và chuyển xử lý
 
@@ -60,3 +60,4 @@ Quy ước: `[x]` chỉ dùng khi có bằng chứng ghi ở cột ghi chú. `[ 
 | 2026-09-05 | Tách nguồn cấp thẻ căn cước lần đầu từ đủ 14 tuổi tại cấp tỉnh | Thủ tục 2.000200 của Cổng DVC Bộ Công an; 50/50 test đạt | Đổi thẻ căn cước vẫn chờ nguồn riêng | Chưa duyệt |
 | 2026-09-05 | Kiểm tra Groq Dynamic bằng 40 câu hỏi giả lập và chuỗi 4 lượt Điều 134 | Groq/model hợp lệ; 53/53 test nội bộ đạt; 30 lượt nóng: p50 157 ms, p95 801 ms, max 1.450 ms; 10 lượt process mới (clock lõi sau khởi tạo): p50 1.211 ms, p95 1.272 ms | Fallback của model còn cao (nóng: 29/30; process mới: 7/10), nên chưa đủ điều kiện đặt làm đường trả lời mặc định; fallback nguồn vẫn an toàn | Chưa duyệt |
 | 2026-09-05 | Sửa demo hỏi loại đăng ký thay vì trả lời chung chung; sửa route camera và lỗi gõ `vnied`; tạo corpus 1.000 câu | 57/57 test mặc định đạt; 1.000/1.000 câu retrieve đúng nguồn hoặc fail-closed theo nhãn; kiểm tra trực tiếp UI với câu đăng ký chung và `vnied` | Chưa có nguồn chính thức đủ rộng cho 500 câu ngoài phạm vi, nên các câu này chủ đích không tư vấn chi tiết | Chưa duyệt |
+| 2026-09-05 | Mở rộng chặn nguồn sai và làm rõ theo chủ đề cho khiếu nại/tố cáo, dân sự, tố tụng, đất đai, hôn nhân, lao động, thuế, hộ tịch, mạng, môi trường, xây dựng, PCCC và các nhóm khác; tách tiếng ồn karaoke khỏi thủ tục kinh doanh karaoke | 60/60 test mặc định đạt; chạy đầy đủ 1.000/1.000 lượt demo trên cơ sở dữ liệu tạm riêng đạt; corpus gồm 40 nhóm (250 nguồn đã duyệt, 750 fail-closed) | 30 lĩnh vực mở rộng chưa có nguồn nghiệp vụ được duyệt, nên chỉ hỏi làm rõ và không tư vấn chi tiết; chưa đủ điều kiện production | Chưa duyệt |

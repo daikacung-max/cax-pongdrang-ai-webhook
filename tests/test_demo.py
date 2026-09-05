@@ -75,6 +75,27 @@ class DemoTests(unittest.TestCase):
         self.assertIn("Sự việc xảy ra khi nào và ở đâu", result["answer"])
         self.assertNotIn("Anh/chị cần tôi hỗ trợ nội dung nào", result["answer"])
 
+    def test_complaint_gets_one_specific_clarifying_question(self):
+        result = respond(str(uuid.uuid4()), "Tôi muốn làm đơn tố cáo")
+        self.assertEqual(result["source_state"], "no_source")
+        self.assertIn("khiếu nại, tố cáo hoặc phản ánh", result["answer"])
+        self.assertIn("cá nhân, cơ quan hay cán bộ", result["answer"])
+        self.assertNotIn("Điều 134", result["answer"])
+
+    def test_civil_debt_does_not_fall_back_to_criminal_law(self):
+        result = respond(str(uuid.uuid4()), "Người vay tiền không trả, tôi cần làm gì?")
+        self.assertEqual(result["source_state"], "no_source")
+        self.assertIn("nợ, hợp đồng hoặc giao dịch dân sự", result["answer"])
+        self.assertIn("khoản vay", result["answer"])
+        self.assertNotIn("Điều 134", result["answer"])
+
+    def test_karaoke_noise_is_not_misread_as_a_business_procedure(self):
+        result = respond(str(uuid.uuid4()), "Hàng xóm hát karaoke ồn ào quá")
+        self.assertEqual(result["source_state"], "no_source")
+        self.assertIn("tiếng ồn sinh hoạt", result["answer"])
+        self.assertIn("thời điểm nào", result["answer"])
+        self.assertNotIn("ngành nghề", result["answer"])
+
     def test_demo_console_is_off_by_default(self):
         with app.test_client() as client:
             response = client.get("/demo")

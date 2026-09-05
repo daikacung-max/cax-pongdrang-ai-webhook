@@ -1,6 +1,7 @@
 """Bộ đáp ứng cục bộ cho demo, không gọi provider và không tạo hồ sơ thật."""
 
 from core import db
+from core.clarification import clarification_for_unverified_topic
 from core.intake import assess
 from core.planner import plan
 from core.retrieval import retrieve
@@ -9,6 +10,9 @@ from core.verifier import finalize, grounded_dynamic_fallback
 
 def _no_source_answer(intake, question=""):
     question_norm = str(question or "").casefold()
+    topical_reply = clarification_for_unverified_topic(question)
+    if topical_reply:
+        return topical_reply
     if intake.get("procedure_code") == "unclassified":
         if "đăng ký" in question_norm or "dang ky" in question_norm:
             return (
