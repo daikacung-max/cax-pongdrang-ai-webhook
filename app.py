@@ -13,6 +13,7 @@ from config import (
 )
 from core import db
 from core.ingest import import_article_index
+from core.verified_sources import ensure_verified_sources
 from core.service import core
 from adapters.zalo import pending
 
@@ -22,20 +23,25 @@ BASE_DIR = Path(__file__).resolve().parent
 
 def ensure_legal_db():
     db.init_schema()
-    if db.stats().get("legal_units", 0) > 0:
-        return
-    index_path = BASE_DIR / "Bộ luật Hình sự năm 2025 - chỉ mục điều luật.json"
-    pdf_path = BASE_DIR / "Bộ luật Hình sự năm 2025.pdf"
-    if index_path.exists() and pdf_path.exists():
-        import_article_index(
-            index_path=index_path,
-            document_id="BLHS_2025",
-            title="Bộ luật Hình sự năm 2025",
-            source_path=pdf_path,
-            number="100/2015/QH13 (đã được sửa đổi, bổ sung)",
-            issuer="Quốc hội",
-            effective_from=None,
-        )
+
+    # Chỉ nạp BLHS từ file gốc khi chưa có dữ liệu BLHS.
+    if not db.get_article("BLHS_2025", "134"):
+        index_path = BASE_DIR / "Bộ luật Hình sự năm 2025 - chỉ mục điều luật.json"
+        pdf_path = BASE_DIR / "Bộ luật Hình sự năm 2025.pdf"
+        if index_path.exists() and pdf_path.exists():
+            import_article_index(
+                index_path=index_path,
+                document_id="BLHS_2025",
+                title="Bộ luật Hình sự năm 2025",
+                source_path=pdf_path,
+                number="100/2015/QH13 (đã được sửa đổi, bổ sung)",
+                issuer="Quốc hội",
+                effective_from=None,
+            )
+
+    # Luôn đồng bộ các snapshot đã kiểm chứng từ nguồn chính thức.
+    # Việc này không phụ thuộc việc BLHS đã có hay chưa.
+    ensure_verified_sources()
 
 
 ensure_legal_db()
@@ -111,6 +117,7 @@ def health():
         "hotline": HOTLINE,
         "database": s,
         "article_134_title": article_134[0]["title"] if article_134 else None,
+        "residence_sources_loaded": s.get("documents", 0) >= 3,
         "real_conversation_api": "/api/chat",
         "zalo_dynamic_adapter": "/zalo/ai",
         "core_answer_model": ANSWER_MODEL,
@@ -168,7 +175,7 @@ def zalo_dynamic():
         return dynamic_response(result["answer"])
     except Exception as exc:
         # Không ghi nội dung câu hỏi hoặc dữ liệu cá nhân vào log.
-        app.logger.error("Zalo AI Core error type=%s", type(exc).__name__)
+        app.logger.error("Zalo AI Core error type=%s detail=%s", type(exc).__name__, str(exc)[:160])
         return dynamic_response(
             f"Trợ lý AI tạm thời chưa hoàn tất được phần phân tích. "
             f"Nếu cần trao đổi trực tiếp, người dân có thể liên hệ trực ban "
