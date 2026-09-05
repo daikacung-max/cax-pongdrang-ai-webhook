@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from pathlib import Path
+import logging
 import time
 import re
 
@@ -25,6 +26,7 @@ from core.telemetry import log_zalo_latency, new_trace_id
 from adapters.zalo import pending
 
 app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
 BASE_DIR = Path(__file__).resolve().parent
 
 
