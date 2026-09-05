@@ -9,7 +9,7 @@ Quy ước: `[x]` chỉ dùng khi có bằng chứng ghi ở cột ghi chú. `[ 
 - [x] Retrieval FTS5 và verifier fail-closed.
 - [x] Lịch sử HMAC + giới hạn số tin/ngày lưu.
 - [x] Log timing không chứa nội dung người dân.
-- [x] 51 kiểm tra tự động đạt tại thời điểm cập nhật, gồm ranh giới nguồn, bảo mật lịch sử và adapter Zalo.
+- [x] 52 kiểm tra tự động đạt tại thời điểm cập nhật, gồm ranh giới nguồn, bảo mật lịch sử, chính sách số điện thoại và adapter Zalo.
 - [ ] OA thật đã kiểm thử hai chiều.
 
 ## B. Demo nghiệp vụ
