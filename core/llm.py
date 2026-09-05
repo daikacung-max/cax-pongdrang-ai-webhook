@@ -42,13 +42,15 @@ def chat_structured(model, messages, schema_name, schema, reasoning_effort="low"
         "messages": messages,
         "temperature": temperature,
         "max_completion_tokens": max_completion_tokens,
-        "reasoning_effort": reasoning_effort,
-        "reasoning_format": "hidden",
         "response_format": {
             "type": "json_schema",
             "json_schema": {"name": schema_name, "strict": True, "schema": schema},
         },
     }
+    if str(model).startswith("openai/gpt-oss"):
+        payload["reasoning_effort"] = reasoning_effort
+        payload["reasoning_format"] = "hidden"
+
     response = _post(payload, timeout)
     try:
         content = response.json()["choices"][0]["message"]["content"]
@@ -65,9 +67,11 @@ def chat_text(model, messages, reasoning_effort="low", timeout=1.6,
         "messages": messages,
         "temperature": temperature,
         "max_completion_tokens": max_completion_tokens,
-        "reasoning_effort": reasoning_effort,
-        "reasoning_format": "hidden",
     }
+    if str(model).startswith("openai/gpt-oss"):
+        payload["reasoning_effort"] = reasoning_effort
+        payload["reasoning_format"] = "hidden"
+
     response = _post(payload, timeout)
     try:
         return str(response.json()["choices"][0]["message"]["content"] or "").strip()
