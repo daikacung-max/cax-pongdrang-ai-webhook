@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from pathlib import Path
 import re
 
 from config import (
@@ -9,10 +10,33 @@ from config import (
     MAX_ZALO_TOTAL_CHARS,
 )
 from core import db
+from core.ingest import import_article_index
 from core.service import core
 from adapters.zalo import pending
 
 app = Flask(__name__)
+BASE_DIR = Path(__file__).resolve().parent
+
+
+def ensure_legal_db():
+    db.init_schema()
+    if db.stats().get("legal_units", 0) > 0:
+        return
+    index_path = BASE_DIR / "Bộ luật Hình sự năm 2025 - chỉ mục điều luật.json"
+    pdf_path = BASE_DIR / "Bộ luật Hình sự năm 2025.pdf"
+    if index_path.exists() and pdf_path.exists():
+        import_article_index(
+            index_path=index_path,
+            document_id="BLHS_2025",
+            title="Bộ luật Hình sự năm 2025",
+            source_path=pdf_path,
+            number="100/2015/QH13 (đã được sửa đổi, bổ sung)",
+            issuer="Quốc hội",
+            effective_from=None,
+        )
+
+
+ensure_legal_db()
 
 
 def split_zalo_messages(text):
@@ -74,7 +98,7 @@ def home():
 
 @app.route("/health", methods=["GET"])
 def health():
-    db.init_schema()
+    ensure_legal_db()
     s = db.stats()
     article_134 = db.get_article("BLHS_2025", "134")
     return jsonify({
@@ -146,6 +170,7 @@ def zalo_dynamic():
 
 @app.route("/debug/article/<article>", methods=["GET"])
 def debug_article(article):
+    ensure_legal_db()
     rows = db.get_article("BLHS_2025", article)
     if not rows:
         return jsonify({"found": False, "article": article}), 404
@@ -160,5 +185,4 @@ def debug_article(article):
 
 
 if __name__ == "__main__":
-    db.init_schema()
     app.run(host="0.0.0.0", port=10000)
