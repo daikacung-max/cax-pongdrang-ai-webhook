@@ -66,6 +66,59 @@ def clean(text):
     text = re.sub(r"\n{3,}","\n\n",text)
     return text.strip()
 
+
+def normalize_phone_digits(value):
+    return re.sub(r"\D", "", str(value or ""))
+
+
+def enforce_local_hotline_only(text):
+    """
+    Không cho câu trả lời hiển thị số điện thoại liên hệ nào khác số trực ban đơn vị.
+    """
+    text = str(text or "")
+    hotline_digits = normalize_phone_digits(HOTLINE)
+
+    phone_pattern = re.compile(
+        r"(?<!\d)(?:\+?84|0)(?:[\s.\-]?\d){8,10}(?!\d)"
+    )
+
+    def replace_phone(match):
+        digits = normalize_phone_digits(match.group(0))
+        if digits.startswith("84"):
+            digits = "0" + digits[2:]
+        if digits == hotline_digits:
+            return HOTLINE
+        return HOTLINE
+
+    text = phone_pattern.sub(replace_phone, text)
+
+    # Nếu model tự sinh số 113/114/115 dưới dạng số liên hệ,
+    # thay bằng số trực ban theo yêu cầu của đơn vị.
+    text = re.sub(
+        r"(?i)((?:số|gọi|hotline|điện thoại|liên hệ)\s*[:\-]?\s*)(113|114|115)\b",
+        lambda m: m.group(1) + HOTLINE,
+        text
+    )
+
+    return text
+
+
+def finalize_answer(text, contact_relevant=False):
+    text = clean(text)
+    text = enforce_local_hotline_only(text)
+
+    lower = norm(text)
+    suggests_contact = any(x in lower for x in [
+        "lien he cong an", "trinh bao", "to giac",
+        "bao tin", "goi cong an", "den cong an",
+        "co quan cong an"
+    ])
+
+    if (contact_relevant or suggests_contact) and HOTLINE not in text:
+        text += f" Số điện thoại trực ban {UNIT}: {HOTLINE}."
+
+    return clean(text)
+
 def split_messages(text):
     text = clean(text)
     if len(text) > MAX_TOTAL:
@@ -95,121 +148,166 @@ def split_messages(text):
     return result[:MAX_MESSAGES]
 
 def chatbot_response(text):
+    safe_text = finalize_answer(text)
     return jsonify({
         "version":"chatbot",
-        "content":{"messages":[{"type":"text","text":x} for x in split_messages(text) if x]}
+        "content":{"messages":[{"type":"text","text":x} for x in split_messages(safe_text) if x]}
     }),200
 
 def detect_law(question):
+    """
+    Xác định văn bản người dùng nêu rõ.
+    Tên luật cụ thể luôn được kiểm tra trước từ khóa chung "hình sự".
+    """
     q = norm(question)
-    if any(x in q for x in ["bo luat hinh su","blhs","hinh su"]):
-        return "BLHS"
-    if any(x in q for x in ["bo luat to tung hinh su","bltths","to tung hinh su"]):
+
+    if any(x in q for x in [
+        "bo luat to tung hinh su",
+        "bltths",
+        "to tung hinh su"
+    ]):
         return "BLTTHS"
-    if any(x in q for x in ["luat xu ly vi pham hanh chinh","xlvphc","vi pham hanh chinh"]):
+
+    if any(x in q for x in [
+        "luat xu ly vi pham hanh chinh",
+        "xlvphc",
+        "xu ly vi pham hanh chinh"
+    ]):
         return "XLVPHC"
+
+    if any(x in q for x in [
+        "bo luat hinh su",
+        "blhs"
+    ]):
+        return "BLHS"
+
+    if "hinh su" in q and "to tung hinh su" not in q:
+        return "BLHS"
+
+    if any(x in q for x in [
+        "luat cu tru",
+        "luat can cuoc",
+        "luat dat dai",
+        "luat phong chong ma tuy",
+        "luat trat tu an toan giao thong",
+        "luat an ninh mang",
+        "luat bao ve bi mat nha nuoc",
+        "luat pccc",
+        "luat phong chay chua chay"
+    ]):
+        return "OTHER_EXPLICIT_LAW"
+
     return None
 
 DEFAULT_ARTICLE_LAW = {
-    "133":"BLHS","134":"BLHS","140":"BLHS","173":"BLHS","174":"BLHS",
-    "175":"BLHS","178":"BLHS","256a":"BLHS","318":"BLHS",
-    "145":"BLTTHS","146":"BLTTHS"
+    "145": "BLTTHS",
+    "146": "BLTTHS",
 }
 
+
 def exact_article_answer(question):
+    """
+    Nếu người dùng nêu số Điều, hệ thống định tuyến theo đúng văn bản.
+    Không dùng semantic search để đoán tên Điều.
+    """
     q = norm(question)
     m = re.search(r"\bdieu\s+(\d+[a-z]?)\b", q)
     if not m:
         return None
 
     art = m.group(1)
-    law = detect_law(question) or DEFAULT_ARTICLE_LAW.get(art)
+    explicit_law = detect_law(question)
 
-    # BLHS: LUÔN ưu tiên chỉ mục được trích trực tiếp từ PDF toàn văn.
-    if law == "BLHS" and art in BLHS_ARTICLES:
+    if explicit_law == "OTHER_EXPLICIT_LAW":
+        return (
+            f"Anh/chị đang hỏi Điều {art} của một văn bản khác Bộ luật Hình sự/Bộ luật Tố tụng hình sự. "
+            "Phiên bản hiện tại chưa có chỉ mục nguyên văn của văn bản đó nên hệ thống không tự suy đoán nội dung Điều."
+        )
+
+    if explicit_law == "BLTTHS" or (
+        explicit_law is None and DEFAULT_ARTICLE_LAW.get(art) == "BLTTHS"
+    ):
+        item = (EXACT.get("BLTTHS") or {}).get(art)
+        if item:
+            return clean(
+                f"Điều {art} Bộ luật Tố tụng hình sự: {item['title']}. "
+                f"{item['summary']}"
+            )
+        return (
+            f"Hệ thống chưa có nội dung Điều {art} Bộ luật Tố tụng hình sự trong chỉ mục hiện tại; "
+            "không tự suy đoán nội dung Điều."
+        )
+
+    if explicit_law == "XLVPHC":
+        item = (EXACT.get("XLVPHC") or {}).get(art)
+        if item:
+            return clean(
+                f"Điều {art} Luật Xử lý vi phạm hành chính: {item['title']}. "
+                f"{item['summary']}"
+            )
+        return (
+            f"Hệ thống chưa có nội dung Điều {art} Luật Xử lý vi phạm hành chính trong chỉ mục hiện tại; "
+            "không tự suy đoán nội dung Điều."
+        )
+
+    # Không nêu luật hoặc nêu rõ BLHS: lấy trực tiếp từ chỉ mục toàn văn PDF.
+    if explicit_law in (None, "BLHS") and art in BLHS_ARTICLES:
         item = BLHS_ARTICLES[art]
         title = clean(item.get("title", ""))
-        raw = clean(item.get("raw_text", ""))
+        locked_prefix = f"Điều {art} Bộ luật Hình sự: {title}."
 
-        if not raw:
-            return f"Điều {art} Bộ luật Hình sự: {title}."
+        if any(x in q for x in [
+            "toi gi", "quy dinh gi", "la gi", "ten toi",
+            "noi dung dieu", "dieu nay quy dinh gi"
+        ]) or len(q.split()) <= 3:
+            return locked_prefix
 
-        # Khi người dân chỉ hỏi "Điều X là tội gì/quy định gì", trả đúng tên Điều trước.
-        short_query = any(x in q for x in [
-            "toi gi", "quy dinh gi", "la gi", "ten toi", "noi dung dieu"
-        ])
+        return {
+            "law": "BLHS",
+            "article": art,
+            "locked_prefix": locked_prefix
+        }
 
-        if short_query:
-            return (
-                f"Điều {art} Bộ luật Hình sự: {title}. "
-                f"Nội dung chi tiết được hệ thống tra trực tiếp từ toàn văn Bộ luật Hình sự năm 2025."
-            )
-
-        # Nếu hỏi cụ thể hơn thì model sẽ được cấp nguyên điều luật ở bước sau,
-        # không dùng summary thủ công.
-        return None
-
-    # Các luật khác vẫn dùng exact_articles còn lại trong KB.
-    if not law:
-        return None
-    item = (EXACT.get(law) or {}).get(art)
-    if not item:
-        return None
-
-    law_name = {
-        "BLHS":"Bộ luật Hình sự",
-        "BLTTHS":"Bộ luật Tố tụng hình sự",
-        "XLVPHC":"Luật Xử lý vi phạm hành chính"
-    }.get(law, law)
-
-    parts = [
-        f"Điều {art} {law_name}: {item['title']}.",
-        item["summary"]
-    ]
-    if item.get("warning"):
-        parts.append(item["warning"])
-    return clean(" ".join(parts))
-
+    return None
 
 def blhs_context_for_question(question, top_k=3):
     """
-    Truy xuất trực tiếp từ toàn văn các Điều BLHS.
-    Ưu tiên: số Điều nêu rõ -> tiêu đề -> độ trùng từ khóa trong văn bản.
+    Truy xuất toàn văn BLHS.
+    Có số Điều rõ ràng thì chỉ đưa đúng Điều đó vào context.
     """
     q = norm(question)
+    explicit = re.search(r"\bdieu\s+(\d+[a-z]?)\b", q)
+
+    if explicit:
+        art = explicit.group(1)
+        item = BLHS_ARTICLES.get(art)
+        if item:
+            raw = item.get("raw_text", "")
+            if len(raw) > 12000:
+                raw = raw[:12000]
+            return f"[BLHS Điều {art}: {item.get('title','')}]\n{raw}"
+        return ""
+
     qt = {w for w in q.split() if len(w) >= 2}
     ranked = []
 
-    explicit = re.search(r"\bdieu\s+(\d+[a-z]?)\b", q)
-    explicit_art = explicit.group(1) if explicit else None
-
     for art, item in BLHS_ARTICLES.items():
         title = norm(item.get("title", ""))
-        raw = norm(item.get("raw_text", ""))
-        score = 0.0
-
-        if explicit_art == art:
-            score += 1000.0
-
         title_tokens = set(title.split())
-        raw_tokens = set(raw.split())
+        score = len(qt & title_tokens) * 10.0
 
-        score += len(qt & title_tokens) * 8.0
-        score += len(qt & raw_tokens) * 0.35
-
-        # Một số từ trọng tâm phổ biến
-        if "thuong tich" in q and "thuong tich" in title:
-            score += 40
-        if "trom" in q and "trom cap tai san" in title:
-            score += 40
-        if "lua dao" in q and "lua dao chiem doat tai san" in title:
-            score += 40
-        if "lam dung tin nhiem" in q and "lam dung tin nhiem chiem doat tai san" in title:
-            score += 40
-        if "gây rối" in question.lower() and "gây rối trật tự công cộng" in item.get("title","").lower():
-            score += 40
-        if "ma túy" in question.lower() and "ma túy" in item.get("title","").lower():
-            score += 15
+        checks = [
+            ("thuong tich", "thuong tich"),
+            ("trom", "trom cap tai san"),
+            ("lua dao", "lua dao chiem doat tai san"),
+            ("lam dung tin nhiem", "lam dung tin nhiem chiem doat tai san"),
+            ("de doa giet", "de doa giet nguoi"),
+            ("huy hoai", "huy hoai hoac co y lam hu hong tai san"),
+            ("gay roi", "gay roi trat tu cong cong"),
+        ]
+        for q_phrase, title_phrase in checks:
+            if q_phrase in q and title_phrase in title:
+                score += 60.0
 
         if score > 0:
             ranked.append((score, item))
@@ -219,7 +317,6 @@ def blhs_context_for_question(question, top_k=3):
     blocks = []
     for score, item in ranked[:top_k]:
         raw = item.get("raw_text", "")
-        # Giữ đủ rộng để model đọc điều luật, nhưng không đẩy toàn bộ 277 trang vào một request.
         if len(raw) > 9000:
             raw = raw[:9000]
         blocks.append(
@@ -264,7 +361,11 @@ def wants_contact(question):
     ])
 
 def contact_answer():
-    return f"Số điện thoại trực ban {UNIT}: {HOTLINE}. Anh/chị có thể liên hệ số này để trình báo, phản ánh hoặc trao đổi thông tin cần thiết."
+    return (
+        f"Số điện thoại trực ban {UNIT}: {HOTLINE}. "
+        "Người dân có thể gọi trực tiếp số này để trình báo, phản ánh tình hình an ninh, trật tự "
+        "hoặc trao đổi nội dung cần Công an xã hỗ trợ."
+    )
 
 GENERAL_SYSTEM = f"""
 Bạn là Trợ lý AI của {UNIT}.
@@ -275,7 +376,7 @@ YÊU CẦU:
 kiến thức phổ thông, công nghệ, đời sống, soạn thảo và các nội dung phù hợp khác.
 2. Tiếng Việt tự nhiên, ngắn gọn, đúng trọng tâm, diễn đạt thuần thục.
 3. Nội dung thuộc Công an/pháp luật: văn phong chuẩn mực, khách quan, dễ hiểu, phục vụ Nhân dân.
-4. Không tự xưng là "Cục Công an xã". Tên đơn vị duy nhất là "{UNIT}".
+4. Không tự xưng là "Cục Công an xã". Tên đơn vị duy nhất là "{UNIT}".\n5. Nếu cần nêu số điện thoại liên hệ, CHỈ được nêu số trực ban "{HOTLINE}". Không được cung cấp bất kỳ số điện thoại/hotline nào khác.
 5. Không dùng Markdown, không dùng dấu *, **, #.
 6. Không trình bày chuỗi suy luận nội bộ.
 7. Câu đơn giản trả lời 1-3 câu. Câu phức tạp: kết luận trước, sau đó tối đa 3-4 ý.
@@ -369,13 +470,13 @@ def purge():
 
 @app.route("/",methods=["GET"])
 def home():
-    return f"{UNIT} - Hybrid Legal Flexible V4",200
+    return f"{UNIT} - Router Fixed Full BLHS V6",200
 
 @app.route("/health",methods=["GET"])
 def health():
     return jsonify({
         "status":"ok",
-        "mode":"hybrid_full_blhs_v5",
+        "mode":"router_fixed_full_blhs_v6",
         "kb_version":VERSION.get("version"),
         "snapshot":VERSION.get("snapshot"),
         "unit":UNIT,
@@ -383,12 +484,40 @@ def health():
         "exact_article_router":True,
         "blhs_fulltext_loaded":bool(BLHS_ARTICLES),
         "blhs_article_count":len(BLHS_ARTICLES),
+        "article_134_title":BLHS_ARTICLES.get("134",{}).get("title"),
+        "article_140_title":BLHS_ARTICLES.get("140",{}).get("title"),
+        "hotline_policy":"local_only",
         "flexible_general_ai":True,
         "hybrid_legal_ai":True,
         "plain_text_only":True,
         "max_messages":MAX_MESSAGES,
         "groq":bool(GROQ_API_KEY)
     }),200
+
+
+@app.route("/selftest", methods=["GET"])
+def selftest():
+    tests = {
+        "unit": UNIT,
+        "hotline": HOTLINE,
+        "article_134_blhs": BLHS_ARTICLES.get("134", {}).get("title"),
+        "article_140_blhs": BLHS_ARTICLES.get("140", {}).get("title"),
+        "article_145_bltths": (EXACT.get("BLTTHS") or {}).get("145", {}).get("title"),
+        "article_146_bltths": (EXACT.get("BLTTHS") or {}).get("146", {}).get("title"),
+        "route_bltths_145": detect_law("Điều 145 Bộ luật Tố tụng hình sự"),
+        "route_blhs_134": detect_law("Điều 134 Bộ luật Hình sự"),
+        "route_xlvphc_134": detect_law("Điều 134 Luật Xử lý vi phạm hành chính"),
+    }
+    tests["passed"] = (
+        tests["article_134_blhs"] == "Tội cố ý gây thương tích hoặc gây tổn hại cho sức khỏe của người khác"
+        and tests["article_140_blhs"] == "Tội hành hạ người khác"
+        and tests["route_bltths_145"] == "BLTTHS"
+        and tests["route_blhs_134"] == "BLHS"
+        and tests["route_xlvphc_134"] == "XLVPHC"
+        and tests["hotline"] == "02623509777"
+    )
+    return jsonify(tests), 200
+
 
 @app.route("/zalo/webhook",methods=["GET","POST"])
 def webhook():
@@ -432,10 +561,15 @@ def ai():
 
     # 2. Điều luật cụ thể: route chính xác trước mọi semantic search
     exact=exact_article_answer(question)
-    if exact:
+    locked_article = None
+
+    if isinstance(exact, str):
         if wants_contact(question):
-            exact += f" Trực ban {UNIT}: {HOTLINE}."
+            exact = finalize_answer(exact, contact_relevant=True)
         return chatbot_response(exact)
+
+    if isinstance(exact, dict) and exact.get("law") == "BLHS":
+        locked_article = exact
 
     legal=is_legal(question)
     ranked=retrieve_cards(question) if legal else []
@@ -447,9 +581,15 @@ def ai():
     try:
         answer=call_groq(question,history,legal=legal,context=context)
 
-        # Thêm số trực ban khi tình huống thực sự cần liên hệ/trình báo.
-        if wants_contact(question) and HOTLINE not in answer:
-            answer += f" Nếu cần trình báo hoặc trao đổi trực tiếp, số trực ban {UNIT}: {HOTLINE}."
+        if locked_article:
+            prefix = locked_article.get("locked_prefix", "")
+            if prefix and prefix.lower() not in answer.lower():
+                answer = prefix + " " + answer
+
+        answer = finalize_answer(
+            answer,
+            contact_relevant=wants_contact(question)
+        )
 
         with state_lock:
             conversation_history.setdefault(sid,[])
