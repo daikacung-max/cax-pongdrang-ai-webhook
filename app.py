@@ -411,20 +411,35 @@ def ask_groq(question, history):
 
     rag_context = format_rag_context(chunks_found)
 
-    web_required = (
-        needs_live_web(question, chunks_found)
-        and not contains_sensitive_data(question)
-    )
+    # V1.3: KHÔNG gọi Web Search trực tiếp trong luồng Zalo Dynamic.
+    # Lý do: Dynamic API cần phản hồi rất nhanh; web tool làm tăng lỗi/độ trễ.
+    freshness_needed = needs_live_web(question, chunks_found)
 
     system_prompt = build_system_prompt(
         question,
         legal_mode,
         rag_context,
-        web_required
+        False
     )
 
+    freshness_note = ""
+
+    if freshness_needed:
+        freshness_note = f"""
+LƯU Ý VỀ TÍNH CẬP NHẬT:
+Knowledge Base hiện được kiểm tra đến ngày {VERSION.get("as_of", "không rõ")}.
+Hãy trả lời theo Knowledge Base nếu KB có dữ liệu phù hợp.
+Nếu câu hỏi phụ thuộc thông tin có thể thay đổi sau mốc trên
+(mức phạt, lệ phí, thời hạn, thẩm quyền, biểu mẫu, văn bản mới),
+phải ghi rõ cuối câu trả lời rằng người dùng nên kiểm tra lại nguồn chính thức.
+KHÔNG tự bịa hoặc suy đoán phần chưa được KB xác nhận.
+"""
+
     messages = [
-        {"role": "system", "content": system_prompt}
+        {
+            "role": "system",
+            "content": system_prompt + "\n\n" + freshness_note
+        }
     ]
 
     messages.extend(history[-MAX_HISTORY_MESSAGES:])
@@ -439,131 +454,17 @@ def ask_groq(question, history):
         "Content-Type": "application/json",
     }
 
-    web_used = False
-    web_attempted = False
-    web_error = None
-
-    # =====================================================
-    # 1) NẾU CẦN DỮ LIỆU MỚI: THỬ COMPOUND MINI TỐI GIẢN
-    # =====================================================
-    if web_required:
-        web_attempted = True
-
-        web_payload = {
-            "model": WEB_MODEL,
-            "messages": messages,
-        }
-
-        try:
-            web_response = requests.post(
-                GROQ_URL,
-                headers=headers,
-                json=web_payload,
-                timeout=1.65
-            )
-
-            if web_response.status_code < 400:
-                web_data = web_response.json()
-
-                web_answer = (
-                    web_data.get("choices", [{}])[0]
-                    .get("message", {})
-                    .get("content", "")
-                    .strip()
-                )
-
-                if web_answer:
-                    web_used = True
-
-                    if len(web_answer) > MAX_ZALO_CHARS:
-                        web_answer = (
-                            web_answer[:MAX_ZALO_CHARS - 20].rstrip()
-                            + "\n…"
-                        )
-
-                    return web_answer, {
-                        "domains": domains,
-                        "legal_mode": legal_mode,
-                        "web_required": True,
-                        "web_attempted": True,
-                        "web_used": True,
-                        "web_error": None,
-                        "chunks": [c.get("id") for c in chunks_found],
-                    }
-
-            try:
-                err = web_response.json()
-                web_error = (
-                    err.get("error", {}).get("message")
-                    if isinstance(err, dict)
-                    else None
-                )
-            except Exception:
-                web_error = web_response.text[:250]
-
-            print(
-                "WEB SEARCH FALLBACK:",
-                web_response.status_code,
-                str(web_error)[:250],
-                flush=True
-            )
-
-        except requests.exceptions.Timeout:
-            web_error = "timeout"
-            print(
-                "WEB SEARCH FALLBACK: TIMEOUT",
-                flush=True
-            )
-
-        except Exception as e:
-            web_error = type(e).__name__
-            print(
-                "WEB SEARCH FALLBACK:",
-                type(e).__name__,
-                flush=True
-            )
-
-    # =====================================================
-    # 2) FAST MODEL + KNOWLEDGE BASE
-    #    Luôn là đường dự phòng để Zalo không bị im/lỗi.
-    # =====================================================
-
-    fallback_note = ""
-
-    if web_required and not web_used:
-        fallback_note = f"""
-LƯU Ý QUAN TRỌNG:
-Hệ thống vừa không truy xuất được web thời gian thực.
-Chỉ được trả lời từ Knowledge Base hiện có và kiến thức chắc chắn.
-Knowledge Base có mốc kiểm tra: {VERSION.get("as_of", "không rõ")}.
-Nếu câu hỏi phụ thuộc quy định mới hơn mốc này hoặc cần xác nhận hiện hành,
-hãy nói rõ cần kiểm tra lại nguồn chính thức, KHÔNG tự suy đoán.
-"""
-
-    fast_messages = [
-        {
-            "role": "system",
-            "content": system_prompt + "\n\n" + fallback_note
-        }
-    ]
-
-    fast_messages.extend(history[-MAX_HISTORY_MESSAGES:])
-    fast_messages.append({
-        "role": "user",
-        "content": question
-    })
-
-    fast_payload = {
+    payload = {
         "model": FAST_MODEL,
-        "messages": fast_messages,
-        "temperature": 0.18 if legal_mode else 0.45,
+        "messages": messages,
+        "temperature": 0.15 if legal_mode else 0.45,
         "max_completion_tokens": 300,
     }
 
     response = requests.post(
         GROQ_URL,
         headers=headers,
-        json=fast_payload,
+        json=payload,
         timeout=1.55
     )
 
@@ -605,10 +506,9 @@ hãy nói rõ cần kiểm tra lại nguồn chính thức, KHÔNG tự suy đo�
     return answer, {
         "domains": domains,
         "legal_mode": legal_mode,
-        "web_required": web_required,
-        "web_attempted": web_attempted,
+        "freshness_needed": freshness_needed,
+        "web_required": False,
         "web_used": False,
-        "web_error": web_error,
         "chunks": [c.get("id") for c in chunks_found],
     }
 
@@ -791,7 +691,7 @@ def zalo_ai():
         print(
             "AI ANSWER: SUCCESS",
             "LEGAL:", trace["legal_mode"],
-            "WEB_REQUIRED:", trace["web_required"],
+            "FRESHNESS_NEEDED:", trace.get("freshness_needed", False),
             "WEB_USED:", trace.get("web_used", False),
             "DOMAINS:", ",".join(trace["domains"]),
             "CHUNKS:", ",".join(trace["chunks"]),
