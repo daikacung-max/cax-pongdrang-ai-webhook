@@ -2,6 +2,7 @@ import unittest
 import uuid
 from unittest.mock import patch
 
+from core.llm import LLMError
 from core.service import core
 
 
@@ -24,6 +25,14 @@ class DynamicServiceTests(unittest.TestCase):
             result = core.chat(user_id, "Kết quả thương tích là 5%.", dynamic=True)
         self.assertEqual(result["_telemetry"]["fallback_reason"], "weak_answer")
         self.assertIn("5%", result["answer"])
+
+    def test_full_core_provider_error_returns_grounded_fallback(self):
+        user_id = "service-test-" + uuid.uuid4().hex
+        with patch("core.service.generate_answer", side_effect=LLMError("provider rejected")):
+            result = core.chat(user_id, "Tôi bị mất căn cước, cần làm gì?", dynamic=False)
+        self.assertEqual(result["_telemetry"]["fallback_reason"], "llm_error")
+        self.assertEqual(result["meta"]["path"], "full_core_grounded_fallback")
+        self.assertNotIn("AI Core chưa xử lý", result["answer"])
 
 
 if __name__ == "__main__":

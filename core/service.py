@@ -12,7 +12,7 @@ from core import cases
 from core.answerer import answer as generate_answer, answer_dynamic_text
 from core.history import conversation_key
 from core.intake import assess as assess_intake, prompt_hint as intake_prompt_hint
-from core.llm import LLMTimeout
+from core.llm import LLMError, LLMTimeout
 from core.planner import plan
 from core.providers import provider_name_for_model
 from core.retrieval import format_context, retrieve
@@ -203,11 +203,37 @@ class AICore:
         if ENABLE_MODEL_ESCALATION and search_plan.get("complexity") == "complex":
             model_used = ESCALATION_MODEL
 
-        with timer.stage("llm_ms"):
-            draft = generate_answer(
-                question, history, legal_context=legal_context, dynamic=False,
-                model=model_used, safety_identifier=safety_identifier, intake_hint=intake_hint,
+        try:
+            with timer.stage("llm_ms"):
+                draft = generate_answer(
+                    question, history, legal_context=legal_context, dynamic=False,
+                    model=model_used, safety_identifier=safety_identifier, intake_hint=intake_hint,
+                )
+        except (LLMTimeout, LLMError) as exc:
+            # Full Core cũng phải fail-closed như Zalo Dynamic. Không trả lỗi 500
+            # hoặc một bản nháp chưa kiểm chứng khi provider từ chối structured
+            # output/tạm thời quá hạn; chỉ trả nội dung fallback bám nguồn đã tìm được.
+            fallback_reason = "llm_timeout" if isinstance(exc, LLMTimeout) else "llm_error"
+            with timer.stage("finalize_ms"):
+                final_answer = finalize(grounded_dynamic_fallback(fallback_question, legal_units))
+            final_answer, handoff = self._record_ready_intake(user_id, intake, final_answer)
+            meta = {
+                "legal": bool(search_plan.get("is_legal")),
+                "retrieved_unit_ids": [x["id"] for x in legal_units],
+                "verified": False, "repaired": False,
+                "verification_errors": [f"full_core_fallback:{type(exc).__name__}"],
+                "dynamic": False, "path": "full_core_grounded_fallback",
+                "intake": intake,
+                "handoff": handoff,
+                **_model_meta(model_used), "models_used": models_used,
+            }
+            self._save(user_id, question, final_answer, search_plan, meta)
+            telemetry = timer.finish(
+                fallback_reason=fallback_reason,
+                model_used=model_used,
+                retrieved_unit_count=len(legal_units),
             )
+            return {"answer": final_answer, "meta": meta, "handoff": handoff, "_telemetry": telemetry}
         models_used.append(model_used)
         with timer.stage("verify_ms"):
             verification = verify(draft, legal_units) if legal_units else {
