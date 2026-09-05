@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo Trợ lý AI Công an xã Pơng Drang</title>
+  <style>
+    :root { color-scheme: light; --ink:#182638; --navy:#0b3862; --soft:#f0f5f8; --line:#d5e0e8; --me:#d9efff; --bot:#fff; --warn:#fff5dc; }
+    * { box-sizing:border-box; } body { margin:0; background:#e8eef2; color:var(--ink); font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { max-width:780px; min-height:100vh; margin:auto; background:#fff; box-shadow:0 0 30px #55708025; display:flex; flex-direction:column; }
+    header { padding:20px 22px 16px; color:#fff; background:linear-gradient(120deg,var(--navy),#12609a); }
+    h1 { margin:0; font-size:20px; } header p { margin:5px 0 0; opacity:.9; font-size:14px; }
+    .notice { margin:14px 18px 0; padding:10px 12px; background:var(--warn); border:1px solid #f0d38c; border-radius:9px; font-size:13px; }
+    #messages { flex:1; padding:18px; overflow:auto; min-height:420px; background:var(--soft); }
+    .message { max-width:88%; margin:9px 0; padding:10px 12px; border:1px solid var(--line); border-radius:14px; white-space:pre-wrap; }
+    .user { margin-left:auto; background:var(--me); border-bottom-right-radius:3px; } .assistant { background:var(--bot); border-bottom-left-radius:3px; }
+    .meta { display:inline-block; margin:0 0 3px; padding:3px 8px; border-radius:999px; background:#dcebdc; color:#245d2a; font-size:12px; }
+    .meta.intake { background:#e5ddf9; color:#543b94; } .meta.pending { background:#fde8cc; color:#8a4b08; }
+    form { display:flex; gap:8px; padding:14px 18px; border-top:1px solid var(--line); } textarea { flex:1; resize:none; min-height:48px; padding:10px; border:1px solid #aebfcd; border-radius:8px; font:inherit; } button { border:0; border-radius:8px; padding:0 16px; background:var(--navy); color:#fff; font-weight:600; cursor:pointer; }
+    footer { padding:0 18px 14px; color:#506273; font-size:12px; display:flex; justify-content:space-between; gap:12px; } a { color:inherit; }
+    @media (max-width:600px) { main { min-height:100vh; } .message { max-width:94%; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header><h1>Trợ lý AI Công an xã Pơng Drang</h1><p>Bản demo hội thoại bằng văn bản</p></header>
+    <div class="notice">Chỉ nhập dữ liệu giả lập. Đây là bản demo cục bộ, không gửi nội dung đến Zalo OA, cán bộ hoặc cơ quan xử lý.</div>
+    <section id="messages" aria-live="polite"></section>
+    <form id="chat-form"><textarea id="message" placeholder="Ví dụ: Làm VNeID mức 2 cần gì?" required></textarea><button type="submit">Gửi</button></form>
+    <footer><span id="status">Sẵn sàng tư vấn</span><button id="new-chat" type="button">Đoạn chat mới</button></footer>
+  </main>
+  <script>
+    const messages = document.getElementById('messages');
+    const form = document.getElementById('chat-form');
+    const input = document.getElementById('message');
+    const status = document.getElementById('status');
+    const newChat = document.getElementById('new-chat');
+    let sessionId = localStorage.getItem('caxDemoSession');
+    if (!sessionId) { sessionId = crypto.randomUUID(); localStorage.setItem('caxDemoSession', sessionId); }
+
+    function addMessage(role, text, label = '') {
+      if (label) { const tag = document.createElement('div'); tag.className = 'meta ' + (label.includes('tiếp nhận') ? 'intake' : label.includes('bổ sung') ? 'pending' : ''); tag.textContent = label; messages.append(tag); messages.append(document.createElement('br')); }
+      const item = document.createElement('div'); item.className = 'message ' + role; item.textContent = text; messages.append(item); messages.scrollTop = messages.scrollHeight;
+    }
+    function labelFor(data) {
+      if (data.handoff_status === 'ready_for_officer') return 'Demo: đủ thông tin để tiếp nhận';
+      if (data.handoff_status === 'needs_information') return 'Demo: cần bổ sung để tiếp nhận';
+      return 'Chỉ tư vấn';
+    }
+    async function loadHistory() {
+      const res = await fetch('/demo/api/history?session_id=' + encodeURIComponent(sessionId));
+      if (!res.ok) return;
+      const data = await res.json();
+      data.messages.forEach(item => addMessage(item.role === 'user' ? 'user' : 'assistant', item.content));
+    }
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault(); const text = input.value.trim(); if (!text) return;
+      addMessage('user', text); input.value = ''; status.textContent = 'Đang xử lý…';
+      try {
+        const res = await fetch('/demo/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id:sessionId, message:text})});
+        const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Không thể xử lý');
+        addMessage('assistant', data.answer, labelFor(data)); status.textContent = data.handoff_status === 'not_requested' ? 'Chỉ tư vấn' : 'Demo tiếp nhận theo yêu cầu';
+      } catch (err) { addMessage('assistant', 'Bản demo chưa xử lý được yêu cầu này. Anh/chị vui lòng thử lại.'); status.textContent = 'Có lỗi'; }
+    });
+    newChat.addEventListener('click', () => { sessionId = crypto.randomUUID(); localStorage.setItem('caxDemoSession', sessionId); messages.innerHTML = ''; status.textContent = 'Sẵn sàng tư vấn'; input.focus(); });
+    loadHistory();
+  </script>
+</body>
+</html>

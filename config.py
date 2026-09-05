@@ -45,3 +45,7 @@ HISTORY_HMAC_SECRET = os.getenv("HISTORY_HMAC_SECRET", "").strip()
 HISTORY_RETENTION_DAYS = int(os.getenv("HISTORY_RETENTION_DAYS", "30"))
 HISTORY_MAX_MESSAGES = int(os.getenv("HISTORY_MAX_MESSAGES", "20"))
 HISTORY_POOL_MAX_SIZE = int(os.getenv("HISTORY_POOL_MAX_SIZE", "5"))
+
+# Bản demo chỉ chạy cục bộ, tách khỏi Zalo OA và production. Mặc định tắt để
+# không vô tình công khai lịch sử hội thoại demo trên web service.
+ENABLE_DEMO_CONSOLE = os.getenv("ENABLE_DEMO_CONSOLE", "false").lower() in ("1", "true", "yes", "on")

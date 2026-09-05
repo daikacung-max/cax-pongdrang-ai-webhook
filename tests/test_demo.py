@@ -1,0 +1,49 @@
+import os
+import tempfile
+import unittest
+import uuid
+
+from app import app, ensure_legal_db
+from core import db
+from core.demo import respond
+
+
+class DemoTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        ensure_legal_db()
+
+    def test_demo_advice_does_not_enter_intake(self):
+        result = respond(str(uuid.uuid4()), "Làm VNeID mức 2 cần gì?")
+        self.assertEqual(result["mode"], "advice_only")
+        self.assertEqual(result["handoff_status"], "not_requested")
+        self.assertEqual(result["source_state"], "grounded")
+
+    def test_demo_explicit_intake_is_only_a_simulation(self):
+        result = respond(str(uuid.uuid4()), "Tôi muốn nộp hồ sơ đăng ký tạm trú.")
+        self.assertEqual(result["mode"], "intake_requested")
+        self.assertEqual(result["handoff_status"], "needs_information")
+        self.assertIn("chỗ ở", result["answer"])
+
+    def test_demo_console_is_off_by_default(self):
+        with app.test_client() as client:
+            response = client.get("/demo")
+        self.assertEqual(response.status_code, 404)
+
+    def test_demo_console_rejects_invalid_session(self):
+        original = app.view_functions["demo_console"]
+        # The route is intentionally disabled by default; test the session validator
+        # through its public API only when temporarily enabled.
+        import app as application
+        old_enabled = application.ENABLE_DEMO_CONSOLE
+        application.ENABLE_DEMO_CONSOLE = True
+        try:
+            with app.test_client() as client:
+                response = client.post("/demo/api/chat", json={"session_id": "not-a-uuid", "message": "Xin chào"})
+            self.assertEqual(response.status_code, 400)
+        finally:
+            application.ENABLE_DEMO_CONSOLE = old_enabled
+
+
+if __name__ == "__main__":
+    unittest.main()

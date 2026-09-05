@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from pathlib import Path
 import logging
 import time
@@ -15,11 +15,13 @@ from config import (
     MAX_ZALO_MESSAGES,
     TARGET_ZALO_CHARS,
     MAX_ZALO_TOTAL_CHARS,
+    ENABLE_DEMO_CONSOLE,
 )
 from core import db
 from core.ingest import import_article_index
 from core.verified_sources import ensure_verified_sources
 from core.service import core
+from core.demo import respond as demo_respond
 from core.llm import LLMTimeout
 from core.providers import provider_name_for_model
 from core.telemetry import log_zalo_latency, new_trace_id
@@ -119,6 +121,14 @@ def dynamic_response(text):
     }), 200
 
 
+def _demo_enabled():
+    return bool(ENABLE_DEMO_CONSOLE)
+
+
+def _valid_demo_session(value):
+    return bool(re.fullmatch(r"[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}", str(value or "").lower()))
+
+
 @app.route("/", methods=["GET"])
 def home():
     return f"{UNIT_NAME} - AI CORE", 200
@@ -149,7 +159,49 @@ def health():
         "escalation_model": ESCALATION_MODEL,
         "history_backend": s.get("history_backend"),
         "dynamic_mode": "single_call_grounded_verified",
+        "demo_console_enabled": _demo_enabled(),
     }), 200
+
+
+@app.route("/demo", methods=["GET"])
+def demo_console():
+    if not _demo_enabled():
+        return "Not found", 404
+    return render_template("demo.html"), 200
+
+
+@app.route("/demo/api/history", methods=["GET"])
+def demo_history():
+    if not _demo_enabled():
+        return jsonify({"error": "Not found"}), 404
+    session_id = str(request.args.get("session_id") or "").strip().lower()
+    if not _valid_demo_session(session_id):
+        return jsonify({"error": "session_id demo không hợp lệ."}), 400
+    history = db.get_history(session_id, limit=20)
+    return jsonify({
+        "messages": [
+            {"role": item["role"], "content": item["content"]}
+            for item in history if item.get("role") in ("user", "assistant")
+        ]
+    }), 200
+
+
+@app.route("/demo/api/chat", methods=["POST"])
+def demo_chat():
+    if not _demo_enabled():
+        return jsonify({"error": "Not found"}), 404
+    data = request.get_json(silent=True) or {}
+    session_id = str(data.get("session_id") or "").strip().lower()
+    message = str(data.get("message") or "").strip()
+    if not _valid_demo_session(session_id) or not message:
+        return jsonify({"error": "session_id demo và message là bắt buộc."}), 400
+    if len(message) > 1500:
+        return jsonify({"error": "Tin nhắn demo quá dài."}), 400
+    try:
+        return jsonify(demo_respond(session_id, message)), 200
+    except Exception as exc:
+        app.logger.error("Demo console error type=%s", type(exc).__name__)
+        return jsonify({"error": "Demo chưa xử lý được yêu cầu này."}), 500
 
 
 @app.route("/api/chat", methods=["POST"])
