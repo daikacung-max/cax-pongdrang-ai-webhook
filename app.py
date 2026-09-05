@@ -5,6 +5,8 @@ import re
 from config import (
     UNIT_NAME,
     HOTLINE,
+    ANSWER_MODEL,
+    DYNAMIC_ANSWER_MODEL,
     MAX_ZALO_MESSAGES,
     TARGET_ZALO_CHARS,
     MAX_ZALO_TOTAL_CHARS,
@@ -111,6 +113,9 @@ def health():
         "article_134_title": article_134[0]["title"] if article_134 else None,
         "real_conversation_api": "/api/chat",
         "zalo_dynamic_adapter": "/zalo/ai",
+        "core_answer_model": ANSWER_MODEL,
+        "dynamic_answer_model": DYNAMIC_ANSWER_MODEL,
+        "dynamic_mode": "single_call_grounded_verified",
     }), 200
 
 
@@ -125,9 +130,10 @@ def api_chat():
         result = core.chat(user_id, message, dynamic=False)
         return jsonify(result), 200
     except Exception as exc:
+        app.logger.error("AI Core API error type=%s", type(exc).__name__)
         return jsonify({
             "error": type(exc).__name__,
-            "message": str(exc),
+            "message": "AI Core chưa xử lý được yêu cầu này.",
         }), 500
 
 
@@ -160,9 +166,11 @@ def zalo_dynamic():
     try:
         result = core.chat(item["user_id"], item["text"], dynamic=True)
         return dynamic_response(result["answer"])
-    except Exception:
+    except Exception as exc:
+        # Không ghi nội dung câu hỏi hoặc dữ liệu cá nhân vào log.
+        app.logger.error("Zalo AI Core error type=%s", type(exc).__name__)
         return dynamic_response(
-            f"Trợ lý AI đang cần thêm thời gian để xử lý nội dung này. "
+            f"Trợ lý AI tạm thời chưa hoàn tất được phần phân tích. "
             f"Nếu cần trao đổi trực tiếp, người dân có thể liên hệ trực ban "
             f"{UNIT_NAME} qua số {HOTLINE}."
         )
