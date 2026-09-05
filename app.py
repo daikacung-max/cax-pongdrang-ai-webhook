@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from pathlib import Path
-from collections import deque
-from threading import Lock
+from threading import Lock, Thread
+from queue import Queue, Empty
 import json
 import os
 import re
@@ -12,36 +12,40 @@ import requests
 app = Flask(__name__)
 
 # =========================================================
-# CẤU HÌNH CHUNG
+# CẤU HÌNH
 # =========================================================
 
 BASE_DIR = Path(__file__).resolve().parent
+KB_FILE = BASE_DIR / "knowledge_base.json"
+
 GROQ_API_KEY = "".join(
     (os.getenv("GROQ_API_KEY") or "").split()
 )
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-FAST_MODEL = "openai/gpt-oss-20b"
-WEB_MODEL = "groq/compound-mini"
+# Model chất lượng cao
+AI_MODEL = "openai/gpt-oss-120b"
 
-MAX_ZALO_CHARS = 1800
-MAX_HISTORY_MESSAGES = 6
-PENDING_TTL_SECONDS = 30
+# Trí nhớ hội thoại
+MAX_HISTORY_MESSAGES = 8
 
-# Dynamic API của Zalo yêu cầu phản hồi dưới 2 giây.
-# Giữ timeout thấp để còn thời gian trả fallback.
-GROQ_TIMEOUT_SECONDS = 1.55
+# Câu trả lời Zalo: ngắn gọn, đúng trọng tâm
+MAX_ANSWER_CHARS = 1000
+
+# Worker được phép suy luận lâu hơn vì chạy ngay từ Webhook,
+# không nằm trong request Dynamic API.
+AI_TIMEOUT_SECONDS = 15.0
 
 
 # =========================================================
-# NẠP KNOWLEDGE BASE TỪ 1 FILE
+# NẠP KNOWLEDGE BASE
 # =========================================================
-
-KB_FILE = BASE_DIR / "knowledge_base.json"
 
 try:
-    KB = json.loads(KB_FILE.read_text(encoding="utf-8"))
+    KB = json.loads(
+        KB_FILE.read_text(encoding="utf-8")
+    )
 except Exception:
     KB = {}
 
@@ -55,72 +59,73 @@ SOURCES = {
 CHUNKS = KB.get("chunks", [])
 ROUTER = KB.get("router", {"rules": []})
 VERSION = KB.get("version", {})
+
 KB_SYSTEM_PROMPT = KB.get(
     "system_prompt",
-    "Bạn là Trợ lý AI Công an xã Pơng Drang. Không bịa căn cứ pháp luật."
+    "Không được bịa căn cứ pháp luật."
 )
 
 print(
-    "KB LOADED:",
-    bool(CHUNKS),
-    "CHUNKS:",
-    len(CHUNKS),
-    "SOURCES:",
-    len(SOURCES),
-    "GROQ:",
-    bool(GROQ_API_KEY),
+    "SYSTEM READY:",
+    "GROQ:", bool(GROQ_API_KEY),
+    "KB:", bool(CHUNKS),
+    "CHUNKS:", len(CHUNKS),
+    "SOURCES:", len(SOURCES),
     flush=True
 )
 
 
 # =========================================================
-# BỘ NHỚ TẠM
+# BỘ NHỚ VÀ HÀNG ĐỢI
 # =========================================================
 
-# Lưu lịch sử theo sender_id do Webhook cung cấp.
 conversation_history = {}
 
-# Hàng đợi giúp ghép câu hỏi vừa vào Webhook với lần Dynamic kế tiếp.
-# Đây an toàn hơn cách "lấy câu hỏi mới nhất toàn hệ thống",
-# nhưng vẫn chỉ là giải pháp tạm khi Zalo Dynamic không truyền user_id.
-pending_questions = deque()
+work_queue = Queue()
+completed_queue = Queue()
 
 state_lock = Lock()
 
 
 # =========================================================
-# CHUẨN HÓA VĂN BẢN / TOKEN
+# CHUẨN HÓA VĂN BẢN
 # =========================================================
 
 def normalize_text(text):
     text = str(text or "").lower().strip()
     text = unicodedata.normalize("NFD", text)
+
     text = "".join(
         ch for ch in text
         if unicodedata.category(ch) != "Mn"
     )
+
     text = text.replace("đ", "d")
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
+
     return text
 
 
 STOP_WORDS = {
-    "toi", "ban", "anh", "chi", "la", "va", "voi", "cua", "co", "khong",
-    "duoc", "cho", "ve", "thi", "the", "nao", "gi", "can", "muon", "hoi",
-    "mot", "nhung", "cac", "nay", "do", "o", "tai", "den", "tu", "khi"
+    "toi", "ban", "anh", "chi", "la", "va", "voi",
+    "cua", "co", "khong", "duoc", "cho", "ve",
+    "thi", "the", "nao", "gi", "can", "muon",
+    "hoi", "mot", "nhung", "cac", "nay", "do",
+    "o", "tai", "den", "tu", "khi"
 }
 
 
 def tokens(text):
     return {
-        w for w in normalize_text(text).split()
-        if len(w) >= 2 and w not in STOP_WORDS
+        word
+        for word in normalize_text(text).split()
+        if len(word) >= 2 and word not in STOP_WORDS
     }
 
 
 # =========================================================
-# NHẬN DIỆN LĨNH VỰC
+# PHÂN LOẠI LĨNH VỰC
 # =========================================================
 
 def detect_domains(question):
@@ -129,17 +134,22 @@ def detect_domains(question):
 
     for rule in ROUTER.get("rules", []):
         score = 0
-        for kw in rule.get("keywords", []):
-            nkw = normalize_text(kw)
-            if nkw and nkw in q:
-                score += max(2, len(nkw.split()))
+
+        for keyword in rule.get("keywords", []):
+            kw = normalize_text(keyword)
+
+            if kw and kw in q:
+                score += max(2, len(kw.split()))
 
         if score > 0:
-            matched.append((score, rule.get("domain", "")))
+            matched.append(
+                (score, rule.get("domain", ""))
+            )
 
     matched.sort(reverse=True)
 
     result = []
+
     for _, domain in matched:
         if domain and domain not in result:
             result.append(domain)
@@ -165,103 +175,140 @@ LEGAL_DOMAINS = {
 }
 
 
-def is_legal_or_police_question(question, domains):
-    if any(d in LEGAL_DOMAINS for d in domains):
+def is_legal_question(question, domains):
+    if any(domain in LEGAL_DOMAINS for domain in domains):
         return True
 
     q = normalize_text(question)
-    police_words = [
-        "cong an", "phap luat", "dieu luat", "nghi dinh", "thong tu",
-        "xu phat", "toi pham", "khoi to", "to giac", "tam tru", "can cuoc",
-        "vneid", "ma tuy", "dat dai", "dang ky xe", "pccc"
+
+    keywords = [
+        "cong an",
+        "phap luat",
+        "dieu luat",
+        "nghi dinh",
+        "thong tu",
+        "xu phat",
+        "toi pham",
+        "khoi to",
+        "to giac",
+        "tam tru",
+        "can cuoc",
+        "vneid",
+        "ma tuy",
+        "dat dai",
+        "dang ky xe",
+        "pccc",
     ]
-    return any(word in q for word in police_words)
+
+    return any(word in q for word in keywords)
 
 
 # =========================================================
-# TRUY XUẤT RAG CỤC BỘ
+# RAG — TÌM KIẾN KHO TRI THỨC
 # =========================================================
 
 def chunk_score(question, chunk, domains):
-    qn = normalize_text(question)
-    qt = tokens(question)
+    q_normalized = normalize_text(question)
+    q_tokens = tokens(question)
 
-    title = normalize_text(chunk.get("title", ""))
-    content = normalize_text(chunk.get("content", ""))
-    ck = " ".join(
+    title = normalize_text(
+        chunk.get("title", "")
+    )
+
+    content = normalize_text(
+        chunk.get("content", "")
+    )
+
+    keyword_text = " ".join(
         normalize_text(x)
         for x in chunk.get("keywords", [])
     )
 
-    ct = tokens(title + " " + ck + " " + content)
+    chunk_tokens = tokens(
+        title + " " + keyword_text + " " + content
+    )
 
     score = 0.0
 
-    # Giao nhau token
-    score += len(qt & ct) * 2.2
+    score += len(q_tokens & chunk_tokens) * 2.2
 
-    # Khớp keyword cụm
-    for kw in chunk.get("keywords", []):
-        nkw = normalize_text(kw)
-        if nkw and nkw in qn:
+    for keyword in chunk.get("keywords", []):
+        kw = normalize_text(keyword)
+
+        if kw and kw in q_normalized:
             score += 5.0
 
-    # Ưu tiên domain
     if chunk.get("domain") in domains:
         score += 5.0
 
-    # Khớp tiêu đề
-    for word in qt:
+    for word in q_tokens:
         if word in title:
             score += 0.8
 
     return score
 
 
-def retrieve_chunks(question, domains, top_k=6):
+def retrieve_chunks(question, domains, top_k=8):
     ranked = []
 
     for chunk in CHUNKS:
-        score = chunk_score(question, chunk, domains)
+        score = chunk_score(
+            question,
+            chunk,
+            domains
+        )
+
         if score > 0:
-            ranked.append((score, chunk))
+            ranked.append(
+                (score, chunk)
+            )
 
-    ranked.sort(key=lambda x: x[0], reverse=True)
+    ranked.sort(
+        key=lambda item: item[0],
+        reverse=True
+    )
 
-    return [item[1] for item in ranked[:top_k]]
+    return [
+        item[1]
+        for item in ranked[:top_k]
+    ]
 
 
 def format_rag_context(chunks_found):
-    if not chunks_found:
-        return ""
-
     blocks = []
 
-    for c in chunks_found:
+    for chunk in chunks_found:
         source_lines = []
-        for sid in c.get("source_ids", []):
-            s = SOURCES.get(str(sid))
-            if not s:
+
+        for source_id in chunk.get(
+            "source_ids",
+            []
+        ):
+            source = SOURCES.get(
+                str(source_id)
+            )
+
+            if not source:
                 continue
 
-            line = (
-                f"{sid}: {s.get('title', '')}; "
-                f"{s.get('number', '')}; "
-                f"cơ quan: {s.get('issuer', '')}; "
-                f"trạng thái: {s.get('effective_status', '')}; "
-                f"kiểm tra: {s.get('checked_at', '')}; "
-                f"URL: {s.get('url', '')}"
+            source_lines.append(
+                f"{source_id}: "
+                f"{source.get('title', '')}; "
+                f"{source.get('number', '')}; "
+                f"{source.get('issuer', '')}; "
+                f"trạng thái: "
+                f"{source.get('effective_status', '')}; "
+                f"kiểm tra: "
+                f"{source.get('checked_at', '')}"
             )
-            source_lines.append(line)
 
         blocks.append(
             "\n".join([
-                f"[CHUNK {c.get('id', '')}]",
-                f"Lĩnh vực: {c.get('domain', '')}",
-                f"Tiêu đề: {c.get('title', '')}",
-                f"Nội dung: {c.get('content', '')}",
+                f"[{chunk.get('id', '')}]",
+                f"Tiêu đề: {chunk.get('title', '')}",
+                f"Nội dung: {chunk.get('content', '')}",
                 "Nguồn:",
-                *source_lines,
+                *source_lines
             ])
         )
 
@@ -269,10 +316,10 @@ def format_rag_context(chunks_found):
 
 
 # =========================================================
-# XÁC ĐỊNH CẦN TRA WEB HAY KHÔNG
+# NHẬN BIẾT THÔNG TIN CÓ TÍNH THỜI ĐIỂM
 # =========================================================
 
-LIVE_WORDS = [
+FRESHNESS_WORDS = [
     "hom nay",
     "hien nay",
     "hien tai",
@@ -280,7 +327,6 @@ LIVE_WORDS = [
     "moi nhat",
     "cap nhat",
     "con hieu luc",
-    "co hieu luc",
     "muc phat",
     "phat bao nhieu",
     "le phi",
@@ -293,156 +339,317 @@ LIVE_WORDS = [
     "ty gia",
     "thoi tiet",
     "tin tuc",
-    "lich thi dau",
-    "ket qua bong da",
 ]
 
 
-def needs_live_web(question, chunks_found):
+def needs_freshness_warning(
+    question,
+    chunks_found
+):
     q = normalize_text(question)
 
-    if any(word in q for word in LIVE_WORDS):
+    if any(
+        word in q
+        for word in FRESHNESS_WORDS
+    ):
         return True
 
-    years = re.findall(r"\b20\d{2}\b", q)
-    if any(int(y) >= 2026 for y in years):
+    years = re.findall(
+        r"\b20\d{2}\b",
+        q
+    )
+
+    if any(
+        int(year) >= 2026
+        for year in years
+    ):
         return True
 
-    if any(c.get("requires_live_check") for c in chunks_found):
-        # Chỉ ép live nếu câu hỏi thực sự hỏi dữ kiện pháp lý cụ thể.
-        legal_detail_words = [
-            "dieu", "khoan", "diem", "muc phat", "phat", "thoi han",
-            "tham quyen", "ho so", "le phi", "hieu luc", "can cu"
+    if any(
+        chunk.get("requires_live_check")
+        for chunk in chunks_found
+    ):
+        detail_words = [
+            "dieu",
+            "khoan",
+            "diem",
+            "phat",
+            "thoi han",
+            "tham quyen",
+            "ho so",
+            "le phi",
+            "hieu luc",
+            "can cu",
         ]
-        if any(word in q for word in legal_detail_words):
+
+        if any(
+            word in q
+            for word in detail_words
+        ):
             return True
 
     return False
 
 
-def contains_sensitive_data(question):
-    q = normalize_text(question)
-
-    if any(x in q for x in ["mat khau", "password", "otp", "ma pin"]):
-        return True
-
-    # Chuỗi số dài có thể là CCCD / tài khoản / điện thoại.
-    return bool(re.search(r"\b\d{9,16}\b", str(question)))
-
-
 # =========================================================
-# XÂY PROMPT
+# PROMPT CHẤT LƯỢNG CAO
 # =========================================================
 
-GENERAL_PROMPT = """
-Bạn là Trợ lý AI đa năng của Công an xã Pơng Drang, tỉnh Đắk Lắk.
+GENERAL_STYLE_PROMPT = """
+Bạn là TRỢ LÝ AI CÔNG AN XÃ PƠNG DRANG, TỈNH ĐẮK LẮK.
 
-Ngoài các nội dung pháp luật và Công an, bạn có thể hỗ trợ kiến thức phổ thông,
-học tập, công nghệ, đời sống và soạn thảo.
+MỤC TIÊU:
+Trả lời linh hoạt tất cả câu hỏi hợp pháp như một trợ lý AI đa năng,
+nhưng giữ phong thái chuyên nghiệp, chuẩn mực, chín chắn và dễ hiểu.
 
-Khi câu hỏi thuộc lĩnh vực pháp luật/Công an:
-- ưu tiên tuyệt đối KNOWLEDGE BASE và nguồn chính thức được cung cấp;
-- không bịa điều, khoản, văn bản, mức phạt, lệ phí, thời hạn hoặc thẩm quyền;
-- nếu chưa đủ căn cứ thì nói rõ chưa đủ dữ kiện;
-- dùng văn phong chuẩn mực, chuyên nghiệp, dễ hiểu;
-- không tự kết luận một người có tội.
+PHONG CÁCH BẮT BUỘC:
+- Tiếng Việt tự nhiên, thuần thục, đúng ngữ pháp.
+- Câu chữ gọn, mạch lạc, đúng trọng tâm.
+- Không nói vòng vo, không lặp ý, không viết bài quá dài.
+- Không dùng giọng máy móc hoặc khuôn mẫu cứng nhắc.
+- Không lạm dụng tiêu đề.
+- Không mở đầu bằng lời chào ở mọi câu trả lời.
+- Không dùng quá nhiều biểu tượng.
+- Không nói “theo tôi”, “có lẽ” nếu đang trả lời nội dung pháp lý cần căn cứ.
+- Nếu câu hỏi đơn giản: trả lời thẳng trong 1–3 câu.
+- Nếu câu hỏi phức tạp: kết luận ngắn trước, sau đó tối đa 3–4 ý chính.
+- Độ dài mục tiêu khoảng 250–800 ký tự; chỉ dài hơn khi thật sự cần.
 
-Khi câu hỏi thông thường:
-- trả lời tự nhiên, hữu ích, không cần quá hành chính.
+PHONG CÁCH CÔNG AN:
+- Với nội dung thuộc pháp luật, ANTT, TTHC hoặc nghiệp vụ phục vụ Nhân dân,
+  sử dụng giọng văn chuẩn mực, rõ trách nhiệm, không đe dọa, không khoa trương.
+- Có thể dùng: “Công an xã Pơng Drang hướng dẫn như sau:” khi phù hợp,
+  nhưng không bắt buộc lặp ở mọi câu.
+- Dùng “anh/chị” khi hướng dẫn người dân.
+- Không tự nhận mình là người có thẩm quyền ra quyết định.
 
-Không yêu cầu người dùng gửi mật khẩu, OTP, PIN hoặc dữ liệu nhạy cảm không cần thiết.
+CÂU HỎI NGOÀI LĨNH VỰC CÔNG AN:
+- Vẫn trả lời bình thường về kiến thức, học tập, công nghệ, đời sống,
+  soạn thảo và các chủ đề hợp pháp khác.
+- Không ép câu trả lời phổ thông thành văn bản hành chính.
+
+CHẤT LƯỢNG:
+- Phân tích kỹ trong nội bộ trước khi trả lời.
+- Tự kiểm tra lại kết luận.
+- Không trình bày chuỗi suy luận nội bộ.
+- Chỉ xuất câu trả lời cuối cùng, súc tích và đã được kiểm tra.
 """
 
 
-def build_system_prompt(question, legal_mode, rag_context, web_required):
-    parts = [GENERAL_PROMPT]
+def build_prompt(
+    question,
+    legal_mode,
+    rag_context,
+    freshness_needed
+):
+    prompt = GENERAL_STYLE_PROMPT
 
     if legal_mode:
-        parts.append(KB_SYSTEM_PROMPT)
+        prompt += "\n\n" + KB_SYSTEM_PROMPT
+
+        prompt += """
+QUY TẮC PHÁP LÝ:
+- Ưu tiên Knowledge Base được cung cấp.
+- Không bịa điều, khoản, văn bản, mức phạt, lệ phí, thời hạn hoặc thẩm quyền.
+- Không kết luận một người có tội chỉ từ thông tin một phía.
+- Nếu thiếu dữ kiện, nói rõ dữ kiện nào cần bổ sung.
+- Khi KB có nguồn, nêu căn cứ ngắn gọn, không chép dài.
+"""
 
     if rag_context:
-        parts.append(
-            """
-DƯỚI ĐÂY LÀ KNOWLEDGE BASE ĐÃ ĐƯỢC CHUẨN HÓA.
-Chỉ sử dụng chunk có liên quan.
-Nếu kiến thức nền của bạn khác với KB, ưu tiên KB.
-Không được biến metadata nguồn thành một kết luận mà nguồn không hỗ trợ.
+        prompt += """
+\nKNOWLEDGE BASE LIÊN QUAN:
+Dữ liệu dưới đây đã được truy xuất cho câu hỏi này.
+Nếu kiến thức nền khác với dữ liệu này, ưu tiên Knowledge Base.
 """
-        )
-        parts.append(rag_context)
+        prompt += "\n" + rag_context
 
-    if web_required:
-        parts.append(
-            """
-CÂU HỎI NÀY CẦN DỮ LIỆU CẬP NHẬT.
-Hãy dùng tìm kiếm web nếu hệ thống cho phép.
-Nếu là pháp luật Việt Nam, chỉ ưu tiên nguồn chính thức.
-Kiểm tra ngày ban hành/ngày hiệu lực/văn bản sửa đổi trước khi khẳng định.
+    if freshness_needed:
+        prompt += f"""
+\nLƯU Ý TÍNH CẬP NHẬT:
+Knowledge Base được kiểm tra đến {VERSION.get('as_of', 'không rõ')}.
+Nếu câu hỏi phụ thuộc dữ liệu có thể thay đổi sau mốc này,
+chỉ khẳng định phần đã có căn cứ. Phần chưa chắc chắn phải nói rõ
+cần kiểm tra nguồn chính thức, tuyệt đối không tự đoán.
 """
-        )
 
-    return "\n\n".join(parts)
+    return prompt
 
 
 # =========================================================
-# GỌI GROQ
+# RÚT GỌN VÀ CHIA CÂU TRẢ LỜI CHO ZALO
 # =========================================================
 
-OFFICIAL_LEGAL_DOMAINS = [
-    "vanban.chinhphu.vn",
-    "chinhphu.vn",
-    "congbao.chinhphu.vn",
-    "bocongan.gov.vn",
-    "vanban.bocongan.gov.vn",
-    "dichvucong.bocongan.gov.vn",
-    "moj.gov.vn",
-    "quochoi.vn",
-]
+def smart_trim(text, max_chars=MAX_ANSWER_CHARS):
+    text = re.sub(
+        r"\n{3,}",
+        "\n\n",
+        str(text or "").strip()
+    )
 
+    if len(text) <= max_chars:
+        return text
+
+    clipped = text[:max_chars]
+
+    # Cắt ở dấu kết thúc câu gần nhất
+    positions = [
+        clipped.rfind(". "),
+        clipped.rfind("? "),
+        clipped.rfind("! "),
+        clipped.rfind("\n"),
+    ]
+
+    cut = max(positions)
+
+    if cut >= int(max_chars * 0.65):
+        clipped = clipped[:cut + 1]
+
+    return clipped.rstrip() + "…"
+
+
+def split_smooth_messages(
+    text,
+    max_messages=3,
+    target_chars=360
+):
+    """
+    Zalo Dynamic không stream token như ChatGPT.
+    Hàm này chia câu trả lời thành 1–3 bong bóng ngắn,
+    để trải nghiệm đọc mềm và tự nhiên hơn.
+    """
+    text = text.strip()
+
+    if len(text) <= target_chars:
+        return [text]
+
+    paragraphs = [
+        p.strip()
+        for p in re.split(r"\n\s*\n", text)
+        if p.strip()
+    ]
+
+    units = []
+
+    for paragraph in paragraphs:
+        if len(paragraph) <= target_chars:
+            units.append(paragraph)
+            continue
+
+        sentences = re.split(
+            r"(?<=[.!?])\s+",
+            paragraph
+        )
+
+        current = ""
+
+        for sentence in sentences:
+            candidate = (
+                sentence
+                if not current
+                else current + " " + sentence
+            )
+
+            if (
+                len(candidate) <= target_chars
+                or not current
+            ):
+                current = candidate
+            else:
+                units.append(current.strip())
+                current = sentence
+
+        if current.strip():
+            units.append(current.strip())
+
+    if len(units) <= max_messages:
+        return units
+
+    # Gộp phần còn lại vào bong bóng cuối
+    result = units[:max_messages - 1]
+    tail = " ".join(
+        units[max_messages - 1:]
+    ).strip()
+
+    result.append(
+        smart_trim(
+            tail,
+            max_chars=target_chars * 2
+        )
+    )
+
+    return result
+
+
+def chatbot_response(text):
+    parts = split_smooth_messages(
+        smart_trim(text)
+    )
+
+    return jsonify({
+        "version": "chatbot",
+        "content": {
+            "messages": [
+                {
+                    "type": "text",
+                    "text": part
+                }
+                for part in parts
+            ]
+        }
+    }), 200
+
+
+# =========================================================
+# GỌI GROQ — REASONING HIGH
+# =========================================================
 
 def ask_groq(question, history):
     domains = detect_domains(question)
-    legal_mode = is_legal_or_police_question(question, domains)
 
-    chunks_found = (
-        retrieve_chunks(question, domains, top_k=6)
-        if legal_mode else []
+    legal_mode = is_legal_question(
+        question,
+        domains
     )
 
-    rag_context = format_rag_context(chunks_found)
+    chunks_found = (
+        retrieve_chunks(
+            question,
+            domains,
+            top_k=8
+        )
+        if legal_mode
+        else []
+    )
 
-    # V1.3: KHÔNG gọi Web Search trực tiếp trong luồng Zalo Dynamic.
-    # Lý do: Dynamic API cần phản hồi rất nhanh; web tool làm tăng lỗi/độ trễ.
-    freshness_needed = needs_live_web(question, chunks_found)
+    rag_context = format_rag_context(
+        chunks_found
+    )
 
-    system_prompt = build_system_prompt(
+    freshness_needed = (
+        needs_freshness_warning(
+            question,
+            chunks_found
+        )
+    )
+
+    system_prompt = build_prompt(
         question,
         legal_mode,
         rag_context,
-        False
+        freshness_needed
     )
-
-    freshness_note = ""
-
-    if freshness_needed:
-        freshness_note = f"""
-LƯU Ý VỀ TÍNH CẬP NHẬT:
-Knowledge Base hiện được kiểm tra đến ngày {VERSION.get("as_of", "không rõ")}.
-Hãy trả lời theo Knowledge Base nếu KB có dữ liệu phù hợp.
-Nếu câu hỏi phụ thuộc thông tin có thể thay đổi sau mốc trên
-(mức phạt, lệ phí, thời hạn, thẩm quyền, biểu mẫu, văn bản mới),
-phải ghi rõ cuối câu trả lời rằng người dùng nên kiểm tra lại nguồn chính thức.
-KHÔNG tự bịa hoặc suy đoán phần chưa được KB xác nhận.
-"""
 
     messages = [
         {
             "role": "system",
-            "content": system_prompt + "\n\n" + freshness_note
+            "content": system_prompt
         }
     ]
 
-    messages.extend(history[-MAX_HISTORY_MESSAGES:])
+    messages.extend(
+        history[-MAX_HISTORY_MESSAGES:]
+    )
 
     messages.append({
         "role": "user",
@@ -450,39 +657,53 @@ KHÔNG tự bịa hoặc suy đoán phần chưa được KB xác nhận.
     })
 
     headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json",
+        "Authorization":
+            f"Bearer {GROQ_API_KEY}",
+        "Content-Type":
+            "application/json",
     }
 
     payload = {
-        "model": FAST_MODEL,
+        "model": AI_MODEL,
         "messages": messages,
-        "temperature": 0.15 if legal_mode else 0.45,
-        "max_completion_tokens": 300,
+        "temperature":
+            0.10 if legal_mode else 0.35,
+        "max_completion_tokens": 650,
+        "reasoning_effort": "high",
+        "include_reasoning": False,
     }
+
+    started = time.time()
 
     response = requests.post(
         GROQ_URL,
         headers=headers,
         json=payload,
-        timeout=1.55
+        timeout=AI_TIMEOUT_SECONDS
+    )
+
+    elapsed = round(
+        time.time() - started,
+        2
     )
 
     if response.status_code >= 400:
         try:
-            err = response.json()
-            err_message = (
-                err.get("error", {}).get("message")
-                if isinstance(err, dict)
-                else None
+            data = response.json()
+
+            error_message = (
+                data.get("error", {})
+                .get("message")
             )
         except Exception:
-            err_message = response.text[:300]
+            error_message = (
+                response.text[:300]
+            )
 
         print(
-            "GROQ API ERROR:",
+            "GROQ ERROR:",
             response.status_code,
-            str(err_message)[:300],
+            str(error_message)[:300],
             flush=True
         )
 
@@ -498,66 +719,164 @@ KHÔNG tự bịa hoặc suy đoán phần chưa được KB xác nhận.
     )
 
     if not answer:
-        raise RuntimeError("Groq không trả về nội dung")
+        raise RuntimeError(
+            "AI không trả về nội dung"
+        )
 
-    if len(answer) > MAX_ZALO_CHARS:
-        answer = answer[:MAX_ZALO_CHARS - 20].rstrip() + "\n…"
+    answer = smart_trim(answer)
 
-    return answer, {
+    trace = {
         "domains": domains,
         "legal_mode": legal_mode,
         "freshness_needed": freshness_needed,
-        "web_required": False,
-        "web_used": False,
-        "chunks": [c.get("id") for c in chunks_found],
+        "chunks": [
+            chunk.get("id")
+            for chunk in chunks_found
+        ],
+        "seconds": elapsed,
     }
 
-
-# =========================================================
-# FORMAT ZALO
-# =========================================================
-
-def chatbot_response(text):
-    return jsonify({
-        "version": "chatbot",
-        "content": {
-            "messages": [
-                {
-                    "type": "text",
-                    "text": str(text)
-                }
-            ]
-        }
-    }), 200
+    return answer, trace
 
 
 # =========================================================
-# HÀNG ĐỢI CÂU HỎI
+# WORKER AI XỬ LÝ NỀN
 # =========================================================
 
-def purge_old_pending(now=None):
-    now = now or time.time()
+def ai_worker():
+    while True:
+        item = work_queue.get()
 
-    while pending_questions:
-        first = pending_questions[0]
-        if now - first.get("time", 0) <= PENDING_TTL_SECONDS:
-            break
-        pending_questions.popleft()
+        try:
+            sender_id = item["sender_id"]
+            question = item["text"]
+
+            with state_lock:
+                history = list(
+                    conversation_history.get(
+                        sender_id,
+                        []
+                    )
+                )
+
+            answer, trace = ask_groq(
+                question,
+                history
+            )
+
+            with state_lock:
+                conversation_history.setdefault(
+                    sender_id,
+                    []
+                )
+
+                conversation_history[
+                    sender_id
+                ].extend([
+                    {
+                        "role": "user",
+                        "content": question
+                    },
+                    {
+                        "role": "assistant",
+                        "content": answer
+                    },
+                ])
+
+                conversation_history[
+                    sender_id
+                ] = conversation_history[
+                    sender_id
+                ][-MAX_HISTORY_MESSAGES:]
+
+            completed_queue.put({
+                "sender_id": sender_id,
+                "answer": answer,
+                "trace": trace,
+            })
+
+            print(
+                "AI READY:",
+                "SECONDS:",
+                trace["seconds"],
+                "LEGAL:",
+                trace["legal_mode"],
+                "FRESHNESS:",
+                trace["freshness_needed"],
+                "DOMAINS:",
+                ",".join(trace["domains"]),
+                "CHUNKS:",
+                ",".join(trace["chunks"]),
+                flush=True
+            )
+
+        except requests.exceptions.Timeout:
+            print(
+                "AI WORKER TIMEOUT",
+                flush=True
+            )
+
+            completed_queue.put({
+                "sender_id":
+                    item.get("sender_id", ""),
+                "answer":
+                    "Hệ thống đang cần thêm thời gian "
+                    "để phân tích nội dung. "
+                    "Anh/chị vui lòng thử lại sau ít giây.",
+                "trace": {},
+            })
+
+        except requests.exceptions.HTTPError as e:
+            status = (
+                e.response.status_code
+                if e.response is not None
+                else "UNKNOWN"
+            )
+
+            print(
+                "AI WORKER HTTP ERROR:",
+                status,
+                flush=True
+            )
+
+            completed_queue.put({
+                "sender_id":
+                    item.get("sender_id", ""),
+                "answer":
+                    "Trợ lý AI hiện chưa xử lý được "
+                    "nội dung này. Anh/chị vui lòng thử lại.",
+                "trace": {},
+            })
+
+        except Exception as e:
+            print(
+                "AI WORKER ERROR:",
+                type(e).__name__,
+                flush=True
+            )
+
+            completed_queue.put({
+                "sender_id":
+                    item.get("sender_id", ""),
+                "answer":
+                    "Hệ thống trợ lý đang tạm thời "
+                    "gián đoạn. Anh/chị vui lòng thử lại.",
+                "trace": {},
+            })
+
+        finally:
+            work_queue.task_done()
 
 
-def pop_pending_question():
-    with state_lock:
-        purge_old_pending()
-
-        if not pending_questions:
-            return None
-
-        # FIFO: Dynamic kế tiếp lấy câu hỏi Webhook cũ nhất đang chờ.
-        return pending_questions.popleft()
+Thread(
+    target=ai_worker,
+    daemon=True,
+    name="cax-pongdrang-ai-worker"
+).start()
 
 
 # =========================================================
-# HOME + HEALTH + KB STATUS
+# HOME / HEALTH
 # =========================================================
 
 @app.route("/", methods=["GET"])
@@ -573,10 +892,13 @@ def home():
 </head>
 <body>
 <h3>Trợ lý AI Công an xã Pơng Drang đang hoạt động</h3>
-<p>Knowledge Base RAG: active</p>
+<p>RAG Quality v1.5</p>
 </body>
 </html>
-""", 200, {"Content-Type": "text/html; charset=utf-8"}
+""", 200, {
+        "Content-Type":
+            "text/html; charset=utf-8"
+    }
 
 
 @app.route("/health", methods=["GET"])
@@ -585,157 +907,138 @@ def health():
         "status": "ok",
         "groq": bool(GROQ_API_KEY),
         "kb_loaded": bool(CHUNKS),
-        "kb_version": VERSION.get("version"),
-        "kb_as_of": VERSION.get("as_of"),
+        "kb_version":
+            VERSION.get("version"),
+        "kb_as_of":
+            VERSION.get("as_of"),
         "chunks": len(CHUNKS),
         "sources": len(SOURCES),
-        "fast_model": FAST_MODEL,
-        "web_model": WEB_MODEL,
-    }), 200
-
-
-@app.route("/kb/status", methods=["GET"])
-def kb_status():
-    return jsonify({
-        "loaded": bool(CHUNKS),
-        "name": VERSION.get("name"),
-        "version": VERSION.get("version"),
-        "as_of": VERSION.get("as_of"),
-        "next_review": VERSION.get("next_mandatory_review"),
-        "chunks": len(CHUNKS),
-        "sources": len(SOURCES),
+        "model": AI_MODEL,
+        "reasoning_effort": "high",
+        "mode": "background_reasoning",
+        "response_style":
+            "concise_police_professional",
     }), 200
 
 
 # =========================================================
-# WEBHOOK ZALO
+# ZALO WEBHOOK
 # =========================================================
 
-@app.route("/zalo/webhook", methods=["GET", "POST"])
+@app.route(
+    "/zalo/webhook",
+    methods=["GET", "POST"]
+)
 def zalo_webhook():
     if request.method == "GET":
         return "OK", 200
 
-    data = request.get_json(silent=True) or {}
+    data = (
+        request.get_json(
+            silent=True
+        ) or {}
+    )
 
-    if data.get("event_name") == "user_send_text":
-        sender = data.get("sender") or {}
-        message = data.get("message") or {}
+    if (
+        data.get("event_name")
+        == "user_send_text"
+    ):
+        sender = (
+            data.get("sender") or {}
+        )
 
-        sender_id = str(sender.get("id") or "").strip()
-        text = str(message.get("text") or "").strip()
-        msg_id = str(message.get("msg_id") or "").strip()
+        message = (
+            data.get("message") or {}
+        )
+
+        sender_id = str(
+            sender.get("id") or ""
+        ).strip()
+
+        text = str(
+            message.get("text") or ""
+        ).strip()
+
+        msg_id = str(
+            message.get("msg_id") or ""
+        ).strip()
 
         if sender_id and text:
-            item = {
+            with state_lock:
+                conversation_history.setdefault(
+                    sender_id,
+                    []
+                )
+
+            work_queue.put({
                 "sender_id": sender_id,
                 "msg_id": msg_id,
                 "text": text,
                 "time": time.time(),
-            }
+            })
 
-            with state_lock:
-                purge_old_pending()
-                pending_questions.append(item)
-                conversation_history.setdefault(sender_id, [])
-
-                # Giới hạn queue phòng lỗi
-                while len(pending_questions) > 100:
-                    pending_questions.popleft()
-
-            # Không log nội dung/PII
             print(
-                "ZALO QUESTION RECEIVED: YES",
-                "LENGTH:", len(text),
-                "QUEUE:", len(pending_questions),
+                "QUESTION RECEIVED:",
+                "YES",
+                "LENGTH:",
+                len(text),
+                "QUEUE:",
+                work_queue.qsize(),
                 flush=True
             )
 
-    return jsonify({"success": True}), 200
+    return jsonify({
+        "success": True
+    }), 200
 
 
 # =========================================================
-# DYNAMIC API -> RAG -> GROQ
+# ZALO DYNAMIC
 # =========================================================
 
-@app.route("/zalo/ai", methods=["GET", "POST"])
+@app.route(
+    "/zalo/ai",
+    methods=["GET", "POST"]
+)
 def zalo_ai():
-    item = pop_pending_question()
-
-    if not item:
-        return chatbot_response(
-            "Anh/chị vui lòng nhập nội dung cần hỗ trợ."
-        )
-
-    sender_id = item["sender_id"]
-    question = item["text"]
-
-    with state_lock:
-        history = list(
-            conversation_history.get(sender_id, [])
-        )
-
     try:
-        answer, trace = ask_groq(question, history)
+        # Dynamic chỉ lấy kết quả đã suy luận ở nền.
+        # Chờ ngắn để vẫn nằm trong giới hạn Zalo.
+        result = completed_queue.get(
+            timeout=1.20
+        )
 
-        with state_lock:
-            conversation_history.setdefault(sender_id, [])
-            conversation_history[sender_id].extend([
-                {"role": "user", "content": question},
-                {"role": "assistant", "content": answer},
-            ])
-            conversation_history[sender_id] = (
-                conversation_history[sender_id][-MAX_HISTORY_MESSAGES:]
-            )
+        answer = result.get(
+            "answer",
+            "Anh/chị vui lòng gửi lại câu hỏi."
+        )
+
+        trace = (
+            result.get("trace")
+            or {}
+        )
 
         print(
-            "AI ANSWER: SUCCESS",
-            "LEGAL:", trace["legal_mode"],
-            "FRESHNESS_NEEDED:", trace.get("freshness_needed", False),
-            "WEB_USED:", trace.get("web_used", False),
-            "DOMAINS:", ",".join(trace["domains"]),
-            "CHUNKS:", ",".join(trace["chunks"]),
+            "DYNAMIC READY:",
+            "AI_SECONDS:",
+            trace.get("seconds"),
             flush=True
         )
+
+        completed_queue.task_done()
 
         return chatbot_response(answer)
 
-    except requests.exceptions.Timeout:
-        print("AI ERROR: TIMEOUT", flush=True)
-
-        return chatbot_response(
-            "Hệ thống đang truy xuất dữ liệu cập nhật hơi lâu. "
-            "Anh/chị vui lòng gửi lại câu hỏi sau ít giây."
-        )
-
-    except requests.exceptions.HTTPError as e:
-        status = (
-            e.response.status_code
-            if e.response is not None
-            else "UNKNOWN"
-        )
-
+    except Empty:
         print(
-            "AI HTTP ERROR:",
-            status,
+            "DYNAMIC NOT READY",
             flush=True
         )
 
         return chatbot_response(
-            "Trợ lý AI hiện chưa truy xuất được dữ liệu. "
-            "Anh/chị vui lòng thử lại."
-        )
-
-    except Exception as e:
-        print(
-            "AI ERROR:",
-            type(e).__name__,
-            flush=True
-        )
-
-        return chatbot_response(
-            "Hệ thống trợ lý đang tạm thời gián đoạn. "
-            "Anh/chị vui lòng thử lại."
+            "🤖 Trợ lý AI vẫn đang phân tích "
+            "và đối chiếu thông tin. "
+            "Anh/chị vui lòng chờ thêm ít giây."
         )
 
 
@@ -744,4 +1047,7 @@ def zalo_ai():
 # =========================================================
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(
+        host="0.0.0.0",
+        port=10000
+    )
