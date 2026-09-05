@@ -37,23 +37,39 @@ def detect_document_from_hint(law_hint):
     return None
 
 
-def _domain(question, queries):
-    q = _norm(str(question or "") + " " + " ".join(str(x or "") for x in (queries or [])))
+def _detect_domain_in_text(text):
+    """Nhận diện lĩnh vực trong MỘT đoạn văn bản, ưu tiên ý định hiện tại."""
+    q = _norm(text)
+    if not q:
+        return None, None
 
-    # Cư trú được ưu tiên trước VNeID nếu câu hỏi đang nói rõ tạm trú/thường trú.
     if any(x in q for x in ["thuong tru", "dang ky thuong tru", "ho khau thuong tru", "nhap khau"]):
         return "permanent_residence", ["RESIDENCE_GUIDANCE_2026", "RESIDENCE_PERMANENT_2026"]
     if any(x in q for x in ["tam tru", "dang ky tam tru"]):
         return "temporary_residence", ["RESIDENCE_GUIDANCE_2026", "TTHC_TEMP_RESIDENCE_2026"]
-    if any(x in q for x in ["xac nhan cu tru", "xac nhan thong tin cu tru", "cu tru"]):
-        return "residence", ["RESIDENCE_GUIDANCE_2026", "RESIDENCE_PERMANENT_2026", "TTHC_TEMP_RESIDENCE_2026"]
     if any(x in q for x in ["vneid", "dinh danh dien tu", "tai khoan dinh danh", "muc do 1", "muc do 01", "muc do 2", "muc do 02"]):
         return "vneid", ["VNEID_2026", "VNEID_SIM_GUIDANCE_2026"]
     if any(x in q for x in ["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe", "cap bien so", "mua xe moi"]):
         return "vehicle", ["VEHICLE_REGISTRATION_2026"]
+    if any(x in q for x in ["xac nhan cu tru", "xac nhan thong tin cu tru", "cu tru"]):
+        return "residence", ["RESIDENCE_GUIDANCE_2026", "RESIDENCE_PERMANENT_2026", "TTHC_TEMP_RESIDENCE_2026"]
     if any(x in q for x in ["toi pham", "bo luat hinh su", "blhs", "bi danh", "danh nguoi", "thuong tich", "dung dao", "hung khi", "trom", "lua dao", "lam dung tin nhiem", "gay roi", "huy hoai", "de doa giet"]):
         return "criminal", ["BLHS_2025"]
     return None, None
+
+
+def _domain(question, queries):
+    """
+    Ý định của CÂU HIỆN TẠI được ưu tiên tuyệt đối.
+    Chỉ dùng lịch sử/planner queries khi câu hiện tại quá ngắn, ví dụ 'thì sao?', 'còn giấy tờ?'.
+    Điều này ngăn câu trước về thường trú làm câu mới về VNeID bị route nhầm sang cư trú.
+    """
+    current_domain = _detect_domain_in_text(question)
+    if current_domain[0]:
+        return current_domain
+
+    contextual = " ".join(str(x or "") for x in (queries or []))
+    return _detect_domain_in_text(contextual)
 
 
 def _priority_unit_ids(domain, question):
@@ -98,7 +114,6 @@ def _candidate_score(unit, query, query_index):
 def retrieve(plan, question):
     candidates = {}
 
-    # Điều luật nêu rõ.
     for ref in plan.get("explicit_references", []):
         article = str(ref.get("article") or "").strip()
         doc_id = detect_document_from_hint(ref.get("law_hint"))
@@ -116,7 +131,6 @@ def retrieve(plan, question):
         queries.append(question)
     domain, document_filter = _domain(question, queries)
 
-    # Các đơn vị nguồn cốt lõi của đúng lĩnh vực được nạp trước để Dynamic không chọn nhầm nguồn.
     for pos, unit_id in enumerate(_priority_unit_ids(domain, question)):
         unit = db.get_unit(unit_id)
         if unit:
