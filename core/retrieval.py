@@ -41,6 +41,35 @@ def detect_document_from_hint(law_hint):
     return None
 
 
+def _domain_document_ids(question, queries):
+    """Khoanh vùng nguồn theo lĩnh vực trước khi FTS để tránh BLHS lẫn vào TTHC và ngược lại."""
+    q = _norm(str(question or "") + " " + " ".join(str(x or "") for x in (queries or [])))
+
+    vehicle_terms = [
+        "dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe",
+        "cap bien so", "giay to dang ky xe", "mua xe moi", "dkx10",
+    ]
+    if any(x in q for x in vehicle_terms):
+        return ["VEHICLE_REGISTRATION_2026"]
+
+    residence_terms = [
+        "tam tru", "thuong tru", "cu tru", "xac nhan cu tru",
+        "xac nhan thong tin cu tru", "vneid cu tru",
+    ]
+    if any(x in q for x in residence_terms):
+        return ["RESIDENCE_GUIDANCE_2026", "TTHC_TEMP_RESIDENCE_2026"]
+
+    criminal_terms = [
+        "toi pham", "bo luat hinh su", "blhs", "bi danh", "danh nguoi",
+        "thuong tich", "dung dao", "hung khi", "trom", "lua dao",
+        "lam dung tin nhiem", "gay roi", "huy hoai", "de doa giet",
+    ]
+    if any(x in q for x in criminal_terms):
+        return ["BLHS_2025"]
+
+    return None
+
+
 def _candidate_score(unit, query, query_index):
     q = _norm(query)
     title = _norm(unit.get("title") or "")
@@ -82,12 +111,19 @@ def retrieve(plan, question):
     if question not in queries:
         queries.append(question)
 
+    document_filter = _domain_document_ids(question, queries)
+
     for query_index, query in enumerate(queries[:4]):
         fts = _fts_query(query)
         if not fts:
             continue
-        found = db.search_fts(fts, limit=max(LEGAL_TOP_K * 2, 12))
-        if not found:
+        found = db.search_fts(
+            fts,
+            limit=max(LEGAL_TOP_K * 2, 12),
+            document_ids=document_filter,
+        )
+        # LIKE fallback hiện không hỗ trợ filter theo document, vì vậy chỉ dùng khi không cần khoanh vùng.
+        if not found and document_filter is None:
             found = db.search_like(query, limit=max(LEGAL_TOP_K * 2, 12))
         for unit in found:
             entry = dict(unit)
