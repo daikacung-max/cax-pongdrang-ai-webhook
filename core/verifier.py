@@ -20,12 +20,8 @@ def _numbers(text):
 def _has_exception_structure(text):
     q = norm(text)
     markers = [
-        "hoac duoi",
-        "nhung thuoc",
-        "tru truong hop",
-        "thuoc mot trong cac truong hop",
-        "cac truong hop sau day",
-        "ngoai tru",
+        "hoac duoi", "nhung thuoc", "tru truong hop",
+        "thuoc mot trong cac truong hop", "cac truong hop sau day", "ngoai tru",
     ]
     return any(marker in q for marker in markers)
 
@@ -33,13 +29,9 @@ def _has_exception_structure(text):
 def _is_overbroad_negative(text):
     q = norm(text)
     markers = [
-        "khong thuoc pham vi",
-        "khong cau thanh",
-        "chac chan khong",
-        "khong bi xu ly hinh su",
-        "khong the bi xu ly hinh su",
-        "chi khi",
-        "chi tu",
+        "khong thuoc pham vi", "khong cau thanh", "chac chan khong",
+        "khong bi xu ly hinh su", "khong the bi xu ly hinh su",
+        "chi khi", "chi tu", "tu 11% tro len moi",
     ]
     return any(marker in q for marker in markers)
 
@@ -47,14 +39,9 @@ def _is_overbroad_negative(text):
 def _acknowledges_exception(text):
     q = norm(text)
     markers = [
-        "van co the",
-        "neu thuoc",
-        "neu khong thuoc",
-        "tru truong hop",
-        "ngoai le",
-        "chua the ket luan",
-        "con phu thuoc",
-        "tuy thuoc",
+        "van co the", "neu thuoc", "neu khong thuoc", "tru truong hop",
+        "ngoai le", "chua the ket luan", "con phu thuoc", "tuy thuoc",
+        "duoi 11% nhung", "hoac duoi 11%",
     ]
     return any(marker in q for marker in markers)
 
@@ -72,50 +59,36 @@ def verify(draft, retrieved_units):
             continue
 
         claimed_article = claim.get("article")
-        if claimed_article is not None:
-            if str(claimed_article) != str(unit.get("article") or ""):
-                errors.append(
-                    f"Điều {claimed_article} không khớp source {unit_id} "
-                    f"(source là Điều {unit.get('article')})."
-                )
-                continue
+        if claimed_article is not None and str(claimed_article) != str(unit.get("article") or ""):
+            errors.append(
+                f"Điều {claimed_article} không khớp source {unit_id} (source là Điều {unit.get('article')})."
+            )
+            continue
 
         official_title = claim.get("official_title")
         if official_title and norm(official_title) != norm(unit.get("title") or ""):
             errors.append(
-                f"Tên Điều/tội danh '{official_title}' không khớp "
-                f"tiêu đề nguồn '{unit.get('title')}'."
+                f"Tên Điều/tội danh '{official_title}' không khớp tiêu đề nguồn '{unit.get('title')}'."
             )
             continue
 
         evidence_quote = str(claim.get("evidence_quote") or "").strip()
         if not evidence_quote:
-            errors.append(
-                f"Claim '{claim.get('claim','')}' không có evidence_quote nguyên văn."
-            )
+            errors.append(f"Claim '{claim.get('claim','')}' không có evidence_quote nguyên văn.")
             continue
 
         source_text = str(unit.get("text") or "")
         if norm(evidence_quote) not in norm(source_text):
-            errors.append(
-                f"evidence_quote của claim không tồn tại nguyên văn trong source {unit_id}."
-            )
+            errors.append(f"evidence_quote của claim không tồn tại nguyên văn trong source {unit_id}.")
             continue
 
-        # Nếu claim nêu con số/ngưỡng, con số đó phải xuất hiện trong chính đoạn chứng cứ.
         claim_numbers = _numbers(claim.get("claim", ""))
         evidence_numbers = _numbers(evidence_quote)
         if claim_numbers and not claim_numbers.issubset(evidence_numbers):
             missing = sorted(claim_numbers - evidence_numbers)
-            errors.append(
-                "Claim nêu số liệu/ngưỡng không có trong evidence_quote: "
-                + ", ".join(missing)
-            )
+            errors.append("Claim nêu số liệu/ngưỡng không có trong evidence_quote: " + ", ".join(missing))
             continue
 
-        # Hàng rào chống rút gọn sai quy tắc có ngoại lệ/nhánh thay thế.
-        # Ví dụ nguồn có cấu trúc '... hoặc dưới ngưỡng nhưng thuộc trường hợp ...'
-        # thì không được kết luận tuyệt đối chỉ dựa vào ngưỡng chính.
         claim_text = str(claim.get("claim") or "")
         if (
             _is_overbroad_negative(claim_text)
@@ -123,32 +96,22 @@ def verify(draft, retrieved_units):
             and not _acknowledges_exception(claim_text)
         ):
             errors.append(
-                "Claim kết luận loại trừ quá rộng trong khi nguồn có nhánh/ngoại lệ liên quan; "
-                "phải nêu điều kiện/ngoại lệ hoặc dùng cách diễn đạt 'chưa thể kết luận'."
+                "Claim kết luận loại trừ quá rộng trong khi nguồn có nhánh/ngoại lệ liên quan."
             )
             continue
 
         verified_claims.append(claim)
 
     allowed_articles = {
-        str(unit.get("article"))
-        for unit in retrieved_units
-        if unit.get("article")
+        str(unit.get("article")) for unit in retrieved_units if unit.get("article")
     }
     cited_articles = set(
         re.findall(r"(?i)\bĐiều\s+(\d+[a-z]?)\b", draft.get("answer", ""))
     )
-    unsupported = sorted(
-        article for article in cited_articles if article not in allowed_articles
-    )
+    unsupported = sorted(article for article in cited_articles if article not in allowed_articles)
     if unsupported:
-        errors.append(
-            "Câu trả lời nêu Điều không có trong nguồn truy xuất: "
-            + ", ".join(unsupported)
-        )
+        errors.append("Câu trả lời nêu Điều không có trong nguồn truy xuất: " + ", ".join(unsupported))
 
-    # Kiểm tra cả câu trả lời cuối: nếu đang kết luận tuyệt đối nhưng nguồn truy xuất
-    # có cấu trúc ngoại lệ và câu trả lời không hề nhắc điều kiện/ngoại lệ, từ chối.
     answer_text = str(draft.get("answer") or "")
     source_blob = "\n".join(str(x.get("text") or "") for x in retrieved_units)
     if (
@@ -157,8 +120,7 @@ def verify(draft, retrieved_units):
         and not _acknowledges_exception(answer_text)
     ):
         errors.append(
-            "Câu trả lời có kết luận loại trừ tuyệt đối nhưng nguồn có ngoại lệ/nhánh thay thế; "
-            "cần sửa lại để phản ánh đầy đủ quy định."
+            "Câu trả lời có kết luận loại trừ tuyệt đối nhưng nguồn có ngoại lệ/nhánh thay thế."
         )
 
     return {
@@ -167,6 +129,69 @@ def verify(draft, retrieved_units):
         "verified_claims": verified_claims,
         "allowed_articles": sorted(allowed_articles),
     }
+
+
+def verify_dynamic_text(answer, retrieved_units):
+    """Verifier nhẹ cho Zalo Dynamic, không cần model gọi lần hai."""
+    answer = str(answer or "")
+    allowed_articles = {
+        str(unit.get("article")) for unit in retrieved_units if unit.get("article")
+    }
+    cited_articles = set(re.findall(r"(?i)\bĐiều\s+(\d+[a-z]?)\b", answer))
+    unsupported = sorted(x for x in cited_articles if x not in allowed_articles)
+
+    source_blob = "\n".join(str(x.get("text") or "") for x in retrieved_units)
+    errors = []
+    if unsupported:
+        errors.append("unsupported_articles:" + ",".join(unsupported))
+    if (
+        _is_overbroad_negative(answer)
+        and _has_exception_structure(source_blob)
+        and not _acknowledges_exception(answer)
+    ):
+        errors.append("overbroad_negative")
+
+    return {"ok": not errors, "errors": errors}
+
+
+def grounded_dynamic_fallback(question, retrieved_units):
+    """Fail-safe có nguồn, chỉ dùng khi model Dynamic timeout hoặc bị verifier từ chối."""
+    if not retrieved_units:
+        return (
+            "Tôi chưa có đủ nguồn phù hợp để khẳng định chi tiết pháp lý của tình huống này. "
+            "Anh/chị có thể mô tả thêm diễn biến và tài liệu đang có để tôi tra chính xác hơn."
+        )
+
+    top = retrieved_units[0]
+    article = str(top.get("article") or "").strip()
+    title = str(top.get("title") or "").strip()
+    source_text = str(top.get("text") or "")
+    q = norm(question)
+
+    if article == "134":
+        if ("5%" in q or "%" in q or "duoi 11" in q or "dao" in q or "hung khi" in q):
+            text = (
+                "Chưa thể kết luận rằng tỷ lệ thương tích dưới 11% thì không thuộc Điều 134 Bộ luật Hình sự. "
+                "Khoản 1 Điều 134 còn quy định trường hợp dưới 11% nhưng thuộc một trong các tình tiết luật định vẫn có thể bị xem xét."
+            )
+            if "dao" in q or "hung khi" in q:
+                text += (
+                    " Việc người kia dùng dao là dữ kiện quan trọng; cần làm rõ đặc điểm của con dao, cách sử dụng và "
+                    "việc nó có thuộc trường hợp vũ khí hoặc hung khí nguy hiểm theo tình tiết vụ việc hay không."
+                )
+            text += " Việc xử lý cụ thể còn phụ thuộc kết quả xác minh và các chứng cứ liên quan."
+            return text
+
+    if article and title:
+        return (
+            f"Nội dung anh/chị hỏi có liên quan đến Điều {article} Bộ luật Hình sự, {title}. "
+            "Tuy nhiên, cần đối chiếu đầy đủ các điều kiện và tình tiết trong điều luật với diễn biến thực tế trước khi kết luận."
+        )
+
+    return (
+        "Nguồn pháp luật đã được tìm thấy nhưng chưa đủ để đưa ra kết luận cụ thể từ dữ kiện hiện có. "
+        "Anh/chị có thể cung cấp thêm thông tin để tôi phân tích sát hơn."
+    )
 
 
 def enforce_phone_policy(text):
@@ -195,8 +220,6 @@ def clean_plain_text(text):
     for mark in ("```", "**", "__", "`", "*"):
         text = text.replace(mark, "")
     text = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", text)
-
-    # Chuẩn hóa cách gọi đơn vị/cán bộ trước khi phát ra Zalo.
     text = re.sub(
         r"(?i)đồn\s+công\s+an\s+xã\s+pơng\s+drang(?:,?\s*tỉnh\s+đắk\s+lắk)?",
         UNIT_NAME,
@@ -208,7 +231,6 @@ def clean_plain_text(text):
         text,
     )
     text = re.sub(r"(?i)nhân\s+viên\s+công\s+an", "cán bộ Công an", text)
-
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
