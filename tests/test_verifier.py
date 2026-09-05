@@ -109,6 +109,13 @@ class DynamicVerifierTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("second_person_must_be_anh_chi", result["errors"])
 
+    def test_rejects_answer_that_claims_to_be_an_officer(self):
+        result = verify_dynamic_text(
+            "Chào anh/chị, tôi là cán bộ Công an xã Pơng Drang.", [], question="Xin chào"
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("assistant_must_not_impersonate_officer", result["errors"])
+
 
 if __name__ == "__main__":
     unittest.main()

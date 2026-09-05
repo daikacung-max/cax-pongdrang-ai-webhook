@@ -43,6 +43,18 @@ def _asserts_guilt(text):
     return any(re.search(pattern, q) for pattern in patterns)
 
 
+def _impersonates_officer(text):
+    """Trợ lý phải minh bạch là AI, không tự nhận là cán bộ đang trả lời."""
+    q = norm(text)
+    patterns = [
+        r"\btoi\s+la\s+(?:mot\s+)?can\s+bo\s+(?:cong\s+an)?\b",
+        r"\btoi\s+la\s+cong\s+an\b",
+        r"\btoi\s+la\s+truc\s+ban\b",
+        r"\bcan\s+bo\s+cong\s+an\s+(?:xa\s+)?pong\s+drang\b",
+    ]
+    return any(re.search(pattern, q) for pattern in patterns)
+
+
 def _premature_fraud_label(answer, question):
     """Không gán Điều 174/tên tội danh chỉ từ lời kể bị lừa chuyển khoản."""
     q = norm(question)
@@ -181,6 +193,8 @@ def verify(draft, retrieved_units):
         errors.append("Câu trả lời nêu Điều không có trong nguồn: " + ", ".join(unsupported))
 
     answer_text = str(draft.get("answer") or "")
+    if _impersonates_officer(answer_text):
+        errors.append("assistant_must_not_impersonate_officer")
     # Cả Full Core lẫn Dynamic đều phải giữ cách xưng hô thống nhất khi nói
     # chuyện với người dân. Nếu model dùng "bạn", Full Core sẽ đi qua fallback
     # đã được kiểm chứng thay vì phát nguyên văn câu trả lời đó.
@@ -220,6 +234,8 @@ def verify_dynamic_text(answer, retrieved_units, question=""):
         errors.append("unsupported_guilt_conclusion")
     if _premature_fraud_label(answer, question):
         errors.append("premature_fraud_offence_label")
+    if _impersonates_officer(answer):
+        errors.append("assistant_must_not_impersonate_officer")
     # Giữ nhất quán cách xưng hô đã công bố của trợ lý. Nếu model lạc sang
     # "bạn", nhánh Dynamic sẽ dùng câu fallback đã bám nguồn và xưng "anh/chị".
     if re.search(r"(?i)\bbạn\s+(?:có|cần|đã|nên|muốn|hãy|vui lòng)\b", answer):
@@ -244,6 +260,8 @@ def verify_dynamic_text(answer, retrieved_units, question=""):
 
 def grounded_dynamic_fallback(question, retrieved_units):
     if not retrieved_units:
+        if norm(question) in {"xin chao", "chao", "chao ban", "hello", "hi"}:
+            return f"Xin chào! Tôi là Trợ lý AI của {UNIT_NAME}. Anh/chị cần tôi hỗ trợ nội dung gì?"
         topical_reply = clarification_for_unverified_topic(question)
         if topical_reply:
             return topical_reply

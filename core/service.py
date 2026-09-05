@@ -158,7 +158,7 @@ class AICore:
                     )
                 models_used.append(model_used)
                 with timer.stage("verify_ms"):
-                    check = verify_dynamic_text(raw_answer, legal_units, question=question) if legal_units else {"ok": True, "errors": []}
+                    check = verify_dynamic_text(raw_answer, legal_units, question=question)
                     weak = _dynamic_answer_is_weak(question, raw_answer, legal_units)
                 if check["ok"] and not weak:
                     verified = True
@@ -216,9 +216,7 @@ class AICore:
             )
         models_used.append(model_used)
         with timer.stage("verify_ms"):
-            verification = verify(draft, legal_units) if legal_units else {
-                "ok": True, "errors": [], "verified_claims": [], "allowed_articles": [],
-            }
+            verification = verify(draft, legal_units)
 
         repaired = False
         if not verification["ok"] and legal_context:
