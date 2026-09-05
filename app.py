@@ -1,19 +1,23 @@
 from flask import Flask, request, jsonify
-import json
 import os
-import requests
+import re
 import time
+import requests
+from threading import Lock
+
 
 app = Flask(__name__)
 
 
 # =========================================================
-# GROQ API
+# CẤU HÌNH
 # =========================================================
 
 GROQ_API_KEY = "".join(
     (os.getenv("GROQ_API_KEY") or "").split()
 )
+
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 print(
     "GROQ KEY LOADED:",
@@ -23,96 +27,273 @@ print(
 
 
 # =========================================================
-# LƯU TẠM CÂU HỎI MỚI NHẤT CỦA NGƯỜI DÙNG
+# BỘ NHỚ TẠM
 # =========================================================
 
+# Câu hỏi mới nhất của từng người dùng
 latest_questions = {}
 
+# Lịch sử hội thoại của từng người
+conversation_history = {}
+
+# Câu trả lời đã tạo theo msg_id
+answer_cache = {}
+
+# Người vừa gửi câu hỏi gần nhất
+latest_sender_id = None
+
+memory_lock = Lock()
+
 
 # =========================================================
-# HƯỚNG DẪN CHO AI
+# SYSTEM PROMPT
 # =========================================================
 
 SYSTEM_PROMPT = """
-Bạn là Trợ lý ảo của Công an xã Pơng Drang, tỉnh Đắk Lắk.
+Bạn là Trợ lý AI của Công an xã Pơng Drang, tỉnh Đắk Lắk.
 
-Nhiệm vụ của bạn là hỗ trợ người dân về:
-- thủ tục hành chính thuộc phạm vi Công an xã;
-- cư trú, thường trú, tạm trú;
-- căn cước;
-- tài khoản định danh điện tử VNeID;
+Bạn là một trợ lý AI đa năng, có khả năng trò chuyện tự nhiên,
+hiểu ngữ cảnh và hỗ trợ người dùng tương tự một trợ lý AI hiện đại.
+
+Bạn có thể hỗ trợ nhiều lĩnh vực:
+- thủ tục hành chính;
+- cư trú, căn cước, VNeID;
 - dịch vụ công;
-- tuyên truyền, phòng ngừa vi phạm pháp luật;
-- thông tin liên hệ và hướng dẫn chung của Công an xã.
+- pháp luật;
+- kiến thức phổ thông;
+- công nghệ;
+- học tập;
+- đời sống;
+- soạn thảo văn bản;
+- giải thích khái niệm;
+- và các câu hỏi hợp pháp khác.
 
-YÊU CẦU BẮT BUỘC:
+NGUYÊN TẮC:
 
-1. Trả lời hoàn toàn bằng tiếng Việt.
-2. Văn phong lịch sự, rõ ràng, dễ hiểu.
-3. Trả lời ngắn gọn, đi thẳng vào câu hỏi.
-4. Không tự bịa điều luật, nghị định, thông tư, lệ phí,
-   thời hạn, thành phần hồ sơ hoặc thẩm quyền giải quyết.
-5. Khi không chắc chắn về quy định pháp luật hiện hành,
-   phải nói rõ người dân cần liên hệ Công an xã để được
-   kiểm tra chính xác.
-6. Không yêu cầu người dân cung cấp mật khẩu, mã OTP,
-   mã PIN hoặc thông tin bảo mật.
-7. Không được tự kết luận một người có tội, vi phạm pháp luật
-   hoặc phải chịu trách nhiệm hình sự.
-8. Không cung cấp thông tin nghiệp vụ nội bộ của lực lượng Công an.
-9. Không hướng dẫn cách né tránh, chống đối hoặc vô hiệu hóa
-   hoạt động của cơ quan Công an.
-10. Nếu câu hỏi không liên quan đến chức năng hỗ trợ của
-    Công an xã Pơng Drang, giải thích ngắn gọn và hướng người dân
-    đến cơ quan phù hợp.
-11. Nếu chưa đủ thông tin để trả lời chính xác, hãy hỏi lại
-    một câu ngắn để làm rõ.
-12. Không khẳng định một quy định pháp luật là chính xác nếu
-    chưa có dữ liệu đáng tin cậy trong hệ thống.
+1. Trả lời bằng tiếng Việt, trừ khi người dùng yêu cầu ngôn ngữ khác.
 
-Cuối câu trả lời không cần lặp lại lời chào.
+2. Hiểu cả câu hỏi viết tắt, sai chính tả hoặc cách nói đời thường.
+
+3. Trả lời trực tiếp, rõ ràng, tự nhiên và hữu ích.
+
+4. Ghi nhớ ngữ cảnh các tin nhắn trước trong cuộc trò chuyện.
+
+5. Không bịa dữ kiện.
+
+6. Nếu được cung cấp kết quả tìm kiếm web, phải dựa vào dữ liệu đó
+   cho những thông tin có tính thời điểm.
+
+7. Đối với pháp luật, thủ tục hành chính, mức phạt, lệ phí,
+   thời hạn hoặc quy định đang có hiệu lực:
+   - ưu tiên nguồn chính thức của cơ quan Nhà nước;
+   - không khẳng định một căn cứ pháp lý nếu chưa đủ chắc chắn;
+   - phân biệt thông tin tham khảo và thông tin chính thức.
+
+8. Không yêu cầu mật khẩu, mã OTP, mã PIN hoặc dữ liệu bảo mật.
+
+9. Không tiết lộ thông tin nghiệp vụ nội bộ, bí mật Nhà nước,
+   dữ liệu cá nhân của người khác hoặc nội dung không được phép công khai.
+
+10. Không hướng dẫn hành vi phạm tội, né tránh cơ quan chức năng
+    hoặc xâm phạm quyền riêng tư.
+
+11. Nếu người dùng gửi thông tin cá nhân nhạy cảm,
+    nhắc họ không nên gửi thêm dữ liệu không cần thiết.
+
+12. Đối với câu hỏi cần dữ liệu mới, hãy nói rõ thông tin được
+    cập nhật từ web nếu đã sử dụng công cụ tìm kiếm.
+
+13. Không cần tự giới thiệu lại ở mỗi tin nhắn.
+
+14. Ưu tiên câu trả lời đủ ý nhưng không quá dài vì đang hiển thị trên Zalo.
 """
 
 
 # =========================================================
-# GỌI GROQ AI
+# NHẬN BIẾT CÂU HỎI CẦN DỮ LIỆU MỚI
 # =========================================================
 
-def ask_groq(question):
+def needs_web_search(question):
+
+    q = question.lower()
+
+    freshness_words = [
+        "hôm nay",
+        "hiện tại",
+        "bây giờ",
+        "mới nhất",
+        "vừa mới",
+        "gần đây",
+        "cập nhật",
+        "thời tiết",
+        "giá vàng",
+        "tỷ giá",
+        "giá bitcoin",
+        "giá btc",
+        "giá xăng",
+        "chứng khoán",
+        "tin tức",
+        "tin mới",
+        "kết quả bóng đá",
+        "lịch thi đấu",
+        "đang xảy ra",
+        "còn hiệu lực",
+        "đang có hiệu lực",
+        "văn bản mới",
+        "nghị định mới",
+        "thông tư mới",
+        "quy định mới",
+        "mức phạt hiện nay",
+        "mức phạt hiện tại",
+        "lệ phí hiện nay",
+        "thủ tục hiện nay"
+    ]
+
+    legal_words = [
+        "nghị định",
+        "thông tư",
+        "luật hiện hành",
+        "điều luật",
+        "mức phạt",
+        "xử phạt bao nhiêu",
+        "căn cứ pháp lý"
+    ]
+
+    for word in freshness_words + legal_words:
+        if word in q:
+            return True
+
+    # Câu hỏi có năm 2026 trở đi thường nên kiểm tra web
+    years = re.findall(r"\b20\d{2}\b", q)
+
+    for year in years:
+        if int(year) >= 2026:
+            return True
+
+    return False
+
+
+# =========================================================
+# PHÁT HIỆN DỮ LIỆU CÓ THỂ NHẠY CẢM
+# =========================================================
+
+def contains_sensitive_data(question):
+
+    q = question.lower()
+
+    dangerous_terms = [
+        "mật khẩu",
+        "password",
+        "mã otp",
+        "otp của tôi",
+        "mã pin"
+    ]
+
+    if any(term in q for term in dangerous_terms):
+        return True
+
+    # Chuỗi số dài có thể là CCCD, tài khoản, điện thoại...
+    if re.search(r"\b\d{9,16}\b", question):
+        return True
+
+    return False
+
+
+# =========================================================
+# GỌI GROQ
+# =========================================================
+
+def ask_groq(question, history=None):
 
     if not GROQ_API_KEY:
         raise Exception("GROQ_API_KEY chưa được cấu hình")
 
-    url = "https://api.groq.com/openai/v1/chat/completions"
+    if history is None:
+        history = []
+
+    messages = [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT
+        }
+    ]
+
+    # Chỉ giữ một số lượt hội thoại gần nhất
+    messages.extend(history[-8:])
+
+    messages.append({
+        "role": "user",
+        "content": question
+    })
+
+    use_web = (
+        needs_web_search(question)
+        and not contains_sensitive_data(question)
+    )
 
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Groq-Model-Version": "latest"
     }
 
-    payload = {
-        "model": "openai/gpt-oss-20b",
+    # =====================================================
+    # CHẾ ĐỘ TÌM WEB THỜI GIAN THỰC
+    # =====================================================
 
-        "messages": [
+    if use_web:
+
+        web_instruction = """
+Khi tìm web:
+- ưu tiên nguồn chính thống và nguồn gốc;
+- với pháp luật Việt Nam ưu tiên các website của Chính phủ,
+  Bộ Công an, Bộ Tư pháp, Cổng Dịch vụ công và cơ quan Nhà nước;
+- đối chiếu ngày đăng, ngày hiệu lực nếu có;
+- không coi một blog hoặc bài mạng xã hội là căn cứ pháp lý;
+- giữ nguồn/citation nếu hệ thống cung cấp.
+"""
+
+        messages.insert(
+            1,
             {
                 "role": "system",
-                "content": SYSTEM_PROMPT
-            },
-            {
-                "role": "user",
-                "content": question
+                "content": web_instruction
             }
-        ],
+        )
 
-        "temperature": 0.2,
-        "max_completion_tokens": 250
-    }
+        payload = {
+            "model": "groq/compound-mini",
+            "messages": messages,
+            "temperature": 0.25,
+            "max_completion_tokens": 350,
+            "compound_custom": {
+                "tools": {
+                    "enabled_tools": [
+                        "web_search"
+                    ]
+                }
+            }
+        }
+
+    # =====================================================
+    # CHẾ ĐỘ AI THÔNG THƯỜNG
+    # =====================================================
+
+    else:
+
+        payload = {
+            "model": "openai/gpt-oss-20b",
+            "messages": messages,
+            "temperature": 0.45,
+            "max_completion_tokens": 350,
+            "reasoning_effort": "low"
+        }
 
     response = requests.post(
-        url,
+        GROQ_URL,
         headers=headers,
         json=payload,
-        timeout=1.55
+        timeout=1.65
     )
 
     response.raise_for_status()
@@ -127,14 +308,33 @@ def ask_groq(question):
     )
 
     if not answer:
-        raise Exception("Groq không trả về nội dung")
+        raise Exception("Groq không trả nội dung")
 
-    # Giới hạn để phù hợp tin nhắn Zalo
-    return answer[:1400]
+    # Giữ tin nhắn vừa phải cho Zalo
+    return answer[:1800], use_web
 
 
 # =========================================================
-# TRANG CHỦ + XÁC MINH DOMAIN ZALO
+# FORMAT PHẢN HỒI ZALO
+# =========================================================
+
+def chatbot_response(text):
+
+    return jsonify({
+        "version": "chatbot",
+        "content": {
+            "messages": [
+                {
+                    "type": "text",
+                    "text": text
+                }
+            ]
+        }
+    }), 200
+
+
+# =========================================================
+# TRANG CHỦ + META XÁC MINH ZALO
 # =========================================================
 
 @app.route("/", methods=["GET"])
@@ -143,26 +343,17 @@ def home():
     return """
 <!doctype html>
 <html lang="vi">
-
 <head>
-<meta charset="utf-8">
-
-<meta
-name="zalo-platform-site-verification"
-content="OiMc2EZKV28O_zyYtDbQAHRNrNRweGyWD34u"
-/>
-
-<title>Trợ lý AI Công an xã Pơng Drang</title>
+    <meta charset="utf-8">
+    <meta
+        name="zalo-platform-site-verification"
+        content="OiMc2EZKV28O_zyYtDbQAHRNrNRweGyWD34u"
+    />
+    <title>Trợ lý AI Công an xã Pơng Drang</title>
 </head>
-
 <body>
-
-<h3>
-Trợ lý AI Công an xã Pơng Drang đang hoạt động
-</h3>
-
+    <h3>Trợ lý AI Công an xã Pơng Drang đang hoạt động</h3>
 </body>
-
 </html>
 """, 200, {
         "Content-Type": "text/html; charset=utf-8"
@@ -179,25 +370,27 @@ def health():
     return jsonify({
         "status": "ok",
         "groq": bool(GROQ_API_KEY),
-        "service": "CAX Pong Drang AI"
+        "service": "CAX Pong Drang AI",
+        "ai_model": "openai/gpt-oss-20b",
+        "realtime_search": "groq/compound-mini"
     }), 200
 
 
 # =========================================================
-# NHẬN WEBHOOK TỪ ZALO
+# WEBHOOK ZALO
 # =========================================================
 
 @app.route("/zalo/webhook", methods=["GET", "POST"])
 def zalo_webhook():
+
+    global latest_sender_id
 
     if request.method == "GET":
         return "OK", 200
 
     data = request.get_json(silent=True) or {}
 
-    event_name = data.get("event_name")
-
-    if event_name == "user_send_text":
+    if data.get("event_name") == "user_send_text":
 
         sender = data.get("sender") or {}
         message = data.get("message") or {}
@@ -206,30 +399,33 @@ def zalo_webhook():
             sender.get("id") or ""
         ).strip()
 
-        user_id_by_app = str(
-            data.get("user_id_by_app") or ""
-        ).strip()
-
         text = str(
             message.get("text") or ""
         ).strip()
 
-        if text:
+        msg_id = str(
+            message.get("msg_id") or ""
+        ).strip()
+
+        if sender_id and text:
 
             item = {
                 "text": text,
+                "msg_id": msg_id,
                 "time": time.time()
             }
 
-            if sender_id:
+            with memory_lock:
+
                 latest_questions[sender_id] = item
+                latest_sender_id = sender_id
 
-            if user_id_by_app:
-                latest_questions[user_id_by_app] = item
+                if sender_id not in conversation_history:
+                    conversation_history[sender_id] = []
 
+            # Không log nội dung người dân
             print(
-                "ZALO QUESTION RECEIVED:",
-                "YES",
+                "ZALO QUESTION RECEIVED: YES",
                 "LENGTH:",
                 len(text),
                 flush=True
@@ -241,49 +437,120 @@ def zalo_webhook():
 
 
 # =========================================================
-# DYNAMIC API ZALO -> GROQ
+# DYNAMIC API -> AI
 # =========================================================
 
 @app.route("/zalo/ai", methods=["GET", "POST"])
 def zalo_ai():
 
-    # Bản thử nghiệm:
-    # lấy câu hỏi mới nhất vừa nhận được từ Zalo Webhook
-    item = None
+    global latest_sender_id
 
-    if latest_questions:
-        item = max(
-            latest_questions.values(),
-            key=lambda x: x.get("time", 0)
-        )
+    body = request.get_json(silent=True) or {}
+
+    # Chỉ log cấu trúc request, không log dữ liệu người dân
+    print(
+        "DYNAMIC REQUEST:",
+        "ARGS:",
+        list(request.args.keys()),
+        "BODY_KEYS:",
+        list(body.keys()),
+        flush=True
+    )
+
+    with memory_lock:
+
+        sender_id = latest_sender_id
+
+        if sender_id:
+            item = latest_questions.get(sender_id)
+            history = list(
+                conversation_history.get(sender_id, [])
+            )
+        else:
+            item = None
+            history = []
 
     if not item:
+
         return chatbot_response(
-            "Anh/chị vui lòng nhập lại nội dung cần hỗ trợ."
+            "Anh/chị vui lòng nhập nội dung cần hỗ trợ."
         )
 
-    # Không sử dụng câu hỏi quá cũ
+    # Không dùng câu hỏi quá cũ
     if time.time() - item.get("time", 0) > 120:
+
         return chatbot_response(
             "Anh/chị vui lòng gửi lại câu hỏi để hệ thống hỗ trợ."
         )
 
     question = item.get("text", "").strip()
+    msg_id = item.get("msg_id", "")
 
     if not question:
+
         return chatbot_response(
             "Anh/chị vui lòng nhập nội dung cần hỗ trợ."
         )
 
-    try:
-        answer = ask_groq(question)
+    # Nếu Dynamic gọi lại cùng một tin nhắn
+    if msg_id:
 
-        print(
-            "GROQ ANSWER: SUCCESS",
-            flush=True
+        with memory_lock:
+            cached = answer_cache.get(msg_id)
+
+        if cached:
+            return chatbot_response(cached)
+
+    try:
+
+        answer, used_web = ask_groq(
+            question,
+            history
         )
 
+        if used_web:
+            print(
+                "GROQ ANSWER: SUCCESS + WEB SEARCH",
+                flush=True
+            )
+        else:
+            print(
+                "GROQ ANSWER: SUCCESS",
+                flush=True
+            )
+
+        with memory_lock:
+
+            conversation_history.setdefault(
+                sender_id,
+                []
+            )
+
+            conversation_history[sender_id].append({
+                "role": "user",
+                "content": question
+            })
+
+            conversation_history[sender_id].append({
+                "role": "assistant",
+                "content": answer
+            })
+
+            # Chỉ lưu 8 message gần nhất
+            conversation_history[sender_id] = (
+                conversation_history[sender_id][-8:]
+            )
+
+            if msg_id:
+                answer_cache[msg_id] = answer
+
+                # Tránh cache phình mãi
+                if len(answer_cache) > 200:
+                    first_key = next(iter(answer_cache))
+                    answer_cache.pop(first_key, None)
+
         return chatbot_response(answer)
+
 
     except requests.exceptions.Timeout:
 
@@ -293,24 +560,30 @@ def zalo_ai():
         )
 
         return chatbot_response(
-            "Hệ thống đang xử lý chậm. "
+            "Hệ thống đang truy xuất dữ liệu hơi lâu. "
             "Anh/chị vui lòng gửi lại câu hỏi sau ít giây."
         )
 
+
     except requests.exceptions.HTTPError as e:
+
+        status = (
+            e.response.status_code
+            if e.response is not None
+            else "UNKNOWN"
+        )
 
         print(
             "GROQ HTTP ERROR:",
-            e.response.status_code
-            if e.response is not None
-            else "UNKNOWN",
+            status,
             flush=True
         )
 
         return chatbot_response(
-            "Trợ lý AI hiện tạm thời chưa phản hồi được. "
+            "Trợ lý AI hiện tạm thời chưa truy xuất được dữ liệu. "
             "Anh/chị vui lòng thử lại."
         )
+
 
     except Exception as e:
 
@@ -324,22 +597,6 @@ def zalo_ai():
             "Hệ thống trợ lý đang tạm thời gián đoạn. "
             "Anh/chị vui lòng thử lại."
         )
-def chatbot_response(text):
-
-    return jsonify({
-        "version": "chatbot",
-
-        "content": {
-
-            "messages": [
-                {
-                    "type": "text",
-                    "text": text
-                }
-            ]
-
-        }
-    }), 200
 
 
 # =========================================================
