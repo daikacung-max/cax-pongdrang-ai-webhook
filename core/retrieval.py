@@ -56,6 +56,10 @@ def _detect_domain_in_text(text):
     # trong văn bản hình sự có thể làm FTS trả sai Điều luật.
     if any(x in q for x in ["can cuoc", "cccd", "can cuoc cong dan"]):
         return "identity_unverified", []
+    # Tin báo mất/trộm/đe dọa phải được ưu tiên hơn tên tài sản (như xe máy),
+    # nếu không FTS có thể kéo nhầm sang thủ tục đăng ký xe.
+    if any(x in q for x in ["bi trom", "bi de doa", "mat tai san", "mat xe", "mat dien thoai"]):
+        return "incident_report", ["BLHS_2025"]
     if any(x in q for x in ["sang ten", "cap doi"]) and any(
         x in q for x in ["xe", "dang ky xe", "bien so"]
     ):

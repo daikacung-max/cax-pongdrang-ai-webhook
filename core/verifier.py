@@ -323,6 +323,12 @@ def grounded_dynamic_fallback(question, retrieved_units):
             "ảnh chụp và thông tin tài khoản liên quan; tôi chưa thể xác định tội danh chỉ từ thông tin hiện có. "
             "Anh/chị chuyển khoản vào thời điểm nào?"
         )
+    if any(x in q for x in ["bi trom", "bi de doa", "mat tai san", "mat xe", "mat dien thoai"]):
+        return (
+            "Tôi đã ghi nhận sự việc anh/chị phản ánh. Anh/chị nên giữ lại thông tin, hình ảnh, video, tin nhắn "
+            "hoặc giấy tờ liên quan nếu có; tôi chưa thể kết luận trách nhiệm hoặc tội danh chỉ từ thông tin ban đầu. "
+            "Sự việc xảy ra khi nào và ở đâu?"
+        )
     if article and title:
         return f"Nội dung anh/chị hỏi có liên quan đến Điều {article} Bộ luật Hình sự, {title}. Cần đối chiếu đầy đủ điều kiện của điều luật với diễn biến thực tế trước khi kết luận."
     return "Nguồn phù hợp đã được tìm thấy nhưng dữ kiện hiện có chưa đủ để kết luận chi tiết. Anh/chị có thể bổ sung tình huống cụ thể để tôi phân tích tiếp theo đúng nguồn."

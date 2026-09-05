@@ -15,9 +15,15 @@ def _no_source_answer(intake):
         )
     if intake.get("procedure_code") == "lost_document":
         return (
-            "Tôi đã ghi nhận anh/chị bị mất thẻ Căn cước hoặc giấy tờ. "
+            "Tôi đã ghi nhận anh/chị bị mất thẻ Căn cước, giấy tờ hoặc tài sản. "
             "Kho dữ liệu demo chưa có nguồn thủ tục cấp lại đã được kiểm chứng cho đúng trường hợp, "
             "nên tôi chưa thể khẳng định giấy tờ, thời hạn hoặc điểm tiếp nhận."
+        )
+    if intake.get("procedure_code") == "crime_report":
+        return (
+            "Tôi đã ghi nhận anh/chị muốn trình báo hoặc thông tin về một sự việc. "
+            "Tôi chưa thể kết luận trách nhiệm hay tội danh chỉ từ nội dung ban đầu. "
+            "Sự việc xảy ra khi nào và ở đâu?"
         )
     if intake.get("procedure_code") == "vehicle_registration":
         return (

@@ -76,7 +76,7 @@ PROCEDURES = (
         "name": "Tố giác, tin báo về tội phạm",
         "queue": "CRIME_INTAKE",
         "source_ready": True,
-        "keywords": ("to giac", "tin bao toi pham", "trinh bao toi pham", "bi de doa", "bi trom"),
+        "keywords": ("to giac", "tin bao toi pham", "trinh bao toi pham", "bi de doa", "de doa", "bi trom"),
         "fields": (
             ("incident_type", "sự việc chính anh/chị muốn trình báo là gì", ("lua dao", "danh", "de doa", "trom", "mat")),
             ("time_place", "sự việc xảy ra khi nào và ở đâu", ("hom nay", "hom qua", "ngay", "tai", "o " , "luc")),
@@ -109,7 +109,7 @@ PROCEDURES = (
         "name": "Trình báo mất giấy tờ hoặc tài sản",
         "queue": "ADMIN_INTAKE",
         "source_ready": False,
-        "keywords": ("mat giay to", "mat can cuoc", "mat cccd", "mat tai san", "that lac"),
+        "keywords": ("mat giay to", "mat can cuoc", "mat cccd", "mat tai san", "mat dien thoai", "mat xe", "that lac"),
         "fields": (
             ("lost_item", "anh/chị bị mất loại giấy tờ hoặc tài sản nào", ("can cuoc", "cccd", "giay", "tai san", "dien thoai", "xe")),
             ("time_place", "anh/chị mất vào khi nào và ở khu vực nào", ("hom nay", "hom qua", "ngay", "tai", "o ", "luc")),
@@ -163,8 +163,16 @@ def assess(question, history):
             "next_question": None,
         }
 
-    # Ưu tiên nhóm cụ thể hơn nhóm tố giác chung khi cùng xuất hiện trong mạch chat.
-    chosen = max(matches, key=lambda item: (len(item["keywords"]), item["source_ready"]))
+    by_code = {item["code"]: item for item in matches}
+    # Tin báo sự việc luôn ưu tiên hơn thủ tục có cùng tên tài sản (ví dụ mất xe
+    # không phải là yêu cầu đăng ký xe). Những nhánh cụ thể vẫn ưu tiên tiếp.
+    if any(x in text for x in ("bi trom", "bi de doa", "de doa")) and "crime_report" in by_code:
+        chosen = by_code["crime_report"]
+    elif any(x in text for x in ("mat dien thoai", "mat xe", "mat tai san")) and "lost_document" in by_code:
+        chosen = by_code["lost_document"]
+    else:
+        # Ưu tiên nhóm cụ thể hơn nhóm tố giác chung khi cùng xuất hiện trong mạch chat.
+        chosen = max(matches, key=lambda item: (len(item["keywords"]), item["source_ready"]))
     missing = [field for field in chosen["fields"] if not any(cue in text for cue in field[2])]
     intake_requested = _requests_intake(question, text)
     if not intake_requested:

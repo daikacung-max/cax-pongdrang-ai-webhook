@@ -50,6 +50,17 @@ class DemoTests(unittest.TestCase):
         self.assertIn("sang tên", result["answer"])
         self.assertNotIn("ĐKX10", result["answer"])
 
+    def test_theft_of_motorcycle_is_not_vehicle_registration(self):
+        result = respond(str(uuid.uuid4()), "Tôi bị trộm mất xe máy.")
+        self.assertIn("Sự việc xảy ra khi nào và ở đâu", result["answer"])
+        self.assertNotIn("ĐKX10", result["answer"])
+        self.assertNotIn("Điều 173", result["answer"])
+
+    def test_threat_report_is_not_a_generic_menu(self):
+        result = respond(str(uuid.uuid4()), "Tôi bị người khác đe dọa.")
+        self.assertIn("Sự việc xảy ra khi nào và ở đâu", result["answer"])
+        self.assertNotIn("Anh/chị cần tôi hỗ trợ nội dung nào", result["answer"])
+
     def test_demo_console_is_off_by_default(self):
         with app.test_client() as client:
             response = client.get("/demo")
