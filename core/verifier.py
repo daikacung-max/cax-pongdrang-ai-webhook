@@ -292,6 +292,13 @@ def grounded_dynamic_fallback(question, retrieved_units):
             "Thông tin, giấy tờ đã có trong cơ sở dữ liệu hoặc VNeID không được yêu cầu nộp lại; nếu dữ liệu chưa khai thác được thì có thể cần xuất trình giấy tờ gốc để đối chiếu khi thực sự cần thiết."
         )
 
+    if any(unit.get("document_id") == "VEHICLE_TRANSFER_LOCAL_2026" for unit in retrieved_units):
+        return (
+            "Sang tên xe thực hiện tại Công an cấp xã được phân cấp đăng ký xe, nên cần xác nhận điểm tiếp nhận cụ thể tại địa phương. "
+            "Chủ xe đang đứng tên làm thủ tục thu hồi trước, sau đó người nhận chuyển nhượng đăng ký sang tên; hồ sơ gồm giấy khai đăng ký xe, giấy tờ của chủ xe, chứng từ chuyển quyền sở hữu, chứng từ lệ phí trước bạ và chứng nhận thu hồi. "
+            "Hai bước cấp chứng nhận không quá 02 ngày làm việc khi hồ sơ hợp lệ. Anh/chị là người đang đứng tên xe hay người nhận chuyển nhượng?"
+        )
+
     if _has_vehicle_source(retrieved_units) and any(x in q for x in ["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so"]):
         return (
             "Đối với đăng ký lần đầu xe mô tô, xe gắn máy, hồ sơ cơ bản gồm Giấy khai đăng ký xe theo mẫu ĐKX10, giấy tờ của chủ xe và giấy tờ của xe; "

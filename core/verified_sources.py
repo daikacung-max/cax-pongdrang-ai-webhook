@@ -395,6 +395,21 @@ def ensure_verified_sources():
         },
     ])
 
+    db.upsert_document({
+        "id": "VEHICLE_TRANSFER_LOCAL_2026", "title": "Đăng ký sang tên, di chuyển xe tại Công an cấp xã được phân cấp đăng ký xe",
+        "number": "Mã thủ tục 1.010912", "issuer": "Bộ Công an", "effective_from": None,
+        "source_path": "https://dichvucong.bocongan.gov.vn/bocongan/bothutuc/tthc?matt=43480", "sha256": None,
+        "metadata": {"checked": "2026-09-05", "official": True},
+    })
+    db.replace_document_units("VEHICLE_TRANSFER_LOCAL_2026", [
+        {"id": "VEHICLE_TRANSFER_LOCAL_2026:scope", "unit_type": "procedure", "title": "Phạm vi và trình tự sang tên xe",
+         "text": "Thủ tục đăng ký sang tên, di chuyển xe thực hiện tại Công an cấp xã được phân cấp đăng ký xe. Khi chuyển quyền sở hữu xe, chủ xe làm thủ tục thu hồi chứng nhận đăng ký xe, biển số xe; người nhận chuyển quyền sở hữu sau đó làm thủ tục đăng ký sang tên tại cơ quan đăng ký xe theo quy định."},
+        {"id": "VEHICLE_TRANSFER_LOCAL_2026:documents", "unit_type": "procedure", "title": "Hồ sơ đăng ký sang tên xe",
+         "text": "Người nhận chuyển quyền sở hữu đưa xe đến để kiểm tra và nộp: Giấy khai đăng ký xe; giấy tờ của chủ xe; chứng từ chuyển quyền sở hữu xe; chứng từ lệ phí trước bạ xe; chứng nhận thu hồi chứng nhận đăng ký xe, biển số xe."},
+        {"id": "VEHICLE_TRANSFER_LOCAL_2026:time", "unit_type": "procedure", "title": "Thời hạn giải quyết sang tên xe",
+         "text": "Cấp chứng nhận thu hồi đăng ký, biển số xe và cấp chứng nhận đăng ký xe đều không quá 02 ngày làm việc kể từ khi nhận đủ hồ sơ hợp lệ. Chủ xe đứng tên có 30 ngày từ ngày làm giấy tờ chuyển quyền sở hữu để làm thủ tục thu hồi."},
+    ])
+
     # ------------------------------------------------------------------
     # 4) TỐ GIÁC, TIN BÁO VỀ TỘI PHẠM
     # ------------------------------------------------------------------

@@ -16,10 +16,11 @@ class DomainBoundaryTests(unittest.TestCase):
         self.assertTrue(units)
         self.assertTrue(all(unit["document_id"] == "CITIZEN_ID_REISSUE_PROVINCIAL_2026" for unit in units))
 
-    def test_vehicle_transfer_cannot_use_first_registration_source(self):
+    def test_vehicle_transfer_uses_its_own_source_not_first_registration(self):
         question = "Tôi muốn sang tên xe máy"
         units = retrieve(plan(question, [], dynamic=True), question)
-        self.assertEqual(units, [])
+        self.assertTrue(units)
+        self.assertTrue(all(unit["document_id"] == "VEHICLE_TRANSFER_LOCAL_2026" for unit in units))
 
     def test_theft_of_motorcycle_cannot_use_vehicle_registration_source(self):
         question = "Tôi bị trộm mất xe máy"

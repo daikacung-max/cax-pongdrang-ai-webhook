@@ -71,7 +71,9 @@ def _detect_domain_in_text(text):
     # nếu không FTS có thể kéo nhầm sang thủ tục đăng ký xe.
     if any(x in q for x in ["bi trom", "bi de doa", "mat tai san", "mat xe", "mat dien thoai"]):
         return "incident_report", ["BLHS_2025"]
-    if any(x in q for x in ["sang ten", "cap doi"]) and any(
+    if "sang ten" in q and any(x in q for x in ["xe", "dang ky xe", "bien so"]):
+        return "vehicle_transfer", ["VEHICLE_TRANSFER_LOCAL_2026"]
+    if "cap doi" in q and any(
         x in q for x in ["xe", "dang ky xe", "bien so"]
     ):
         return "vehicle_unverified", []
@@ -143,6 +145,8 @@ def _priority_unit_ids(domain, question):
         ]
     if domain == "vehicle":
         return ["VEHICLE_REGISTRATION_2026:first_registration_documents", "VEHICLE_REGISTRATION_2026:authority"]
+    if domain == "vehicle_transfer":
+        return ["VEHICLE_TRANSFER_LOCAL_2026:scope", "VEHICLE_TRANSFER_LOCAL_2026:documents", "VEHICLE_TRANSFER_LOCAL_2026:time"]
     return []
 
 

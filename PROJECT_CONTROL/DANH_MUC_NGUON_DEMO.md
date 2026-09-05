@@ -12,7 +12,7 @@ Ngày kiểm tra: 2026-09-05. Chỉ mục có trạng thái **Đang dùng** mớ
 | Đăng ký tạm trú | Đang dùng | Cổng DVC Bộ Công an và quy định cư trú hiện hành |
 | Đăng ký thường trú | Đang dùng | Cổng DVC Bộ Công an và quy định cư trú hiện hành |
 | Đăng ký xe mô tô, xe gắn máy lần đầu | Đang dùng | Nguồn Bộ Công an trong kho pháp luật |
-| Sang tên/di chuyển xe | Chờ rà soát hiệu lực | Cần rà soát thủ tục địa phương được phân cấp và văn bản còn hiệu lực |
+| Sang tên/di chuyển xe | Đang dùng có điều kiện | Cổng DVC Bộ Công an, thủ tục 1.010912; chỉ tại Công an xã được phân cấp đăng ký xe |
 | Tố giác, tin báo về tội phạm | Đang dùng | Hướng dẫn Bộ Công an từ 01/03/2025 |
 | Hành hung/thương tích, bảo toàn chứng cứ | Đang dùng có giới hạn | Điều 134 và quy tắc an toàn; không kết luận tội phạm |
 | Lừa đảo chuyển khoản | Chờ nguồn chi tiết | Chỉ hướng dẫn bảo toàn chứng cứ/chuyển cán bộ sau khi nguồn được duyệt |
@@ -23,4 +23,5 @@ Nguồn được thêm trong đợt này:
 - [Căn cước dưới 14 tuổi, thủ tục 1.014062](https://dichvucong.bocongan.gov.vn/public/link-to/chi-tiet-thu-tuc?ma-thu-tuc=122156)
 - [Cấp lại thẻ căn cước tại cấp tỉnh, thủ tục 2.001194](https://dichvucong.bocongan.gov.vn/bocongan/bothutuc/tthc?matt=26093)
 - [Cấp thẻ Căn cước từ đủ 14 tuổi tại cấp tỉnh, thủ tục 2.000200](https://dichvucong.bocongan.gov.vn/public/link-to/chi-tiet-thu-tuc?ma-thu-tuc=26052)
+- [Đăng ký sang tên, di chuyển xe tại Công an cấp xã được phân cấp, thủ tục 1.010912](https://dichvucong.bocongan.gov.vn/bocongan/bothutuc/tthc?matt=43480)
 - [Hướng dẫn tố giác, báo tin về tội phạm từ 01/03/2025](https://bocongan.gov.vn/bai-viet/huong-dan-to-giac-bao-tin-ve-toi-pham-kien-nghi-khoi-to-tu-ngay-0132025-d2-t43729)

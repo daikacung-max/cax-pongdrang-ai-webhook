@@ -28,7 +28,7 @@ class DemoAcceptanceTests(unittest.TestCase):
             ("Đăng ký thường trú cần gì?", "advice_only", "not_requested", "07 ngày làm việc"),
             ("Tôi thuê nhà, muốn đăng ký thường trú", "advice_only", "not_requested", "nhà thuê"),
             ("Đăng ký xe máy mới cần gì?", "advice_only", "not_requested", "ĐKX10"),
-            ("Tôi muốn sang tên xe máy", "advice_only", "not_requested", "chưa có nguồn"),
+            ("Tôi muốn sang tên xe máy", "advice_only", "not_requested", "Công an cấp xã được phân cấp"),
             ("Con tôi 10 tuổi cần làm căn cước", "advice_only", "not_requested", "dưới 14 tuổi"),
             ("Tôi bị mất căn cước", "advice_only", "not_requested", "Công an cấp tỉnh"),
             ("Thẻ căn cước của tôi bị hư hỏng", "advice_only", "not_requested", "Công an cấp tỉnh"),

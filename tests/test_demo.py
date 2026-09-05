@@ -45,11 +45,11 @@ class DemoTests(unittest.TestCase):
         self.assertIn("chưa thể xác định tội danh", result["answer"])
         self.assertNotIn("Điều 174", result["answer"])
 
-    def test_vehicle_transfer_does_not_borrow_new_vehicle_procedure(self):
+    def test_vehicle_transfer_uses_its_own_verified_procedure(self):
         result = respond(str(uuid.uuid4()), "Tôi muốn sang tên xe máy.")
-        self.assertEqual(result["source_state"], "no_source")
+        self.assertEqual(result["source_state"], "grounded")
         self.assertIn("sang tên", result["answer"])
-        self.assertNotIn("ĐKX10", result["answer"])
+        self.assertIn("Công an cấp xã được phân cấp", result["answer"])
 
     def test_theft_of_motorcycle_is_not_vehicle_registration(self):
         result = respond(str(uuid.uuid4()), "Tôi bị trộm mất xe máy.")
