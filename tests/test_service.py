@@ -15,6 +15,16 @@ class DynamicServiceTests(unittest.TestCase):
         self.assertNotIn("Điều 148", result["answer"])
         self.assertTrue(any("134" in unit_id for unit_id in result["meta"]["retrieved_unit_ids"]))
 
+    def test_article_134_new_injury_percentage_is_not_ignored(self):
+        user_id = "service-test-" + uuid.uuid4().hex
+        with patch(
+            "core.service.answer_dynamic_text",
+            return_value="Anh/chị có thể cho biết người đã đánh là ai không?",
+        ):
+            result = core.chat(user_id, "Kết quả thương tích là 5%.", dynamic=True)
+        self.assertEqual(result["_telemetry"]["fallback_reason"], "weak_answer")
+        self.assertIn("5%", result["answer"])
+
 
 if __name__ == "__main__":
     unittest.main()

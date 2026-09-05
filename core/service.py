@@ -38,7 +38,20 @@ def _has_doc_prefix(units, prefix):
 
 def _dynamic_answer_is_weak(question, answer, legal_units):
     """Chỉ buộc fallback khi model bỏ qua nguồn hoặc đưa hướng dẫn TTHC rủi ro."""
+    q = norm(question)
     a = norm(answer)
+
+    if any(str(x.get("article") or "") == "134" for x in legal_units):
+        # Dữ kiện mới ở chuỗi hành hung phải được nhắc đúng; nếu không, dùng câu
+        # fallback đã bám nguồn thay vì hỏi lại một thông tin vừa được người dân nêu.
+        if "%" in q and "%" not in a:
+            return True
+        if "dao" in q and "dao" not in a:
+            return True
+        if any(x in q for x in ["camera", "video", "clip", "ghi hinh"]) and not any(
+            x in a for x in ["camera", "video", "clip", "ghi hinh"]
+        ):
+            return True
 
     if _has_doc_prefix(legal_units, "VNEID_"):
         weak = [

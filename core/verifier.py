@@ -259,8 +259,14 @@ def grounded_dynamic_fallback(question, retrieved_units):
     article = str(top.get("article") or "").strip()
     title = str(top.get("title") or "").strip()
     if article == "134" and any(x in q for x in ["5%", "%", "duoi 11", "dao", "hung khi"]):
+        injury = re.search(r"\b\d+(?:[.,]\d+)?%", str(question or ""))
+        acknowledgement = (
+            f"Anh/chị cho biết tỷ lệ thương tích là {injury.group(0)}. "
+            if injury else ""
+        )
         text = (
-            "Chưa thể kết luận rằng tỷ lệ thương tích dưới 11% thì không thuộc Điều 134 Bộ luật Hình sự. "
+            acknowledgement
+            + "Chưa thể kết luận rằng tỷ lệ thương tích dưới 11% thì không thuộc Điều 134 Bộ luật Hình sự. "
             "Khoản 1 Điều 134 còn quy định trường hợp dưới 11% nhưng thuộc một trong các tình tiết luật định vẫn có thể bị xem xét."
         )
         if "dao" in q or "hung khi" in q:
