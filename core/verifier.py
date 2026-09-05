@@ -54,18 +54,34 @@ def _has_residence_source(retrieved_units):
 
 
 def _unsafe_residence_requirements(answer):
-    """Các cụm từng bị model tự bịa thành thành phần hồ sơ/đầu mối giải quyết."""
     q = norm(answer)
     risky = [
-        "so ho khau",
-        "ban sao cmnd",
-        "ban sao cccd",
-        "giay khai sinh",
-        "thu moi",
-        "giay phep su dung nha",
-        "giay chung minh quan he",
-        "phong dang ky dan cu",
-        "cap giay tam tru",
+        "so ho khau", "ban sao cmnd", "ban sao cccd", "giay khai sinh",
+        "thu moi", "giay phep su dung nha", "giay chung minh quan he",
+        "phong dang ky dan cu", "cap giay tam tru",
+    ]
+    return [x for x in risky if x in q]
+
+
+def _has_vehicle_source(retrieved_units):
+    return any(
+        str(x.get("document_id") or "") == "VEHICLE_REGISTRATION_2026"
+        for x in retrieved_units
+    )
+
+
+def _unsafe_vehicle_requirements(answer):
+    """Chặn các giấy tờ/cách gọi đã từng bị model tự bịa trong hướng dẫn đăng ký xe mô tô."""
+    q = norm(answer)
+    risky = [
+        "giay kiem dinh ky thuat",
+        "kiem dinh ky thuat xe",
+        "bao hiem trach nhiem dan su",
+        "bdtds",
+        "phong dang ky xe cua cong an xa",
+        "don dang ky xe",
+        "the dang ky xe",
+        "nhan vien dang ky xe",
     ]
     return [x for x in risky if x in q]
 
@@ -148,6 +164,11 @@ def verify(draft, retrieved_units):
         if risky:
             errors.append("Câu trả lời tự thêm thành phần/đầu mối cư trú không được nguồn hiện hành hỗ trợ: " + ", ".join(risky))
 
+    if _has_vehicle_source(retrieved_units):
+        risky = _unsafe_vehicle_requirements(answer_text)
+        if risky:
+            errors.append("Câu trả lời tự thêm giấy tờ/cách gọi đăng ký xe không được nguồn hiện hành hỗ trợ: " + ", ".join(risky))
+
     return {
         "ok": not errors,
         "errors": errors,
@@ -181,26 +202,38 @@ def verify_dynamic_text(answer, retrieved_units):
         if risky:
             errors.append("unsupported_residence_requirements:" + ",".join(risky))
 
+    if _has_vehicle_source(retrieved_units):
+        risky = _unsafe_vehicle_requirements(answer)
+        if risky:
+            errors.append("unsupported_vehicle_requirements:" + ",".join(risky))
+
     return {"ok": not errors, "errors": errors}
 
 
 def grounded_dynamic_fallback(question, retrieved_units):
-    """Fail-safe có nguồn, dùng khi model Dynamic timeout hoặc bị verifier từ chối."""
+    """Fail-safe dựng từ nguồn cục bộ khi model Dynamic timeout, lỗi hoặc bị verifier từ chối."""
     if not retrieved_units:
         return (
-            "Kho dữ liệu hiện chưa có nguồn đã kiểm chứng đủ gần để tôi khẳng định chi tiết pháp lý của nội dung này. "
+            "Kho dữ liệu hiện chưa có nguồn đã kiểm chứng đủ gần để tôi khẳng định chi tiết của nội dung này. "
             "Tôi sẽ không tự đoán giấy tờ, điều luật, mức phạt hoặc thẩm quyền khi chưa có nguồn phù hợp."
         )
 
     q = norm(question)
 
-    # Fallback cư trú hiện hành: dựng hoàn toàn từ snapshot chính thức đã nạp.
     if _has_residence_source(retrieved_units) and "tam tru" in q:
         return (
             "Hiện nay thủ tục đăng ký tạm trú được thực hiện tại Công an cấp xã hoặc trực tuyến; thời hạn giải quyết là 03 ngày làm việc. "
-            "Theo quy định cư trú áp dụng từ 01/07/2026, khi nộp trực tiếp, công dân cung cấp thông tin cơ bản và thông tin về điều kiện đăng ký; "
-            "cán bộ tiếp nhận chủ động khai thác dữ liệu để tạo lập hồ sơ. Những thông tin, giấy tờ đã có trong cơ sở dữ liệu hoặc VNeID không được yêu cầu nộp lại; "
-            "nếu chưa khai thác được dữ liệu thì có thể cần xuất trình giấy tờ gốc để đối chiếu khi thực sự cần thiết."
+            "Khi nộp trực tiếp, công dân cung cấp thông tin cơ bản và thông tin về điều kiện đăng ký; cán bộ tiếp nhận chủ động khai thác dữ liệu để tạo lập hồ sơ. "
+            "Những thông tin, giấy tờ đã có trong cơ sở dữ liệu hoặc VNeID không được yêu cầu nộp lại; nếu chưa khai thác được dữ liệu thì có thể cần xuất trình giấy tờ gốc để đối chiếu khi thực sự cần thiết."
+        )
+
+    if _has_vehicle_source(retrieved_units) and any(x in q for x in ["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so"]):
+        return (
+            "Đối với đăng ký lần đầu xe mô tô, xe gắn máy, nguồn chính thức Bộ Công an hiện hành xác định hồ sơ cơ bản gồm Giấy khai đăng ký xe theo mẫu ĐKX10, giấy tờ của chủ xe và giấy tờ của xe; "
+            "giấy tờ của xe gồm chứng nhận nguồn gốc xe, chứng nhận quyền sở hữu hợp pháp và chứng từ hoàn thành nghĩa vụ tài chính. "
+            "Bộ hồ sơ chung này không liệt kê giấy kiểm định kỹ thuật xe mô tô hoặc bảo hiểm trách nhiệm dân sự là giấy tờ đăng ký bắt buộc. "
+            "Từ 01/07/2025, tổ chức, cá nhân trong nước được lựa chọn đăng ký tại Phòng Cảnh sát giao thông hoặc Công an cấp xã trong tỉnh, thành phố theo quy định và tổ chức thực tế của địa phương. "
+            f"Nếu cần xác nhận Công an xã Pơng Drang, tỉnh Đắk Lắk có tiếp nhận trực tiếp trường hợp cụ thể của anh/chị, vui lòng gọi số trực ban {HOTLINE}."
         )
 
     top = retrieved_units[0]
@@ -270,6 +303,7 @@ def clean_plain_text(text):
         text,
     )
     text = re.sub(r"(?i)nhân\s+viên\s+công\s+an", "cán bộ Công an", text)
+    text = re.sub(r"(?i)nhân\s+viên\s+đăng\s+ký\s+xe", "cán bộ đăng ký xe", text)
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
