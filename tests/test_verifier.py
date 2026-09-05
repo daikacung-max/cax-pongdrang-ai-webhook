@@ -1,6 +1,6 @@
 import unittest
 
-from core.verifier import verify_dynamic_text
+from core.verifier import verify, verify_dynamic_text
 
 
 ARTICLE_134 = {
@@ -98,6 +98,14 @@ class DynamicVerifierTests(unittest.TestCase):
             [ARTICLE_134],
             question="Tôi có camera ghi lại vụ việc.",
         )
+        self.assertFalse(result["ok"])
+        self.assertIn("second_person_must_be_anh_chi", result["errors"])
+
+    def test_rejects_informal_second_person_in_structured_reply(self):
+        result = verify({
+            "answer": "Bạn nên giữ lại file gốc của camera.",
+            "legal_claims": [],
+        }, [ARTICLE_134])
         self.assertFalse(result["ok"])
         self.assertIn("second_person_must_be_anh_chi", result["errors"])
 

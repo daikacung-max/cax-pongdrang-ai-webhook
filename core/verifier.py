@@ -181,6 +181,11 @@ def verify(draft, retrieved_units):
         errors.append("Câu trả lời nêu Điều không có trong nguồn: " + ", ".join(unsupported))
 
     answer_text = str(draft.get("answer") or "")
+    # Cả Full Core lẫn Dynamic đều phải giữ cách xưng hô thống nhất khi nói
+    # chuyện với người dân. Nếu model dùng "bạn", Full Core sẽ đi qua fallback
+    # đã được kiểm chứng thay vì phát nguyên văn câu trả lời đó.
+    if re.search(r"(?i)\bbạn\s+(?:có|cần|đã|nên|muốn|hãy|vui lòng)\b", answer_text):
+        errors.append("second_person_must_be_anh_chi")
     source_blob = "\n".join(str(x.get("text") or "") for x in retrieved_units)
     if _is_overbroad_negative(answer_text) and _has_exception_structure(source_blob) and not _acknowledges_exception(answer_text):
         errors.append("Câu trả lời loại trừ tuyệt đối trong khi nguồn có ngoại lệ.")
