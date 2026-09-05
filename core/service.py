@@ -3,6 +3,7 @@ from config import (
     DYNAMIC_ANSWER_MODEL,
     DYNAMIC_LEGAL_TOP_K,
     ENABLE_MODEL_ESCALATION,
+    ENABLE_INTAKE_CASES,
     ESCALATION_MODEL,
     MAX_HISTORY_MESSAGES,
 )
@@ -273,6 +274,12 @@ class AICore:
     @staticmethod
     def _record_ready_intake(user_id, intake, answer_text):
         """Ghi hồ sơ sau khi người dân yêu cầu tiếp nhận và đã đủ dữ kiện."""
+        if intake.get("handoff_status") == "ready_for_officer" and not ENABLE_INTAKE_CASES:
+            return (
+                f"{answer_text} Đây là bản thử nghiệm chỉ để tư vấn; hệ thống chưa tiếp nhận "
+                "hoặc chuyển hồ sơ thật. Nếu cần giải quyết, anh/chị cần liên hệ trực tiếp Công an xã.",
+                None,
+            )
         handoff = cases.create_or_get_open(user_id, intake)
         if handoff and handoff.get("created"):
             answer_text = (

@@ -53,6 +53,17 @@ class IntakeCaseTests(unittest.TestCase):
         self.assertEqual(allowed.status_code, 200)
         self.assertIn("cases", allowed.get_json())
 
+    def test_pilot_mode_does_not_create_a_case(self):
+        intake = {
+            "handoff_status": "ready_for_officer",
+            "procedure_code": "residence",
+            "handoff_queue": "ADMIN_RESIDENCE",
+        }
+        with patch("core.service.ENABLE_INTAKE_CASES", False):
+            answer, handoff = core._record_ready_intake("synthetic-pilot-" + uuid.uuid4().hex, intake, "Đã ghi nhận.")
+        self.assertIsNone(handoff)
+        self.assertIn("bản thử nghiệm", answer)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -50,6 +50,7 @@ HISTORY_POOL_MAX_SIZE = int(os.getenv("HISTORY_POOL_MAX_SIZE", "5"))
 # Cổng cán bộ là API nội bộ. Token chỉ dùng tạm thời sau reverse proxy/SSO;
 # không trả về cho người dân và không được đưa vào mã nguồn hay log.
 OFFICER_API_TOKEN = os.getenv("OFFICER_API_TOKEN", "").strip()
+ENABLE_INTAKE_CASES = os.getenv("ENABLE_INTAKE_CASES", "true").lower() in ("1", "true", "yes", "on")
 
 # Bản demo chỉ chạy cục bộ, tách khỏi Zalo OA và production. Mặc định tắt để
 # không vô tình công khai lịch sử hội thoại demo trên web service.

@@ -24,6 +24,8 @@ services:
         value: "true"
       - key: ENABLE_DEMO_CONSOLE
         value: "false"
+      - key: ENABLE_INTAKE_CASES
+        value: "true"
       - key: ANSWER_MODEL
         value: openai/gpt-oss-120b
       - key: FULL_CORE_CANDIDATE_MODEL
