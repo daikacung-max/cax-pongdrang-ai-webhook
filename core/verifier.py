@@ -151,7 +151,7 @@ def _article_134_dynamic_errors(answer, retrieved_units):
     return errors
 
 
-def verify(draft, retrieved_units):
+def verify(draft, retrieved_units, question=""):
     by_id = {u["id"]: u for u in retrieved_units}
     errors = []
     verified_claims = []
@@ -195,6 +195,8 @@ def verify(draft, retrieved_units):
     answer_text = str(draft.get("answer") or "")
     if _impersonates_officer(answer_text):
         errors.append("assistant_must_not_impersonate_officer")
+    if norm(question) in {"xin chao", "chao", "chao ban", "hello", "hi"} and "tro ly ai" not in norm(answer_text):
+        errors.append("greeting_must_identify_assistant_as_ai")
     # Cả Full Core lẫn Dynamic đều phải giữ cách xưng hô thống nhất khi nói
     # chuyện với người dân. Nếu model dùng "bạn", Full Core sẽ đi qua fallback
     # đã được kiểm chứng thay vì phát nguyên văn câu trả lời đó.

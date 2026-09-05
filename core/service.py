@@ -216,7 +216,7 @@ class AICore:
             )
         models_used.append(model_used)
         with timer.stage("verify_ms"):
-            verification = verify(draft, legal_units)
+            verification = verify(draft, legal_units, question=question)
 
         repaired = False
         if not verification["ok"] and legal_context:
@@ -235,7 +235,7 @@ class AICore:
                 )
             models_used.append(model_used)
             with timer.stage("verify_ms"):
-                verification = verify(draft, legal_units)
+                verification = verify(draft, legal_units, question=question)
 
         if (
             not verification["ok"] and legal_context and ENABLE_MODEL_ESCALATION
@@ -256,7 +256,7 @@ class AICore:
                 )
             models_used.append(model_used)
             with timer.stage("verify_ms"):
-                verification = verify(draft, legal_units)
+                verification = verify(draft, legal_units, question=question)
 
         if verification["ok"]:
             raw_answer = draft["answer"]

@@ -116,6 +116,11 @@ class DynamicVerifierTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("assistant_must_not_impersonate_officer", result["errors"])
 
+    def test_greeting_must_identify_assistant_as_ai(self):
+        result = verify({"answer": "Chào anh/chị, tôi có thể hỗ trợ gì?", "legal_claims": []}, [], question="Xin chào")
+        self.assertFalse(result["ok"])
+        self.assertIn("greeting_must_identify_assistant_as_ai", result["errors"])
+
 
 if __name__ == "__main__":
     unittest.main()
