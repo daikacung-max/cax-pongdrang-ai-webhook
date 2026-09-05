@@ -138,38 +138,10 @@ def quick_plan(question):
 
 def plan(question, history, dynamic=False, safety_identifier=None):
     contextual = _contextual_question(question, history)
-
-    # Zalo Dynamic cần tốc độ; dùng planner cục bộ trên cả ngữ cảnh hội thoại.
-    if dynamic:
-        return quick_plan(contextual)
-
-    # Không để model biến lời chào hoặc câu xã giao thành một vấn đề pháp luật.
-    # Với câu không chứa tín hiệu thuộc phạm vi tư vấn, planner cục bộ là cổng
-    # quyết định cuối cùng; như vậy retrieval không thể chọn ngẫu nhiên một Điều
-    # luật rồi đưa fallback sai chủ đề.
+    # Trong pilot, planner xác định bằng quy tắc trên ngữ cảnh gần nhất thay vì
+    # để model tự viết truy vấn. Các nhóm nguồn đã duyệt đều có từ vựng/điều
+    # kiện rõ ràng; cách này giữ nguyên luồng Planner -> FTS5 nhưng ngăn một
+    # model phản hồi không ổn định kéo Điều luật không liên quan vào câu trả lời.
+    # Những nội dung chưa có nguồn tiếp tục đi fail-closed.
     baseline = quick_plan(contextual)
-    if not baseline["is_legal"]:
-        return baseline
-
-    system = """
-Bạn là bộ lập kế hoạch tìm nguồn cho trợ lý AI của Công an xã.
-Bạn không trả lời pháp luật và không kết luận tội danh. Chỉ xác định câu hỏi có cần nguồn pháp luật/TTHC không và tạo 1-4 truy vấn ngắn.
-Hiểu câu hỏi mới trong mạch hội thoại; dữ kiện ngắn có thể tiếp tục lượt trước. Nếu người dân nêu Điều luật rõ ràng, ghi số Điều vào explicit_references.
-Đánh dấu complexity=complex chỉ khi phải đối chiếu nhiều Điều luật/tài liệu hoặc có các dữ kiện pháp lý mâu thuẫn; trường hợp thông thường là simple.
-"""
-    history_text = "\n".join(f"{x['role']}: {x['content']}" for x in history[-6:])
-    user = f"Lịch sử gần nhất:\n{history_text}\n\nCâu hỏi mới:\n{question}"
-    try:
-        return chat_structured(
-            model=PLANNER_MODEL,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            schema_name="legal_search_plan",
-            schema=PLAN_SCHEMA,
-            reasoning_effort="low",
-            timeout=min(CORE_TIMEOUT_SECONDS, 5),
-            temperature=0.1,
-            max_completion_tokens=220,
-            safety_identifier=safety_identifier,
-        )
-    except Exception:
-        return baseline
+    return baseline

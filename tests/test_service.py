@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from core.llm import LLMError
 from core.planner import plan
+from core.retrieval import retrieve
 from core.service import core
 
 
@@ -58,6 +59,12 @@ class DynamicServiceTests(unittest.TestCase):
             result = plan("Xin chào", [], dynamic=False)
         self.assertFalse(result["is_legal"])
         planner_model.assert_not_called()
+
+    def test_full_core_assault_plan_retrieves_article_134(self):
+        question = "Tôi bị người khác đánh"
+        result = plan(question, [], dynamic=False)
+        units = retrieve(result, question)
+        self.assertTrue(any(str(unit.get("article")) == "134" for unit in units))
 
 
 if __name__ == "__main__":
