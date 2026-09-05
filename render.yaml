@@ -2,17 +2,52 @@ services:
   - type: web
     name: cax-pongdrang-ai
     runtime: python
-    plan: free
+    region: singapore
+    plan: starter
     buildCommand: pip install -r requirements.txt && python scripts/build_db.py
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 60
+    healthCheckPath: /health
     envVars:
       - key: GROQ_API_KEY
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cax-pongdrang-ai-history
+          property: connectionString
+      - key: HISTORY_HMAC_SECRET
+        generateValue: true
       - key: ANSWER_MODEL
         value: openai/gpt-oss-120b
+      - key: FULL_CORE_CANDIDATE_MODEL
+        value: gpt-5.6-terra
+      - key: DYNAMIC_CANDIDATE_MODEL
+        value: gpt-5.6-luna
+      - key: ESCALATION_MODEL
+        value: gpt-5.6-sol
+      - key: ENABLE_MODEL_ESCALATION
+        value: "false"
       - key: PLANNER_MODEL
+        value: openai/gpt-oss-20b
+      - key: DYNAMIC_ANSWER_MODEL
         value: openai/gpt-oss-20b
       - key: CORE_REASONING_EFFORT
         value: medium
       - key: DYNAMIC_REASONING_EFFORT
         value: low
+      - key: DYNAMIC_HISTORY_MESSAGES
+        value: "8"
+      - key: DYNAMIC_HISTORY_MAX_CHARS
+        value: "3000"
+      - key: HISTORY_RETENTION_DAYS
+        value: "30"
+      - key: HISTORY_MAX_MESSAGES
+        value: "20"
+
+databases:
+  - name: cax-pongdrang-ai-history
+    databaseName: cax_pongdrang_ai
+    user: cax_pongdrang_ai
+    region: singapore
+    plan: basic-256mb

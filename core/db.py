@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from config import DB_PATH
+from core import history
 
 
 def utc_now():
@@ -80,6 +81,7 @@ def init_schema():
             )
         """)
         con.execute("CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id, id DESC)")
+    history.init_schema()
 
 
 def upsert_document(doc):
@@ -205,37 +207,12 @@ def search_like(query, limit=8):
         return [dict(x) for x in con.execute(sql, params).fetchall()]
 
 
-def ensure_conversation(user_id):
-    now = utc_now()
-    with connect() as con:
-        con.execute("""
-            INSERT INTO conversations(user_id, created_at, updated_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET updated_at=excluded.updated_at
-        """, (user_id, now, now))
-
-
 def add_message(user_id, role, content, meta=None):
-    ensure_conversation(user_id)
-    with connect() as con:
-        con.execute("""
-            INSERT INTO messages(user_id, role, content, meta_json, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        """, (
-            user_id, role, content, json.dumps(meta or {}, ensure_ascii=False), utc_now(),
-        ))
+    history.add_message(user_id, role, content, meta=meta)
 
 
 def get_history(user_id, limit=10):
-    with connect() as con:
-        rows = con.execute("""
-            SELECT role, content, meta_json, created_at FROM messages
-            WHERE user_id=? ORDER BY id DESC LIMIT ?
-        """, (user_id, int(limit))).fetchall()
-    return [{
-        "role": row["role"], "content": row["content"],
-        "meta": json.loads(row["meta_json"] or "{}"), "created_at": row["created_at"],
-    } for row in reversed(rows)]
+    return history.get_history(user_id, limit=limit)
 
 
 def stats():
@@ -243,5 +220,6 @@ def stats():
         return {
             "documents": con.execute("SELECT COUNT(*) FROM documents").fetchone()[0],
             "legal_units": con.execute("SELECT COUNT(*) FROM legal_units").fetchone()[0],
-            "messages": con.execute("SELECT COUNT(*) FROM messages").fetchone()[0],
+            "messages": history.message_count(),
+            "history_backend": history.backend_name(),
         }

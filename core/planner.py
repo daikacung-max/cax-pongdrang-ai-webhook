@@ -1,7 +1,7 @@
 import re
 import unicodedata
 
-from config import PLANNER_MODEL, CORE_TIMEOUT_SECONDS
+from config import PLANNER_MODEL, CORE_TIMEOUT_SECONDS, RETRIEVAL_HISTORY_USER_TURNS
 from core.llm import chat_structured
 
 PLAN_SCHEMA = {
@@ -21,8 +21,13 @@ PLAN_SCHEMA = {
         },
         "needs_clarification": {"type": "boolean"},
         "clarification_question": {"type": ["string", "null"]},
+        "complexity": {"type": "string", "enum": ["simple", "complex"]},
+        "complexity_reasons": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
     },
-    "required": ["is_legal", "search_queries", "explicit_references", "needs_clarification", "clarification_question"],
+    "required": [
+        "is_legal", "search_queries", "explicit_references", "needs_clarification",
+        "clarification_question", "complexity", "complexity_reasons",
+    ],
     "additionalProperties": False,
 }
 
@@ -57,10 +62,10 @@ def _norm(text):
 
 # Từ vựng này chỉ dùng để tạo truy vấn tìm nguồn, không phải câu trả lời mẫu.
 SEARCH_VOCAB = [
-    (["bi danh", "danh nguoi", "bi thuong", "thuong tich", "dung dao", "hung khi"],
+    (["bi danh", "danh nguoi", "nguoi khac danh", "bi nguoi khac danh", "bi thuong", "thuong tich", "dung dao", "hung khi"],
      "Tội cố ý gây thương tích hoặc gây tổn hại cho sức khỏe của người khác"),
     (["trom", "mat tai san", "lay trom"], "trộm cắp tài sản"),
-    (["lua dao", "bi lua"], "lừa đảo chiếm đoạt tài sản"),
+    (["lua dao", "bi lua", "bi lua chuyen khoan"], "lừa đảo chiếm đoạt tài sản"),
     (["vay khong tra", "muon khong tra"], "lạm dụng tín nhiệm chiếm đoạt tài sản"),
     (["doa giet", "de doa giet"], "đe dọa giết người"),
     (["dap pha", "huy hoai"], "hủy hoại cố ý làm hư hỏng tài sản"),
@@ -79,8 +84,8 @@ SEARCH_VOCAB = [
 
 LEGAL_HINTS = [
     "luat", "bo luat", "dieu ", "xu phat", "toi pham", "cong an", "tam tru", "thuong tru", "cu tru",
-    "dang ky xe", "can cuoc", "to giac", "thuong tich", "bi thuong", "bi danh", "dung dao", "hung khi",
-    "bi lua", "trom", "ma tuy", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid",
+    "dang ky xe", "can cuoc", "to giac", "thuong tich", "bi thuong", "bi danh", "nguoi khac danh", "dung dao", "hung khi",
+    "bi lua", "bi lua chuyen khoan", "trom", "ma tuy", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid",
     "dinh danh dien tu", "tai khoan dinh danh", "xe mo to", "xe may", "xe gan may", "bien so xe", "ho khau", "nhap khau",
 ]
 
@@ -88,10 +93,13 @@ LEGAL_HINTS = [
 def _contextual_question(question, history):
     previous_user_turns = [
         str(x.get("content") or "").strip()
-        for x in history[-6:]
+        for x in history
         if x.get("role") == "user" and str(x.get("content") or "").strip()
     ]
-    context = previous_user_turns[-2:] + [str(question or "").strip()]
+    # Tính cả câu hiện tại trong ngân sách tối đa bốn lượt người dùng.
+    context = (previous_user_turns + [str(question or "").strip()])[
+        -max(1, RETRIEVAL_HISTORY_USER_TURNS):
+    ]
     return " | ".join(x for x in context if x)
 
 
@@ -106,16 +114,21 @@ def quick_plan(question):
         if any(p in q for p in phrases):
             queries.append(expansion)
     queries.append(question)
+    complex_reasons = []
+    if len(refs) > 1:
+        complex_reasons.append("multiple_explicit_articles")
     return {
         "is_legal": any(x in q for x in LEGAL_HINTS),
         "search_queries": queries[:4],
         "explicit_references": refs[:4],
         "needs_clarification": False,
         "clarification_question": None,
+        "complexity": "complex" if complex_reasons else "simple",
+        "complexity_reasons": complex_reasons,
     }
 
 
-def plan(question, history, dynamic=False):
+def plan(question, history, dynamic=False, safety_identifier=None):
     contextual = _contextual_question(question, history)
 
     # Zalo Dynamic cần tốc độ; dùng planner cục bộ trên cả ngữ cảnh hội thoại.
@@ -126,6 +139,7 @@ def plan(question, history, dynamic=False):
 Bạn là bộ lập kế hoạch tìm nguồn cho trợ lý AI của Công an xã.
 Bạn không trả lời pháp luật và không kết luận tội danh. Chỉ xác định câu hỏi có cần nguồn pháp luật/TTHC không và tạo 1-4 truy vấn ngắn.
 Hiểu câu hỏi mới trong mạch hội thoại; dữ kiện ngắn có thể tiếp tục lượt trước. Nếu người dân nêu Điều luật rõ ràng, ghi số Điều vào explicit_references.
+Đánh dấu complexity=complex chỉ khi phải đối chiếu nhiều Điều luật/tài liệu hoặc có các dữ kiện pháp lý mâu thuẫn; trường hợp thông thường là simple.
 """
     history_text = "\n".join(f"{x['role']}: {x['content']}" for x in history[-6:])
     user = f"Lịch sử gần nhất:\n{history_text}\n\nCâu hỏi mới:\n{question}"
@@ -139,6 +153,7 @@ Hiểu câu hỏi mới trong mạch hội thoại; dữ kiện ngắn có thể
             timeout=min(CORE_TIMEOUT_SECONDS, 5),
             temperature=0.1,
             max_completion_tokens=220,
+            safety_identifier=safety_identifier,
         )
     except Exception:
         return quick_plan(contextual)

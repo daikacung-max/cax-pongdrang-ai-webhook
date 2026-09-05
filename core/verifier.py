@@ -32,6 +32,16 @@ def _acknowledges_exception(text):
     return any(x in q for x in ["van co the", "neu thuoc", "tru truong hop", "ngoai le", "chua the ket luan", "con phu thuoc", "tuy thuoc", "duoi 11% nhung"])
 
 
+def _asserts_guilt(text):
+    q = norm(text)
+    patterns = [
+        r"\b(?:nguoi kia|ho|anh ay|co ay|doi tuong)\s+(?:da\s+)?pham toi\b",
+        r"\bchac chan\s+(?:la\s+)?(?:toi pham|pham toi|bi truy cuu)\b",
+        r"\bdu can cu ket luan\s+(?:la\s+)?pham toi\b",
+    ]
+    return any(re.search(pattern, q) for pattern in patterns)
+
+
 def _has_residence_source(units):
     return any(str(x.get("document_id") or "").startswith(("RESIDENCE_", "TTHC_TEMP_RESIDENCE_")) for x in units)
 
@@ -57,6 +67,29 @@ def _unsafe_vehicle_requirements(answer):
     q = norm(answer)
     risky = ["giay kiem dinh ky thuat", "bao hiem trach nhiem dan su", "phong dang ky xe cua cong an xa", "don dang ky xe", "the dang ky xe", "nhan vien dang ky xe"]
     return [x for x in risky if x in q]
+
+
+def _unsupported_procedural_details(answer, source_blob, question=""):
+    """Chặn tên biểu mẫu, giấy tờ và cơ quan nhạy cảm không xuất hiện trong nguồn."""
+    answer_norm = norm(answer)
+    allowed = norm(source_blob + "\n" + str(question or ""))
+    candidates = set()
+
+    # Mã biểu mẫu là nơi model dễ bịa nhất, ví dụ TK99 hay ĐKX01.
+    for match in re.finditer(
+        r"\b(?:mau|phieu|to khai|don)\s+([a-zđ]{0,8}\d+[a-z0-9-]*)\b",
+        answer_norm,
+    ):
+        candidates.add(match.group(0))
+
+    sensitive_phrases = [
+        "uy ban nhan dan", "cong an huyen", "cong an tinh",
+        "phong canh sat", "phong quan ly hanh chinh", "van phong cong an xa",
+        "dich vu buu chinh", "buu chinh cong ich", "hop dong thue nha",
+        "giay khai sinh", "giay ket hon", "so ho khau", "so do", "so hong",
+    ]
+    candidates.update(x for x in sensitive_phrases if x in answer_norm)
+    return sorted(x for x in candidates if x not in allowed)
 
 
 def verify(draft, retrieved_units):
@@ -116,7 +149,7 @@ def verify(draft, retrieved_units):
     return {"ok": not errors, "errors": errors, "verified_claims": verified_claims, "allowed_articles": sorted(allowed_articles)}
 
 
-def verify_dynamic_text(answer, retrieved_units):
+def verify_dynamic_text(answer, retrieved_units, question=""):
     answer = str(answer or "")
     errors = []
     allowed_articles = {str(u.get("article")) for u in retrieved_units if u.get("article")}
@@ -125,8 +158,17 @@ def verify_dynamic_text(answer, retrieved_units):
     if unsupported:
         errors.append("unsupported_articles:" + ",".join(unsupported))
     source_blob = "\n".join(str(x.get("text") or "") for x in retrieved_units)
+    allowed_numbers = _numbers(source_blob) | _numbers(question) | _numbers(HOTLINE)
+    unsupported_numbers = sorted(_numbers(answer) - allowed_numbers)
+    if unsupported_numbers:
+        errors.append("unsupported_numbers:" + ",".join(unsupported_numbers))
     if _is_overbroad_negative(answer) and _has_exception_structure(source_blob) and not _acknowledges_exception(answer):
         errors.append("overbroad_negative")
+    if _asserts_guilt(answer):
+        errors.append("unsupported_guilt_conclusion")
+    answer_norm = norm(answer)
+    if any(x in answer_norm for x in ["dao la hung khi nguy hiem", "dao chinh la hung khi nguy hiem"]):
+        errors.append("knife_assumed_dangerous_weapon")
     if _has_residence_source(retrieved_units):
         risky = _unsafe_residence_requirements(answer)
         if risky:
@@ -135,6 +177,9 @@ def verify_dynamic_text(answer, retrieved_units):
         risky = _unsafe_vehicle_requirements(answer)
         if risky:
             errors.append("unsupported_vehicle_requirements:" + ",".join(risky))
+    unsupported_details = _unsupported_procedural_details(answer, source_blob, question)
+    if unsupported_details:
+        errors.append("unsupported_procedural_details:" + ",".join(unsupported_details))
     return {"ok": not errors, "errors": errors}
 
 
@@ -192,6 +237,11 @@ def grounded_dynamic_fallback(question, retrieved_units):
         if "dao" in q or "hung khi" in q:
             text += " Việc dùng dao là dữ kiện quan trọng; cần làm rõ đặc điểm con dao, cách sử dụng và việc có thuộc trường hợp vũ khí hoặc hung khí nguy hiểm hay không."
         return text + " Việc xử lý cụ thể còn phụ thuộc kết quả xác minh và chứng cứ liên quan."
+    if article == "134" and any(x in q for x in ["camera", "video", "clip", "ghi hinh"]):
+        return (
+            "Đoạn camera là chứng cứ cần bảo toàn. Anh/chị nên giữ nguyên file gốc, không chỉnh sửa, sao lưu thêm một bản và ghi lại thời gian, địa điểm, người biết sự việc; "
+            "khi trình báo thì cung cấp bản sao theo hướng dẫn và giữ lại bản gốc để đối chiếu. Việc đánh giá trách nhiệm cụ thể vẫn phải dựa trên toàn bộ diễn biến, thương tích và kết quả xác minh."
+        )
     if article and title:
         return f"Nội dung anh/chị hỏi có liên quan đến Điều {article} Bộ luật Hình sự, {title}. Cần đối chiếu đầy đủ điều kiện của điều luật với diễn biến thực tế trước khi kết luận."
     return "Nguồn phù hợp đã được tìm thấy nhưng dữ kiện hiện có chưa đủ để kết luận chi tiết. Anh/chị có thể bổ sung tình huống cụ thể để tôi phân tích tiếp theo đúng nguồn."

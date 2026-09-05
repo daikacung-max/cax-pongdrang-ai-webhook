@@ -53,7 +53,7 @@ def _detect_domain_in_text(text):
         return "vehicle", ["VEHICLE_REGISTRATION_2026"]
     if any(x in q for x in ["xac nhan cu tru", "xac nhan thong tin cu tru", "cu tru"]):
         return "residence", ["RESIDENCE_GUIDANCE_2026", "RESIDENCE_PERMANENT_2026", "TTHC_TEMP_RESIDENCE_2026"]
-    if any(x in q for x in ["toi pham", "bo luat hinh su", "blhs", "bi danh", "danh nguoi", "thuong tich", "dung dao", "hung khi", "trom", "lua dao", "lam dung tin nhiem", "gay roi", "huy hoai", "de doa giet"]):
+    if any(x in q for x in ["toi pham", "bo luat hinh su", "blhs", "bi danh", "danh nguoi", "nguoi khac danh", "thuong tich", "dung dao", "hung khi", "trom", "lua dao", "bi lua chuyen khoan", "lam dung tin nhiem", "gay roi", "huy hoai", "de doa giet"]):
         return "criminal", ["BLHS_2025"]
     return None, None
 

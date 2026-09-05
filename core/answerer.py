@@ -7,6 +7,8 @@ from config import (
     DYNAMIC_REASONING_EFFORT,
     CORE_TIMEOUT_SECONDS,
     DYNAMIC_TIMEOUT_SECONDS,
+    DYNAMIC_HISTORY_MESSAGES,
+    DYNAMIC_HISTORY_MAX_CHARS,
 )
 from core.llm import chat_structured, chat_text
 
@@ -47,8 +49,10 @@ ANSWER_SCHEMA = {
 
 
 BASE_SYSTEM = f"""
-Bạn là Trợ lý AI của {UNIT_NAME}.
-Hãy trò chuyện tự nhiên, hiểu mạch hội thoại, trả lời đúng phần người dân vừa hỏi.
+Bạn là Trợ lý AI của {UNIT_NAME}, không phải cán bộ thật.
+Đây là hội thoại chat bằng văn bản. Hãy trả lời tự nhiên như cán bộ đang trực tiếp hướng dẫn người dân, hiểu mạch hội thoại và chỉ trả lời đúng phần vừa được hỏi.
+Nếu người dân cung cấp một dữ kiện mới, hãy ghi nhận đúng dữ kiện đó, giải thích ngắn ý nghĩa, nêu việc nên làm tiếp theo và chỉ hỏi một câu quan trọng nhất nếu cần làm rõ.
+Không tự giới thiệu lại ở mỗi lượt, không nhắc lại toàn bộ câu trả lời trước, không dùng lời mở đầu hoặc lời kết rập khuôn.
 Không dùng câu mẫu rập khuôn, không kết luận một người có tội chỉ từ lời kể một phía.
 Không gọi đơn vị là 'đồn Công an xã' hoặc 'Cục Công an xã'; dùng đúng tên {UNIT_NAME}.
 Dùng cách gọi 'cán bộ Công an'. Nếu cần số liên hệ, chỉ dùng {HOTLINE}.
@@ -88,8 +92,29 @@ def build_messages(question, history, legal_context="", repair_note=None):
     return messages
 
 
-def answer(question, history, legal_context="", dynamic=False, repair_note=None):
-    model = DYNAMIC_ANSWER_MODEL if dynamic else ANSWER_MODEL
+def _bounded_history(history, max_messages, max_chars):
+    """Giữ các lượt mới nhất trong ngân sách ký tự, không tóm tắt bằng luật cứng."""
+    selected = []
+    used = 0
+    for item in reversed(list(history or [])[-max(1, max_messages):]):
+        if item.get("role") not in ("user", "assistant"):
+            continue
+        content = str(item.get("content") or "").strip()
+        if not content:
+            continue
+        remaining = max_chars - used
+        if remaining <= 0:
+            break
+        if len(content) > remaining:
+            content = content[-remaining:]
+        selected.append({"role": item["role"], "content": content})
+        used += len(content)
+    return list(reversed(selected))
+
+
+def answer(question, history, legal_context="", dynamic=False, repair_note=None,
+           model=None, safety_identifier=None):
+    model = model or (DYNAMIC_ANSWER_MODEL if dynamic else ANSWER_MODEL)
     return chat_structured(
         model=model,
         messages=build_messages(
@@ -101,14 +126,19 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None)
         timeout=(DYNAMIC_TIMEOUT_SECONDS if dynamic else CORE_TIMEOUT_SECONDS),
         temperature=0.08 if legal_context else 0.42,
         max_completion_tokens=360 if dynamic else 1100,
+        safety_identifier=safety_identifier,
     )
 
 
-def answer_dynamic_text(question, history, legal_context=""):
+def answer_dynamic_text(question, history, legal_context="", model=None,
+                        safety_identifier=None):
     """Một lượt gọi model real-time, prompt ngắn, dành riêng cho Zalo Dynamic."""
     system = f"""
-Bạn là Trợ lý AI của {UNIT_NAME}. Trả lời tiếng Việt tự nhiên, ngắn gọn, thường 2-4 câu.
-Hiểu câu hỏi theo các lượt hội thoại gần nhất và trả lời phần thông tin mới, không kể lại từ đầu.
+Bạn là Trợ lý AI của {UNIT_NAME}, không phải cán bộ thật. Đây là hội thoại chat bằng văn bản.
+Trả lời tiếng Việt tự nhiên như cán bộ đang trực tiếp hướng dẫn, thường 2-5 câu.
+Hiểu câu hỏi theo các lượt gần nhất và trả lời phần thông tin mới, không kể lại từ đầu, không tự giới thiệu lại ở mỗi lượt.
+Khi có dữ kiện mới: ghi nhận đúng dữ kiện đó, giải thích ngắn ý nghĩa, nêu việc nên làm tiếp theo; nếu thiếu thông tin thì chỉ hỏi một câu quan trọng nhất.
+Không dùng lời mở đầu, trấn an hoặc kết thúc rập khuôn. Không biến câu trả lời thành văn bản hành chính khi vài câu chat là đủ.
 Không kết luận một người có tội chỉ từ lời kể một phía.
 Tên đơn vị duy nhất: {UNIT_NAME}. Số liên hệ duy nhất: {HOTLINE}.
 Nếu có SOURCE bên dưới, mọi chi tiết pháp luật và thủ tục hành chính phải bám SOURCE.
@@ -123,16 +153,19 @@ Nếu chưa đủ căn cứ, nói rõ phần nào còn thiếu, không đẩy ng
         system += "\nSOURCE:\n" + legal_context
 
     messages = [{"role": "system", "content": system}]
-    for item in history[-4:]:
-        if item["role"] in ("user", "assistant"):
-            messages.append({"role": item["role"], "content": item["content"]})
+    messages.extend(_bounded_history(
+        history,
+        max_messages=DYNAMIC_HISTORY_MESSAGES,
+        max_chars=DYNAMIC_HISTORY_MAX_CHARS,
+    ))
     messages.append({"role": "user", "content": question})
 
     return chat_text(
-        model=DYNAMIC_ANSWER_MODEL,
+        model=model or DYNAMIC_ANSWER_MODEL,
         messages=messages,
         reasoning_effort=DYNAMIC_REASONING_EFFORT,
         timeout=DYNAMIC_TIMEOUT_SECONDS,
         temperature=0.05 if legal_context else 0.25,
         max_completion_tokens=160,
+        safety_identifier=safety_identifier,
     )
