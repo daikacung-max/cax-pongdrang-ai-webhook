@@ -21,7 +21,9 @@ DYNAMIC_LEGAL_TOP_K = int(os.getenv("DYNAMIC_LEGAL_TOP_K", "2"))
 CORE_REASONING_EFFORT = os.getenv("CORE_REASONING_EFFORT", "medium")
 DYNAMIC_REASONING_EFFORT = os.getenv("DYNAMIC_REASONING_EFFORT", "low")
 CORE_TIMEOUT_SECONDS = float(os.getenv("CORE_TIMEOUT_SECONDS", "12"))
-DYNAMIC_TIMEOUT_SECONDS = float(os.getenv("DYNAMIC_TIMEOUT_SECONDS", "1.45"))
+# Dynamic GET có thể phải đợi webhook tới khoảng 0.4-0.6s; dành khoảng 1.05s cho model.
+# Nếu model chậm, AI Core tự dùng grounded fallback từ nguồn đã kiểm chứng.
+DYNAMIC_TIMEOUT_SECONDS = float(os.getenv("DYNAMIC_TIMEOUT_SECONDS", "1.05"))
 MAX_ZALO_MESSAGES = int(os.getenv("MAX_ZALO_MESSAGES", "4"))
 TARGET_ZALO_CHARS = int(os.getenv("TARGET_ZALO_CHARS", "650"))
 MAX_ZALO_TOTAL_CHARS = int(os.getenv("MAX_ZALO_TOTAL_CHARS", "2400"))
