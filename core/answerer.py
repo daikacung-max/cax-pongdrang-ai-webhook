@@ -8,7 +8,7 @@ from config import (
     CORE_TIMEOUT_SECONDS,
     DYNAMIC_TIMEOUT_SECONDS,
 )
-from core.llm import chat_structured
+from core.llm import chat_structured, chat_text
 
 
 ANSWER_SCHEMA = {
@@ -48,40 +48,22 @@ ANSWER_SCHEMA = {
 
 BASE_SYSTEM = f"""
 Bạn là Trợ lý AI của {UNIT_NAME}.
-
-Hãy trò chuyện với người dân như một trợ lý AI thực thụ:
-- hiểu câu hỏi trong toàn bộ mạch hội thoại gần nhất;
-- nếu đây là câu hỏi nối tiếp, trả lời ngay phần thông tin MỚI người dân vừa bổ sung, không kể lại từ đầu những hướng dẫn đã nói ở lượt trước;
-- trả lời trực tiếp, tự nhiên, dễ hiểu;
-- không dùng câu mẫu rập khuôn;
-- không liệt kê hàng loạt tội danh khi không cần;
-- nếu thiếu dữ kiện quan trọng, có thể hỏi lại một câu ngắn;
-- không kết luận một người có tội chỉ từ lời kể một phía;
-- không trình bày chuỗi suy luận nội bộ;
-- chỉ xuất nội dung trả lời cho người dân trong trường answer;
-- không dùng Markdown, không dùng dấu *, **, #;
-- không gọi đơn vị là 'đồn Công an xã'; phải dùng đúng tên {UNIT_NAME};
-- dùng cách gọi 'cán bộ Công an', không dùng 'nhân viên công an';
-- không mặc nhiên nói Công an xã 'tiến hành điều tra' mọi vụ việc. Khi cần, diễn đạt theo hướng tiếp nhận, xác minh ban đầu, xử lý hoặc chuyển cơ quan có thẩm quyền theo quy định;
-- khi nói về thương tích, ưu tiên cách diễn đạt 'hồ sơ khám, chữa bệnh, kết quả khám, giấy ra viện hoặc tài liệu y tế liên quan' thay vì mặc định yêu cầu một loại 'giấy chứng nhận y tế'.
-
-Tên đơn vị chính xác là: {UNIT_NAME}.
-Nếu cần cung cấp số điện thoại liên hệ, số duy nhất được dùng là: {HOTLINE}.
+Hãy trò chuyện tự nhiên, hiểu mạch hội thoại, trả lời đúng phần người dân vừa hỏi.
+Không dùng câu mẫu rập khuôn, không kết luận một người có tội chỉ từ lời kể một phía.
+Không gọi đơn vị là 'đồn Công an xã' hoặc 'Cục Công an xã'; dùng đúng tên {UNIT_NAME}.
+Dùng cách gọi 'cán bộ Công an'. Nếu cần số liên hệ, chỉ dùng {HOTLINE}.
+Không dùng Markdown, không trình bày chuỗi suy luận nội bộ.
 """
+
 
 LEGAL_SYSTEM = """
 Đối với câu hỏi pháp luật:
-- LEGAL_SOURCE_CONTEXT là nguồn được truy xuất từ kho văn bản.
-- Hãy dùng nguồn để trả lời đúng trọng tâm pháp lý của câu hỏi hiện tại, không chỉ đưa lời khuyên chung nếu nguồn đã trả lời được vấn đề người dân đang hỏi.
-- Mọi chi tiết cụ thể như số Điều, tên Điều/tội danh, ngưỡng định lượng, khung hình phạt, thời hạn, lệ phí, thẩm quyền hoặc kết luận loại trừ trách nhiệm phải có căn cứ trực tiếp trong LEGAL_SOURCE_CONTEXT.
-- Với MỖI legal_claim, evidence_quote phải là một đoạn NGUYÊN VĂN ngắn được chép trực tiếp từ đúng SOURCE_UNIT_ID và phải đủ để hỗ trợ claim đó. Không được tự viết lại evidence_quote.
-- Không được rút gọn một quy tắc có nhiều nhánh thành chỉ một điều kiện. Nếu nguồn có cấu trúc 'A hoặc B', 'trừ trường hợp', 'dưới ngưỡng nhưng thuộc trường hợp...', phải giữ lại nhánh/ngoại lệ có liên quan đến dữ kiện người dân.
-- Đặc biệt cẩn trọng với các câu tuyệt đối như 'không thuộc', 'không cấu thành', 'chắc chắn không bị xử lý'. Chỉ được nói như vậy khi nguồn và dữ kiện đã loại trừ toàn bộ các nhánh/ngoại lệ liên quan. Nếu chưa đủ, phải nói 'chưa thể kết luận' hoặc 'vẫn có thể được xem xét nếu...'.
-- Nếu câu hỏi có một dữ kiện mới làm thay đổi cách đánh giá pháp lý, hãy nói rõ dữ kiện đó có ý nghĩa gì theo nguồn, nhưng không kết luận thay cơ quan có thẩm quyền.
-- Mỗi chi tiết pháp lý cụ thể mà bạn dựa vào phải khai báo trong legal_claims và source_unit_id phải đúng ID có trong context.
-- official_title nếu nêu phải đúng tiêu đề trong nguồn.
-- Nếu nguồn chưa đủ để nêu một chi tiết chính xác, đừng bịa. Hãy giải thích ở mức nguyên tắc hoặc hỏi thêm.
-- Kho văn bản là nguồn pháp lý. Bạn vẫn được dùng năng lực ngôn ngữ, suy luận và hiểu tình huống để giải thích, gợi ý bước tiếp theo, và duy trì cuộc trò chuyện.
+- LEGAL_SOURCE_CONTEXT là nguồn pháp lý đã truy xuất.
+- Mọi số Điều, tên Điều/tội danh, ngưỡng, khung hình phạt, thời hạn, lệ phí, thẩm quyền hoặc kết luận loại trừ phải bám trực tiếp nguồn.
+- Với mỗi legal_claim, evidence_quote phải là đoạn nguyên văn ngắn chép trực tiếp từ đúng SOURCE_UNIT_ID.
+- Không được biến quy tắc có nhiều nhánh thành một điều kiện duy nhất. Nếu nguồn có 'hoặc', 'nhưng thuộc', 'trừ trường hợp' hay ngoại lệ liên quan thì phải phản ánh đầy đủ.
+- Không nói 'không cấu thành', 'không thuộc', 'chắc chắn không bị xử lý' nếu nguồn còn nhánh/ngoại lệ chưa được loại trừ.
+- Nếu dữ kiện mới làm thay đổi đánh giá pháp lý, nói rõ ý nghĩa của dữ kiện mới theo nguồn, nhưng không kết luận thay cơ quan có thẩm quyền.
 """
 
 
@@ -95,6 +77,7 @@ def build_messages(question, history, legal_context="", repair_note=None):
             "\nCÂU TRẢ LỜI TRƯỚC BỊ BỘ KIỂM CHỨNG TỪ CHỐI."
             "\nHãy sửa đúng các lỗi sau:\n" + repair_note
         )
+
     messages = [{"role": "system", "content": system}]
     for item in history[-8:]:
         if item["role"] in ("user", "assistant"):
@@ -116,4 +99,35 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None)
         timeout=(DYNAMIC_TIMEOUT_SECONDS if dynamic else CORE_TIMEOUT_SECONDS),
         temperature=0.08 if legal_context else 0.42,
         max_completion_tokens=420 if dynamic else 1100,
+    )
+
+
+def answer_dynamic_text(question, history, legal_context=""):
+    """Một lượt gọi 20B, prompt ngắn, dành riêng cho giới hạn dưới 2 giây của Zalo Dynamic."""
+    system = f"""
+Bạn là Trợ lý AI của {UNIT_NAME}. Trả lời bằng tiếng Việt tự nhiên, ngắn gọn, thường 2-5 câu.
+Hiểu câu hỏi theo các lượt hội thoại gần nhất và trả lời phần thông tin mới, không kể lại từ đầu.
+Không kết luận một người có tội chỉ từ lời kể một phía.
+Tên đơn vị duy nhất: {UNIT_NAME}. Số liên hệ duy nhất: {HOTLINE}.
+Nếu có SOURCE bên dưới, mọi số Điều, tên tội, ngưỡng và kết luận pháp lý phải bám SOURCE.
+Đặc biệt không được kết luận chỉ dựa vào một ngưỡng nếu SOURCE còn nhánh 'hoặc', 'nhưng thuộc', ngoại lệ hay điều kiện thay thế.
+Nếu chưa đủ căn cứ, nói 'chưa thể kết luận' và giải thích điều gì cần làm rõ.
+Không dùng Markdown.
+"""
+    if legal_context:
+        system += "\nSOURCE:\n" + legal_context
+
+    messages = [{"role": "system", "content": system}]
+    for item in history[-4:]:
+        if item["role"] in ("user", "assistant"):
+            messages.append({"role": item["role"], "content": item["content"]})
+    messages.append({"role": "user", "content": question})
+
+    return chat_text(
+        model=DYNAMIC_ANSWER_MODEL,
+        messages=messages,
+        reasoning_effort=DYNAMIC_REASONING_EFFORT,
+        timeout=DYNAMIC_TIMEOUT_SECONDS,
+        temperature=0.08 if legal_context else 0.35,
+        max_completion_tokens=260,
     )
