@@ -253,7 +253,7 @@ def grounded_dynamic_fallback(question, retrieved_units):
                 "Mỗi trường hợp có giấy tờ khác nhau; anh/chị cho biết đúng nội dung cần đăng ký để tôi hướng dẫn chính xác."
             )
         return (
-            "Kho dữ liệu hiện chưa có nguồn đã kiểm chứng đủ gần để tôi khẳng định chi tiết nội dung này. "
+            "Anh/chị vui lòng lưu ý: kho dữ liệu hiện chưa có nguồn đã kiểm chứng đủ gần để tôi khẳng định chi tiết nội dung này. "
             "Tôi sẽ không tự đoán giấy tờ, điều luật, mức phạt hoặc thẩm quyền khi chưa có nguồn phù hợp."
         )
 

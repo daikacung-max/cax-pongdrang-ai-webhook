@@ -143,6 +143,14 @@ def plan(question, history, dynamic=False, safety_identifier=None):
     if dynamic:
         return quick_plan(contextual)
 
+    # Không để model biến lời chào hoặc câu xã giao thành một vấn đề pháp luật.
+    # Với câu không chứa tín hiệu thuộc phạm vi tư vấn, planner cục bộ là cổng
+    # quyết định cuối cùng; như vậy retrieval không thể chọn ngẫu nhiên một Điều
+    # luật rồi đưa fallback sai chủ đề.
+    baseline = quick_plan(contextual)
+    if not baseline["is_legal"]:
+        return baseline
+
     system = """
 Bạn là bộ lập kế hoạch tìm nguồn cho trợ lý AI của Công an xã.
 Bạn không trả lời pháp luật và không kết luận tội danh. Chỉ xác định câu hỏi có cần nguồn pháp luật/TTHC không và tạo 1-4 truy vấn ngắn.
@@ -164,4 +172,4 @@ Hiểu câu hỏi mới trong mạch hội thoại; dữ kiện ngắn có thể
             safety_identifier=safety_identifier,
         )
     except Exception:
-        return quick_plan(contextual)
+        return baseline

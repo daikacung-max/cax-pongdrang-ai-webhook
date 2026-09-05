@@ -32,9 +32,10 @@ from core.ingest import import_article_index
 from core.verified_sources import ensure_verified_sources
 from core.service import core
 from core.demo import respond as demo_respond
-from core.llm import LLMTimeout
+from core.llm import LLMError, LLMTimeout
 from core.providers import provider_name_for_model
 from core.telemetry import log_zalo_latency, new_trace_id
+from core.verifier import grounded_dynamic_fallback
 from adapters.zalo import pending
 
 app = Flask(__name__)
@@ -265,6 +266,18 @@ def api_chat():
         result = core.chat(user_id, message, dynamic=False)
         result.pop("_telemetry", None)
         return jsonify(result), 200
+    except (LLMError, LLMTimeout) as exc:
+        # Lớp biên API không được lộ lỗi kỹ thuật nếu một nhánh provider ngoài
+        # dự kiến còn sót lại. Không dùng nguồn chưa kiểm chứng ở đây.
+        app.logger.error("AI Core safe fallback type=%s", type(exc).__name__)
+        return jsonify({
+            "answer": grounded_dynamic_fallback(message, []),
+            "meta": {
+                "legal": False, "verified": False, "repaired": False,
+                "dynamic": False, "path": "api_boundary_grounded_fallback",
+            },
+            "handoff": None,
+        }), 200
     except Exception as exc:
         app.logger.error("AI Core API error type=%s", type(exc).__name__)
         return jsonify({

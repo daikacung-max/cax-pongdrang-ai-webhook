@@ -3,6 +3,7 @@ import uuid
 from unittest.mock import patch
 
 from core.llm import LLMError
+from core.planner import plan
 from core.service import core
 
 
@@ -51,6 +52,12 @@ class DynamicServiceTests(unittest.TestCase):
         self.assertEqual(model.call_count, 2)
         self.assertEqual(result["_telemetry"]["fallback_reason"], "llm_error")
         self.assertEqual(result["meta"]["path"], "full_core_grounded_fallback")
+
+    def test_greeting_is_not_promoted_to_legal_retrieval_by_planner_model(self):
+        with patch("core.planner.chat_structured") as planner_model:
+            result = plan("Xin chào", [], dynamic=False)
+        self.assertFalse(result["is_legal"])
+        planner_model.assert_not_called()
 
 
 if __name__ == "__main__":

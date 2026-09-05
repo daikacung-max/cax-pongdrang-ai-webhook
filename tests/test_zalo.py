@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from adapters.zalo import PendingZaloMessages
 from app import app, split_zalo_messages
+from core.llm import LLMError
 
 
 class ZaloAdapterTests(unittest.TestCase):
@@ -48,6 +49,17 @@ class ZaloAdapterTests(unittest.TestCase):
         self.assertEqual(health.get_json()["status"], "ok")
         self.assertEqual(article.status_code, 200)
         self.assertTrue(article.get_json()["found"])
+
+    def test_api_chat_provider_error_returns_safe_text(self):
+        with patch("app.core.chat", side_effect=LLMError("provider failed")):
+            with app.test_client() as client:
+                response = client.post("/api/chat", json={
+                    "user_id": "synthetic-test-user", "message": "Tôi bị người khác đánh",
+                })
+        body = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(body["meta"]["path"], "api_boundary_grounded_fallback")
+        self.assertIn("anh/chị", body["answer"].lower())
 
     def test_signed_zalo_webhook_accepts_official_formula(self):
         body = (
