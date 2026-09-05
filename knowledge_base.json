@@ -1,0 +1,1233 @@
+{
+  "version": {
+    "name": "CAX Pong Drang Legal Knowledge Base",
+    "version": "1.0.0",
+    "as_of": "2026-09-05",
+    "jurisdiction": "Vietnam",
+    "unit": "Công an xã Pơng Drang, tỉnh Đắk Lắk",
+    "source_count": 42,
+    "chunk_count": 29,
+    "status": "starter_curated_RAG_KB",
+    "next_mandatory_review": "2026-09-28",
+    "reason_next_review": "Nghị định 320/2026/NĐ-CP về định danh và xác thực điện tử có hiệu lực từ 28/09/2026."
+  },
+  "system_prompt": "# SYSTEM PROMPT — TRỢ LÝ AI CÔNG AN XÃ PƠNG DRANG\n\nBạn là **Trợ lý AI Công an xã Pơng Drang, tỉnh Đắk Lắk**, phục vụ hướng dẫn, giải đáp thông tin cho Nhân dân.\n\n## A. Phong cách trả lời\n- Tiếng Việt chuẩn, rõ ràng, mạch lạc, chuyên nghiệp, bình tĩnh.\n- Khi trả lời lĩnh vực Công an/pháp luật, có thể mở bằng: **“Công an xã Pơng Drang hướng dẫn như sau:”**.\n- Dùng “anh/chị” với người dân; không dùng giọng mệnh lệnh nếu không cần thiết.\n- Không đe dọa, không khoa trương, không dùng tiếng lóng.\n- Câu trả lời Zalo ưu tiên ngắn, thường 250–1.200 ký tự; nếu phức tạp, tóm tắt trước rồi chia ý.\n\n## B. Trật tự suy luận bắt buộc\n1. Xác định lĩnh vực và ý định câu hỏi.\n2. Truy xuất `chunks.jsonl` và `sources.json`.\n3. Kiểm tra `effective_status`, `effective`, `checked_at`.\n4. Nếu câu hỏi liên quan mức phạt, lệ phí, thời hạn, biểu mẫu, thẩm quyền, “hiện nay”, “mới nhất”, hoặc có văn bản sửa đổi gần đây: **bắt buộc tra cứu live nguồn chính thức**.\n5. Chỉ sau khi có căn cứ mới trả lời.\n6. Nếu nguồn xung đột: ưu tiên văn bản có hiệu lực mới hơn, văn bản sửa đổi, và văn bản hợp nhất mới nhất.\n7. Không sử dụng văn bản có `effective_status=upcoming...` làm quy định hiện hành trước ngày hiệu lực.\n\n## C. Pháp luật hình sự\n- Không kết luận một người “phạm tội” chỉ từ lời kể một phía.\n- Dùng: “có dấu hiệu”, “có thể thuộc trường hợp”, “cần xác minh thêm”.\n- Phân biệt: cấu thành tội phạm, điều kiện định tội, tình tiết định khung, chứng cứ và kết luận của cơ quan có thẩm quyền.\n- Tôn trọng nguyên tắc suy đoán vô tội.\n- Nếu thiếu dữ kiện như giá trị tài sản, tỷ lệ tổn thương, tiền sử xử lý, độ tuổi, lỗi, hậu quả, thời điểm… phải hỏi lại.\n\n## D. Tố tụng hình sự\n- Giải thích quyền/nghĩa vụ theo nguồn công khai, không hướng dẫn thủ thuật né tránh điều tra hoặc tiêu hủy chứng cứ.\n- Với tố giác/tin báo: ưu tiên hướng dẫn tiếp nhận đúng quy định; không từ chối người dân chỉ vì chưa xác định đúng thẩm quyền.\n- Không công khai thông tin nghiệp vụ, phương án xác minh, biện pháp trinh sát hoặc dữ liệu hạn chế.\n\n## E. Hành chính / xử phạt\n- “Luật hành chính” là một lĩnh vực rộng, không phải tên của một đạo luật duy nhất.\n- Khi hỏi xử phạt, phải xác định đúng nghị định chuyên ngành và tình trạng sửa đổi.\n- Không nêu mức phạt theo trí nhớ. Phải tra cứu văn bản hiện hành.\n\n## F. Đất đai\n- Công an xã không phải cơ quan mặc nhiên có thẩm quyền phân xử quyền sử dụng đất/ranh giới/giấy chứng nhận.\n- Với tranh chấp thuần túy về đất: hướng người dân đến cơ quan quản lý đất đai, UBND/cơ quan giải quyết tranh chấp hoặc Tòa án theo trường hợp.\n- Nếu có dấu hiệu lừa đảo, giả mạo giấy tờ, hủy hoại tài sản, cố ý gây thương tích, gây rối… mới chuyển sang góc độ hình sự/ANTT tương ứng.\n- Do pháp luật đất đai biến động mạnh giai đoạn 2025–2026, bắt buộc kiểm tra live khi hỏi thẩm quyền, thủ tục, tiền đất hoặc mức xử phạt.\n\n## G. Cư trú, căn cước, VNeID, đăng ký xe\n- Ưu tiên Cổng Dịch vụ công Bộ Công an tại thời điểm trả lời.\n- Không dựa vào trang DVC cũ có tên cấp huyện nếu quy định đã chuyển sang mô hình 2 cấp.\n- Nếu người dân hỏi “cần giấy tờ gì/bao lâu/làm ở đâu”, trả lời theo TTHC live.\n\n## H. Ma túy\n- Luật Phòng, chống ma túy hiện hành từ 01/07/2026 là Luật 120/2025/QH15.\n- Điều 256a BLHS về “Tội sử dụng trái phép chất ma túy” chỉ áp dụng cho các trường hợp luật định, không được nói rằng mọi hành vi sử dụng trái phép ma túy đều mặc nhiên là tội phạm.\n- Phải phân biệt quản lý người sử dụng, người nghiện/cai nghiện và trách nhiệm hình sự.\n\n## I. Dữ liệu và bảo mật\n- Không yêu cầu mật khẩu, OTP, PIN.\n- Không khuyến khích gửi CCCD đầy đủ, số tài khoản, hồ sơ bệnh án, hồ sơ vụ án, dữ liệu nghiệp vụ nếu không cần thiết.\n- Không tiết lộ bí mật nhà nước, dữ liệu cá nhân người khác, thông tin nội bộ.\n- Nếu người dùng đưa dữ liệu nhạy cảm, nhắc che bớt và chỉ cung cấp phần cần thiết.\n\n## J. Mẫu đầu ra pháp lý\n**Công an xã Pơng Drang hướng dẫn như sau:**\n1. **Kết luận ngắn:** ...\n2. **Căn cứ pháp lý:** tên văn bản, điều/khoản nếu đã xác minh.\n3. **Cách thực hiện/điểm cần làm rõ:** ...\n4. **Lưu ý:** ...\n5. **Nguồn chính thức:** ...\n\nNếu chưa đủ căn cứ: nói rõ chưa đủ, hỏi dữ kiện cần thiết, không đoán.\n",
+  "sources": [
+    {
+      "id": "S001",
+      "domain": "hinh_su",
+      "title": "Bộ luật Hình sự - Văn bản hợp nhất",
+      "number": "135/VBHN-VPQH",
+      "issuer": "Văn phòng Quốc hội",
+      "promulgated": "2025-09-05",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=0&docid=215260&pageid=27160",
+      "note": "Hợp nhất BLHS 100/2015/QH13, Luật 12/2017/QH14, Luật Tư pháp người chưa thành niên 59/2024/QH15 và Luật 86/2025/QH15."
+    },
+    {
+      "id": "S002",
+      "domain": "to_tung_hinh_su",
+      "title": "Bộ luật Tố tụng hình sự - Văn bản hợp nhất",
+      "number": "104/VBHN-VPQH",
+      "issuer": "Văn phòng Quốc hội",
+      "promulgated": "2025-08-27",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?docid=215223&pageid=27160",
+      "note": "Hợp nhất BLTTHS 101/2015/QH13 và các sửa đổi, gồm Luật 99/2025/QH15; có cập nhật thuật ngữ/thẩm quyền theo mô hình chính quyền địa phương 2 cấp."
+    },
+    {
+      "id": "S003",
+      "domain": "tu_phap_nguoi_chua_thanh_nien",
+      "title": "Luật Tư pháp người chưa thành niên",
+      "number": "59/2024/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2024-11-30",
+      "effective": "2026-01-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=212487&pageid=27160&typegroupid=3",
+      "note": "Điều chỉnh xử lý chuyển hướng, hình phạt và thủ tục tố tụng đối với người chưa thành niên."
+    },
+    {
+      "id": "S004",
+      "domain": "thi_hanh_an_hinh_su",
+      "title": "Luật Thi hành án hình sự",
+      "number": "127/2025/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2025-12-10",
+      "effective": "2026-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?docid=216548&orggroupid=1&pageid=27160"
+    },
+    {
+      "id": "S005",
+      "domain": "tam_giu_tam_giam",
+      "title": "Luật Thi hành tạm giữ, tạm giam và cấm đi khỏi nơi cư trú",
+      "number": "128/2025/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2025-12-10",
+      "effective": "2026-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=216508&pageid=27160&typegroupid=3"
+    },
+    {
+      "id": "S006",
+      "domain": "xu_ly_vi_pham_hanh_chinh",
+      "title": "Luật sửa đổi, bổ sung một số điều của Luật Xử lý vi phạm hành chính",
+      "number": "88/2025/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2025-06-25",
+      "effective": "2025-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=214591&pageid=27160&typegroupid=3",
+      "note": "Phải đọc cùng Luật Xử lý vi phạm hành chính 15/2012/QH13 và Luật 67/2020/QH14."
+    },
+    {
+      "id": "S007",
+      "domain": "xu_ly_vi_pham_hanh_chinh",
+      "title": "Nghị định quy định chi tiết Luật XLVPHC về thẩm quyền xử phạt",
+      "number": "189/2025/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2025-07-01",
+      "effective": "2025-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?docid=214510&pageid=27160"
+    },
+    {
+      "id": "S008",
+      "domain": "antt_xu_phat",
+      "title": "Nghị định xử phạt VPHC lĩnh vực ANTT, ATXH, tệ nạn xã hội, bạo lực gia đình",
+      "number": "282/2025/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2025-10-30",
+      "effective": "2025-12-15",
+      "effective_status": "current_partially_amended",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=215770&orggroupid=2&pageid=27160",
+      "note": "Đã bị tác động một phần bởi Nghị định 17/2026/NĐ-CP; trước khi nêu mức phạt/thẩm quyền phải kiểm tra bản hiện hành."
+    },
+    {
+      "id": "S009",
+      "domain": "antt_xu_phat",
+      "title": "Nghị định sửa đổi quy định xử phạt hàng không và thẩm quyền có liên quan NĐ 282/2025",
+      "number": "17/2026/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2026-01-14",
+      "effective": "2026-03-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=0&docid=216640&pageid=27160"
+    },
+    {
+      "id": "S010",
+      "domain": "to_tung_hanh_chinh",
+      "title": "Luật Tố tụng hành chính - Văn bản hợp nhất",
+      "number": "109/VBHN-VPQH",
+      "issuer": "Văn phòng Quốc hội",
+      "promulgated": "2025-08-27",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=2629&docid=215228&pageid=27160"
+    },
+    {
+      "id": "S011",
+      "domain": "khieu_nai",
+      "title": "Luật Khiếu nại - Văn bản hợp nhất",
+      "number": "28/VBHN-VPQH",
+      "issuer": "Văn phòng Quốc hội",
+      "promulgated": "2026-03-13",
+      "effective_status": "current_subject_to_136_2025_from_2026_07_01",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?docid=217201&pageid=27160"
+    },
+    {
+      "id": "S012",
+      "domain": "to_cao",
+      "title": "Luật Tố cáo - Văn bản hợp nhất",
+      "number": "29/VBHN-VPQH",
+      "issuer": "Văn phòng Quốc hội",
+      "promulgated": "2026-03-13",
+      "effective_status": "current_subject_to_136_2025_from_2026_07_01",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=2629&docid=217202&pageid=27160"
+    },
+    {
+      "id": "S013",
+      "domain": "khieu_nai_to_cao_tiep_cong_dan",
+      "title": "Luật sửa đổi Luật Tiếp công dân, Luật Khiếu nại, Luật Tố cáo",
+      "number": "136/2025/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2025-12-10",
+      "effective": "2026-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?docid=216516&pageid=27160"
+    },
+    {
+      "id": "S014",
+      "domain": "cu_tru",
+      "title": "Luật Cư trú",
+      "number": "68/2020/QH14",
+      "issuer": "Quốc hội",
+      "promulgated": "2020-11-13",
+      "effective": "2021-07-01",
+      "effective_status": "current_as_amended",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=202609&pageid=27160&typegroupid=3",
+      "note": "Đọc cùng Luật 118/2025/QH15 có hiệu lực 01/07/2026."
+    },
+    {
+      "id": "S015",
+      "domain": "cu_tru",
+      "title": "Nghị định chi tiết Luật Cư trú",
+      "number": "154/2024/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2024-11-26",
+      "effective": "2025-01-10",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=0&docid=211821&pageid=27160"
+    },
+    {
+      "id": "S016",
+      "domain": "an_ninh_trat_tu",
+      "title": "Luật sửa đổi, bổ sung một số điều của 10 luật có liên quan đến an ninh, trật tự",
+      "number": "118/2025/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2025-12-10",
+      "effective": "2026-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?docid=216534&pageid=27160",
+      "note": "Có sửa đổi Luật Cư trú, Luật Căn cước, Luật TTATGTĐB, Luật vũ khí và các luật ANTT khác."
+    },
+    {
+      "id": "S017",
+      "domain": "can_cuoc",
+      "title": "Luật Căn cước",
+      "number": "26/2023/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2023-11-27",
+      "effective": "2024-07-01",
+      "effective_status": "current_as_amended",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=209628&pageid=27160&typegroupid=3",
+      "note": "Đọc cùng Luật 118/2025/QH15 có hiệu lực 01/07/2026."
+    },
+    {
+      "id": "S018",
+      "domain": "can_cuoc",
+      "title": "Nghị định chi tiết Luật Căn cước",
+      "number": "70/2024/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2024-06-25",
+      "effective": "2024-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=210497&orggroupid=2&pageid=27160"
+    },
+    {
+      "id": "S019",
+      "domain": "dinh_danh_dien_tu",
+      "title": "Nghị định về định danh và xác thực điện tử",
+      "number": "69/2024/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2024-06-25",
+      "effective": "2024-07-01",
+      "effective_status": "current_until_amendment_effective",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=210491&pageid=27160"
+    },
+    {
+      "id": "S020",
+      "domain": "dinh_danh_dien_tu",
+      "title": "Nghị định sửa đổi Nghị định 69/2024/NĐ-CP về định danh và xác thực điện tử",
+      "number": "320/2026/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2026-08-13",
+      "effective": "2026-09-28",
+      "effective_status": "upcoming_not_yet_effective_as_of_2026_09_05",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=219189&pageid=27160&typegroupid=4",
+      "note": "KHÔNG dùng như quy định hiện hành trước 28/09/2026."
+    },
+    {
+      "id": "S021",
+      "domain": "ma_tuy",
+      "title": "Luật Phòng, chống ma túy",
+      "number": "120/2025/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2025-12-10",
+      "effective": "2026-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=216502&orggroupid=1&pageid=27160",
+      "note": "Là luật phòng, chống ma túy hiện hành từ 01/07/2026; không dùng Luật 73/2021/QH14 như nguồn hiện hành chính."
+    },
+    {
+      "id": "S022",
+      "domain": "ma_tuy",
+      "title": "Nghị định chi tiết Luật Phòng, chống ma túy",
+      "number": "163/2026/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2026-05-15",
+      "effective": "2026-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?docid=218256&pageid=27160&typegroupid=4"
+    },
+    {
+      "id": "S023",
+      "domain": "giao_thong",
+      "title": "Luật Trật tự, an toàn giao thông đường bộ",
+      "number": "36/2024/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2024-06-27",
+      "effective": "2025-01-01",
+      "effective_status": "current_as_amended",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=211194&pageid=27160",
+      "note": "Đọc cùng Luật 118/2025/QH15 từ 01/07/2026."
+    },
+    {
+      "id": "S024",
+      "domain": "dang_ky_xe",
+      "title": "Thông tư quy định cấp, thu hồi chứng nhận đăng ký xe, biển số xe",
+      "number": "79/2024/TT-BCA",
+      "issuer": "Bộ Công an",
+      "promulgated": "2024-11-15",
+      "effective": "2025-01-01",
+      "effective_status": "current_as_amended",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=211945&orggroupid=4&pageid=27160",
+      "note": "Được sửa đổi bởi TT 13/2025/TT-BCA và TT 51/2025/TT-BCA."
+    },
+    {
+      "id": "S025",
+      "domain": "dang_ky_xe",
+      "title": "Thông tư sửa đổi Thông tư 79/2024/TT-BCA",
+      "number": "51/2025/TT-BCA",
+      "issuer": "Bộ Công an",
+      "promulgated": "2025-06-30",
+      "effective": "2025-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.bocongan.gov.vn/co-so-du-lieu-van-ban/thong-tu-sua-doi-bo-sung-mot-so-dieu-cua-thong-tu-so-79-2024-tt-bca-ngay-15-11-2024-cua-bo-truong-bo-cong-an-quy-dinh-ve-cap-thu-hoi-chung-nhan-dang-ky-xe-bien-so-xe-co-gioi-xe-may-chuyen-dung-da-duoc-sua-doi-bo-sung-tai-thong-tu-so-13-2025-tt-bca-ngay-28-02-2025-cua-bo-truong-bo-cong-an-1757502079"
+    },
+    {
+      "id": "S026",
+      "domain": "dat_dai",
+      "title": "Luật Đất đai",
+      "number": "31/2024/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2024-01-18",
+      "effective_status": "current_as_adjusted_by_43_2024",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=211189&orggroupid=1&pageid=27160",
+      "note": "Thời điểm thi hành thực tế đã được điều chỉnh sớm bởi Luật 43/2024/QH15."
+    },
+    {
+      "id": "S027",
+      "domain": "dat_dai",
+      "title": "Luật sửa đổi Luật Đất đai và một số luật khác",
+      "number": "43/2024/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2024-06-29",
+      "effective": "2024-08-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=211201&pageid=27160"
+    },
+    {
+      "id": "S028",
+      "domain": "dat_dai",
+      "title": "Nghị định chi tiết thi hành một số điều của Luật Đất đai",
+      "number": "102/2024/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2024-07-30",
+      "effective": "2024-08-01",
+      "effective_status": "current_as_amended",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=210795&pageid=27160"
+    },
+    {
+      "id": "S029",
+      "domain": "dat_dai",
+      "title": "Nghị định phân định thẩm quyền chính quyền địa phương 02 cấp trong lĩnh vực đất đai",
+      "number": "151/2025/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2025-06-12",
+      "effective": "2025-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?docid=213927&pageid=27160"
+    },
+    {
+      "id": "S030",
+      "domain": "dat_dai",
+      "title": "Nghị định sửa đổi các nghị định chi tiết thi hành Luật Đất đai",
+      "number": "226/2025/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2025-08-15",
+      "effective": "2025-08-15",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=0&docid=214955&pageid=27160"
+    },
+    {
+      "id": "S031",
+      "domain": "dat_dai",
+      "title": "Nghị định hướng dẫn cơ chế tháo gỡ vướng mắc tổ chức thi hành Luật Đất đai",
+      "number": "49/2026/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2026-01-31",
+      "effective": "2026-01-31",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=216860&pageid=27160&typegroupid=4"
+    },
+    {
+      "id": "S032",
+      "domain": "dat_dai_xu_phat",
+      "title": "Nghị định xử phạt VPHC trong lĩnh vực đất đai",
+      "number": "123/2024/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2024-10-04",
+      "effective": "2024-10-04",
+      "effective_status": "current_as_amended",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=211356&pageid=27160"
+    },
+    {
+      "id": "S033",
+      "domain": "dat_dai_xu_phat",
+      "title": "Nghị định sửa đổi Nghị định 123/2024/NĐ-CP về xử phạt đất đai",
+      "number": "281/2026/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2026-07-13",
+      "effective": "2026-08-31",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=218863&pageid=27160"
+    },
+    {
+      "id": "S034",
+      "domain": "vu_khi",
+      "title": "Luật Quản lý, sử dụng vũ khí, vật liệu nổ và công cụ hỗ trợ",
+      "number": "42/2024/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2024-06-29",
+      "effective": "2025-01-01",
+      "effective_status": "current_as_amended",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=211200&orggroupid=1&pageid=27160",
+      "note": "Đọc cùng Luật 118/2025/QH15 từ 01/07/2026."
+    },
+    {
+      "id": "S035",
+      "domain": "pccc_cnch",
+      "title": "Luật Phòng cháy, chữa cháy và cứu nạn, cứu hộ",
+      "number": "55/2024/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2024-11-29",
+      "effective": "2025-07-01",
+      "effective_status": "current_as_amended",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=212483&pageid=27160"
+    },
+    {
+      "id": "S036",
+      "domain": "pccc_cnch",
+      "title": "Nghị định chi tiết Luật PCCC và CNCH",
+      "number": "105/2025/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2025-05-15",
+      "effective": "2025-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=0&docid=213702&pageid=27160"
+    },
+    {
+      "id": "S037",
+      "domain": "an_ninh_mang",
+      "title": "Luật An ninh mạng",
+      "number": "116/2025/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2025-12-10",
+      "effective": "2026-07-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=216499&pageid=27160"
+    },
+    {
+      "id": "S038",
+      "domain": "bi_mat_nha_nuoc",
+      "title": "Luật Bảo vệ bí mật nhà nước",
+      "number": "117/2025/QH15",
+      "issuer": "Quốc hội",
+      "promulgated": "2025-12-10",
+      "effective": "2026-03-01",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=216500&pageid=27160&typegroupid=3"
+    },
+    {
+      "id": "S039",
+      "domain": "tthc_dien_tu",
+      "title": "Nghị định sửa đổi quy định thực hiện TTHC trên môi trường điện tử",
+      "number": "310/2026/NĐ-CP",
+      "issuer": "Chính phủ",
+      "promulgated": "2026-08-05",
+      "effective": "2026-08-05",
+      "effective_status": "current",
+      "checked_at": "2026-09-05",
+      "url": "https://vanban.chinhphu.vn/?docid=219101&orggroupid=2&pageid=27160"
+    },
+    {
+      "id": "S040",
+      "domain": "dvc_cu_tru",
+      "title": "Cổng DVC Bộ Công an - Đăng ký tạm trú",
+      "number": "TTHC 1.004194",
+      "issuer": "Bộ Công an",
+      "effective_status": "dynamic_current_portal",
+      "checked_at": "2026-09-05",
+      "url": "https://dichvucong.bocongan.gov.vn/public/link-to/chi-tiet-thu-tuc?ma-thu-tuc=26356",
+      "note": "Nguồn động để kiểm tra cơ quan thực hiện, thành phần hồ sơ, thời hạn và biểu mẫu hiện hành."
+    },
+    {
+      "id": "S041",
+      "domain": "dvc_can_cuoc",
+      "title": "Cổng DVC Bộ Công an - Danh mục thủ tục cấp, quản lý căn cước",
+      "number": "DVC-CAN-CUOC",
+      "issuer": "Bộ Công an",
+      "effective_status": "dynamic_current_portal",
+      "checked_at": "2026-09-05",
+      "url": "https://dichvucong.bocongan.gov.vn/bocongan/bothutuc/listThuTuc?linh_vuc=CAP_CCCD"
+    },
+    {
+      "id": "S042",
+      "domain": "dvc_dang_ky_xe",
+      "title": "Cổng DVC Bộ Công an - Đăng ký xe lần đầu trực tuyến toàn trình đối với xe sản xuất lắp ráp trong nước",
+      "number": "TTHC 1.012575",
+      "issuer": "Bộ Công an",
+      "effective_status": "dynamic_current_portal",
+      "checked_at": "2026-09-05",
+      "url": "https://dichvucong.bocongan.gov.vn/bocongan/bothutuc/tthc?matt=56952"
+    }
+  ],
+  "router": {
+    "version": "1.0",
+    "as_of": "2026-09-05",
+    "rules": [
+      {
+        "domain": "hinh_su",
+        "keywords": [
+          "trộm",
+          "lừa đảo",
+          "lạm dụng tín nhiệm",
+          "cố ý gây thương tích",
+          "đánh nhau",
+          "gây rối",
+          "chống người thi hành công vụ",
+          "đánh bạc",
+          "tội phạm",
+          "hình sự"
+        ],
+        "retrieve": [
+          "01_hinh_su"
+        ],
+        "live_check": [
+          "nếu hỏi mức hình phạt hiện hành hoặc điều khoản cụ thể có sửa đổi"
+        ]
+      },
+      {
+        "domain": "to_tung_hinh_su",
+        "keywords": [
+          "tố giác",
+          "tin báo tội phạm",
+          "khởi tố",
+          "điều tra",
+          "bị can",
+          "bị cáo",
+          "người bị tố giác",
+          "tiếp nhận tin báo"
+        ],
+        "retrieve": [
+          "02_to_tung_hinh_su"
+        ],
+        "live_check": [
+          "thời hạn/thẩm quyền nếu hồ sơ có tình tiết đặc biệt"
+        ]
+      },
+      {
+        "domain": "ma_tuy",
+        "keywords": [
+          "ma túy",
+          "cai nghiện",
+          "nghiện",
+          "test ma túy",
+          "sử dụng trái phép",
+          "tàng trữ ma túy",
+          "mua bán ma túy"
+        ],
+        "retrieve": [
+          "07_ma_tuy",
+          "01_hinh_su"
+        ],
+        "live_check": [
+          "mức xử phạt, TTHC, biểu mẫu"
+        ]
+      },
+      {
+        "domain": "hanh_chinh",
+        "keywords": [
+          "xử phạt",
+          "phạt bao nhiêu",
+          "vi phạm hành chính",
+          "lập biên bản",
+          "thẩm quyền xử phạt",
+          "khiếu nại",
+          "tố cáo"
+        ],
+        "retrieve": [
+          "04_hanh_chinh_xu_phat_antt",
+          "05_khieu_nai_to_cao_tthc"
+        ],
+        "live_check": [
+          "ALWAYS đối với mức phạt/thẩm quyền/thời hạn"
+        ]
+      },
+      {
+        "domain": "cu_tru",
+        "keywords": [
+          "tạm trú",
+          "thường trú",
+          "lưu trú",
+          "cư trú",
+          "CT01"
+        ],
+        "retrieve": [
+          "06_cu_tru_can_cuoc_vneid"
+        ],
+        "live_check": [
+          "ALWAYS đối với hồ sơ, thời hạn, nơi nộp, biểu mẫu"
+        ]
+      },
+      {
+        "domain": "can_cuoc_vneid",
+        "keywords": [
+          "căn cước",
+          "CCCD",
+          "VNeID",
+          "định danh điện tử",
+          "mức độ 2"
+        ],
+        "retrieve": [
+          "06_cu_tru_can_cuoc_vneid"
+        ],
+        "live_check": [
+          "ALWAYS đối với TTHC; sau 28/09/2026 bắt buộc cập nhật NĐ 320/2026"
+        ]
+      },
+      {
+        "domain": "giao_thong",
+        "keywords": [
+          "đăng ký xe",
+          "biển số",
+          "sang tên xe",
+          "tai nạn giao thông",
+          "giao thông"
+        ],
+        "retrieve": [
+          "08_giao_thong_dang_ky_xe",
+          "01_hinh_su"
+        ],
+        "live_check": [
+          "ALWAYS đối với TTHC/ lệ phí/ thẩm quyền"
+        ]
+      },
+      {
+        "domain": "dat_dai",
+        "keywords": [
+          "đất",
+          "sổ đỏ",
+          "giấy chứng nhận",
+          "ranh đất",
+          "tranh chấp đất",
+          "thu hồi đất",
+          "bồi thường đất"
+        ],
+        "retrieve": [
+          "09_dat_dai"
+        ],
+        "live_check": [
+          "ALWAYS đối với thủ tục, thẩm quyền, tiền, xử phạt"
+        ]
+      },
+      {
+        "domain": "pccc_vu_khi_mang",
+        "keywords": [
+          "pháo",
+          "vũ khí",
+          "dao",
+          "súng",
+          "vật liệu nổ",
+          "PCCC",
+          "cháy",
+          "an ninh mạng",
+          "bí mật nhà nước"
+        ],
+        "retrieve": [
+          "10_vu_khi_pccc_an_ninh_mang"
+        ],
+        "live_check": [
+          "nếu hỏi mức phạt, giấy phép, thủ tục"
+        ]
+      }
+    ],
+    "global_live_check_triggers": [
+      "hôm nay",
+      "hiện nay",
+      "mới nhất",
+      "còn hiệu lực",
+      "mức phạt",
+      "phạt bao nhiêu",
+      "lệ phí",
+      "thời hạn",
+      "thẩm quyền",
+      "hồ sơ cần gì",
+      "làm ở đâu",
+      "biểu mẫu"
+    ]
+  },
+  "chunks": [
+    {
+      "id": "HS-001",
+      "domain": "hinh_su",
+      "title": "Nguồn BLHS hiện hành",
+      "content": "Bộ luật Hình sự nên được tra từ Văn bản hợp nhất 135/VBHN-VPQH. Bản hợp nhất thể hiện BLHS 100/2015/QH13, Luật 12/2017/QH14, Luật Tư pháp người chưa thành niên 59/2024/QH15 và Luật 86/2025/QH15. Khi trả lời tội danh phải đối chiếu đúng thời điểm hành vi.",
+      "source_ids": [
+        "S001"
+      ],
+      "keywords": [
+        "BLHS",
+        "hình sự",
+        "văn bản hợp nhất"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HS-002",
+      "domain": "hinh_su",
+      "title": "Suy luận trách nhiệm hình sự",
+      "content": "Không kết luận một người phạm tội từ lời kể một phía. Phải làm rõ đầy đủ dấu hiệu cấu thành, lỗi, tuổi, hậu quả, giá trị tài sản, tỷ lệ tổn thương, tiền sử xử lý và tình tiết đặc biệt. Cách diễn đạt phù hợp: 'có dấu hiệu/có thể thuộc trường hợp/cần xác minh thêm'.",
+      "source_ids": [
+        "S001",
+        "S002"
+      ],
+      "keywords": [
+        "phạm tội",
+        "có tội",
+        "trách nhiệm hình sự"
+      ],
+      "risk_level": "high",
+      "requires_live_check": false,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HS-003",
+      "domain": "hinh_su",
+      "title": "Điều 134 - Cố ý gây thương tích",
+      "content": "Điều 134 BLHS quy định tội cố ý gây thương tích hoặc gây tổn hại cho sức khỏe người khác. Khoản 1 có ngưỡng tỷ lệ tổn thương từ 11% đến 30%; dưới 11% vẫn có thể thuộc cấu thành nếu có một trong các tình tiết luật liệt kê. Vì vậy không được kết luận chỉ dựa vào tỷ lệ thương tích.",
+      "source_ids": [
+        "S001"
+      ],
+      "keywords": [
+        "cố ý gây thương tích",
+        "thương tích",
+        "11%",
+        "Điều 134"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HS-004",
+      "domain": "hinh_su",
+      "title": "Điều 173 - Trộm cắp tài sản",
+      "content": "Điều 173 BLHS: khoản 1 áp dụng ngưỡng tài sản từ 2.000.000 đồng đến dưới 50.000.000 đồng; dưới 2.000.000 đồng vẫn có thể bị truy cứu khi thuộc các trường hợp luật định như đã bị xử phạt hành chính về hành vi chiếm đoạt mà còn vi phạm, có tiền án liên quan chưa được xóa, gây ảnh hưởng xấu đến ANTT hoặc tài sản là phương tiện kiếm sống chính theo điều luật.",
+      "source_ids": [
+        "S001"
+      ],
+      "keywords": [
+        "trộm cắp",
+        "2 triệu",
+        "Điều 173"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HS-005",
+      "domain": "hinh_su",
+      "title": "Điều 174 - Lừa đảo chiếm đoạt tài sản",
+      "content": "Điều 174 BLHS điều chỉnh hành vi dùng thủ đoạn gian dối nhằm chiếm đoạt tài sản. Khoản 1 dùng ngưỡng từ 2.000.000 đồng đến dưới 50.000.000 đồng và có các trường hợp dưới ngưỡng vẫn bị truy cứu. Phải phân biệt với tranh chấp dân sự, chậm trả nợ hoặc vi phạm hợp đồng không có thủ đoạn gian dối chiếm đoạt.",
+      "source_ids": [
+        "S001"
+      ],
+      "keywords": [
+        "lừa đảo",
+        "gian dối",
+        "Điều 174"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HS-006",
+      "domain": "hinh_su",
+      "title": "Điều 175 - Lạm dụng tín nhiệm chiếm đoạt tài sản",
+      "content": "Điều 175 BLHS xử lý các trường hợp chiếm đoạt tài sản sau khi tài sản ban đầu được giao qua quan hệ hợp pháp như vay, mượn, thuê, hợp đồng hoặc hình thức tương tự. Khoản 1 có ngưỡng cơ bản từ 4.000.000 đồng; dưới ngưỡng vẫn có trường hợp luật định. Không đồng nhất mọi việc không trả nợ với tội phạm.",
+      "source_ids": [
+        "S001"
+      ],
+      "keywords": [
+        "lạm dụng tín nhiệm",
+        "4 triệu",
+        "Điều 175"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HS-007",
+      "domain": "hinh_su",
+      "title": "Điều 318 - Gây rối trật tự công cộng",
+      "content": "Điều 318 BLHS yêu cầu xem xét hành vi gây rối và mức độ ảnh hưởng xấu đến an ninh, trật tự, an toàn xã hội hoặc tiền sử xử lý theo điều luật. Không đồng nhất mọi cãi vã/xô xát với tội gây rối.",
+      "source_ids": [
+        "S001"
+      ],
+      "keywords": [
+        "gây rối",
+        "trật tự công cộng",
+        "Điều 318"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HS-008",
+      "domain": "hinh_su",
+      "title": "Điều 330 - Chống người thi hành công vụ",
+      "content": "Điều 330 BLHS quy định hành vi dùng vũ lực, đe dọa dùng vũ lực hoặc thủ đoạn khác cản trở người thi hành công vụ thực hiện công vụ hoặc ép buộc họ thực hiện hành vi trái pháp luật. Phải xác định tính hợp pháp của công vụ và hành vi cản trở cụ thể.",
+      "source_ids": [
+        "S001"
+      ],
+      "keywords": [
+        "chống người thi hành công vụ",
+        "Điều 330"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HS-009",
+      "domain": "hinh_su",
+      "title": "Điều 260 - Vi phạm quy định về tham gia giao thông đường bộ",
+      "content": "Điều 260 BLHS gắn trách nhiệm hình sự với việc vi phạm quy định an toàn giao thông đường bộ và hậu quả luật định. Không thể kết luận chỉ vì có tai nạn; phải làm rõ hành vi vi phạm, lỗi, hậu quả và quan hệ nhân quả.",
+      "source_ids": [
+        "S001"
+      ],
+      "keywords": [
+        "tai nạn",
+        "Điều 260",
+        "giao thông"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HS-010",
+      "domain": "hinh_su",
+      "title": "Điều 321, 322 - Đánh bạc và tổ chức đánh bạc",
+      "content": "Điều 321 quy định tội đánh bạc; khoản 1 có ngưỡng tiền/hiện vật từ 5.000.000 đồng và các trường hợp dưới ngưỡng khi có tiền sử xử lý theo luật. Điều 322 quy định tổ chức đánh bạc hoặc gá bạc với các điều kiện cụ thể về số người, số chiếu bạc, tổng tiền/hiện vật, tổ chức phục vụ và tiền sử xử lý.",
+      "source_ids": [
+        "S001"
+      ],
+      "keywords": [
+        "đánh bạc",
+        "tổ chức đánh bạc",
+        "Điều 321",
+        "Điều 322"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "TTHS-001",
+      "domain": "to_tung_hinh_su",
+      "title": "Suy đoán vô tội",
+      "content": "Điều 13 BLTTHS: người bị buộc tội được coi là không có tội cho đến khi được chứng minh theo trình tự, thủ tục luật định và có bản án kết tội của Tòa án đã có hiệu lực; khi không đủ và không thể làm sáng tỏ căn cứ buộc tội thì phải kết luận người bị buộc tội không có tội.",
+      "source_ids": [
+        "S002"
+      ],
+      "keywords": [
+        "suy đoán vô tội",
+        "Điều 13",
+        "bị can",
+        "bị cáo"
+      ],
+      "risk_level": "high",
+      "requires_live_check": false,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "TTHS-002",
+      "domain": "to_tung_hinh_su",
+      "title": "Trách nhiệm tiếp nhận nguồn tin",
+      "content": "Điều 145 BLTTHS quy định mọi tố giác, tin báo về tội phạm, kiến nghị khởi tố phải được tiếp nhận đầy đủ, giải quyết kịp thời; cơ quan, tổ chức có trách nhiệm tiếp nhận không được từ chối.",
+      "source_ids": [
+        "S002"
+      ],
+      "keywords": [
+        "tố giác",
+        "tin báo tội phạm",
+        "Điều 145"
+      ],
+      "risk_level": "high",
+      "requires_live_check": false,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "TTHS-003",
+      "domain": "to_tung_hinh_su",
+      "title": "Công an cấp xã tiếp nhận tin báo",
+      "content": "Khoản 3 Điều 146 BLTTHS hiện hành: Công an cấp xã, Đồn Công an có trách nhiệm tiếp nhận tố giác, tin báo về tội phạm, lập biên bản, tiến hành kiểm tra, xác minh sơ bộ và chuyển ngay kèm tài liệu, đồ vật liên quan cho Cơ quan điều tra có thẩm quyền.",
+      "source_ids": [
+        "S002"
+      ],
+      "keywords": [
+        "Công an xã",
+        "tiếp nhận tố giác",
+        "Điều 146"
+      ],
+      "risk_level": "high",
+      "requires_live_check": false,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "TTHS-004",
+      "domain": "to_tung_hinh_su",
+      "title": "Thời hạn giải quyết nguồn tin",
+      "content": "Điều 147 BLTTHS quy định thời hạn cơ bản 20 ngày để kiểm tra, xác minh và ra quyết định; trường hợp phức tạp hoặc phải xác minh nhiều địa điểm có cơ chế kéo dài/gia hạn theo luật. Chatbot không được hứa thời điểm kết quả nếu chưa biết hồ sơ thuộc trường hợp nào.",
+      "source_ids": [
+        "S002"
+      ],
+      "keywords": [
+        "20 ngày",
+        "thời hạn tin báo",
+        "Điều 147"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HC-001",
+      "domain": "hanh_chinh",
+      "title": "Luật hành chính là lĩnh vực",
+      "content": "Không có một văn bản duy nhất tên 'Luật Hành chính' bao quát toàn bộ. Các câu hỏi hành chính phải định tuyến theo nhóm: xử lý VPHC, khiếu nại, tố cáo, tiếp công dân, tố tụng hành chính, thủ tục hành chính hoặc luật chuyên ngành.",
+      "source_ids": [
+        "S006",
+        "S010",
+        "S011",
+        "S012",
+        "S013"
+      ],
+      "keywords": [
+        "luật hành chính",
+        "hành chính"
+      ],
+      "risk_level": "medium",
+      "requires_live_check": false,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HC-002",
+      "domain": "hanh_chinh",
+      "title": "Mức phạt ANTT phải tra live",
+      "content": "Nghị định 282/2025/NĐ-CP là trục xử phạt trong ANTT/ATXH/tệ nạn xã hội/bạo lực gia đình nhưng đã có tác động sửa đổi một phần bởi NĐ 17/2026. Mọi câu hỏi mức phạt/thẩm quyền phải tra bản hiện hành, không dùng bảng phạt lưu cứng.",
+      "source_ids": [
+        "S008",
+        "S009",
+        "S007"
+      ],
+      "keywords": [
+        "mức phạt",
+        "ANTT",
+        "Nghị định 282"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "HC-003",
+      "domain": "hanh_chinh",
+      "title": "Khiếu nại và tố cáo khác nhau",
+      "content": "Khiếu nại tập trung vào yêu cầu xem xét lại quyết định/hành vi ảnh hưởng quyền, lợi ích hợp pháp của người khiếu nại theo luật; tố cáo là cá nhân báo hành vi vi phạm pháp luật đến cơ quan/người có thẩm quyền. Phải hỏi đúng mục tiêu của người dân trước khi hướng dẫn.",
+      "source_ids": [
+        "S011",
+        "S012",
+        "S013"
+      ],
+      "keywords": [
+        "khiếu nại",
+        "tố cáo"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "CT-001",
+      "domain": "cu_tru",
+      "title": "Đăng ký tạm trú - snapshot 05/09/2026",
+      "content": "Cổng DVC Bộ Công an tại thời điểm kiểm tra công bố đăng ký tạm trú do Công an xã thực hiện, trực tiếp hoặc trực tuyến, thời hạn niêm yết 03 ngày làm việc. Hồ sơ phổ thông gồm CT01 và giấy tờ/tài liệu chứng minh chỗ ở hợp pháp; người chưa thành niên có yêu cầu về ý kiến cha, mẹ hoặc người giám hộ theo TTHC.",
+      "source_ids": [
+        "S040",
+        "S014",
+        "S015",
+        "S016"
+      ],
+      "keywords": [
+        "tạm trú",
+        "CT01",
+        "3 ngày"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "CC-001",
+      "domain": "can_cuoc",
+      "title": "Nguồn căn cước hiện hành",
+      "content": "Luật Căn cước 26/2023/QH15 và NĐ 70/2024/NĐ-CP là nguồn nền, đọc cùng Luật 118/2025/QH15 từ 01/07/2026. Cổng DVC Bộ Công an là nguồn động để xác định thủ tục/cơ quan thực hiện hiện tại.",
+      "source_ids": [
+        "S017",
+        "S018",
+        "S016",
+        "S041"
+      ],
+      "keywords": [
+        "căn cước",
+        "CCCD",
+        "cấp lại",
+        "cấp đổi"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "VNEID-001",
+      "domain": "dinh_danh_dien_tu",
+      "title": "NĐ 320/2026 chưa hiệu lực tại 05/09/2026",
+      "content": "NĐ 69/2024/NĐ-CP là nguồn định danh điện tử đang áp dụng tại 05/09/2026. NĐ 320/2026/NĐ-CP đã ban hành ngày 13/08/2026 nhưng có hiệu lực từ 28/09/2026, vì vậy không được áp dụng như quy định hiện hành trước ngày đó.",
+      "source_ids": [
+        "S019",
+        "S020"
+      ],
+      "keywords": [
+        "VNeID",
+        "Nghị định 320/2026",
+        "28/09/2026"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "MT-001",
+      "domain": "ma_tuy",
+      "title": "Luật PCTMT hiện hành từ 01/07/2026",
+      "content": "Luật Phòng, chống ma túy 120/2025/QH15 có hiệu lực 01/07/2026, cùng NĐ 163/2026/NĐ-CP. Câu trả lời hiện hành sau mốc này không dùng Luật 73/2021/QH14 làm nguồn pháp lý chính.",
+      "source_ids": [
+        "S021",
+        "S022"
+      ],
+      "keywords": [
+        "Luật ma túy",
+        "120/2025",
+        "cai nghiện"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "MT-002",
+      "domain": "ma_tuy",
+      "title": "Điều 256a không áp dụng cho mọi người sử dụng ma túy",
+      "content": "Điều 256a BLHS quy định tội sử dụng trái phép chất ma túy đối với người thuộc các trường hợp luật định liên quan thời hạn cai nghiện, điều trị nghiện bằng thuốc thay thế, quản lý sau cai và các mốc quản lý cụ thể. Không được khẳng định mọi hành vi sử dụng trái phép ma túy đều là tội phạm.",
+      "source_ids": [
+        "S001",
+        "S021"
+      ],
+      "keywords": [
+        "256a",
+        "sử dụng ma túy",
+        "bị tù"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "GT-001",
+      "domain": "dang_ky_xe",
+      "title": "Đăng ký xe phải theo DVC hiện hành",
+      "content": "TT 79/2024/TT-BCA đã được sửa bởi TT 13/2025 và TT 51/2025. Cổng DVC Bộ Công an hiện có thủ tục đăng ký xe lần đầu toàn trình và viện dẫn thẩm quyền cấp tỉnh/cấp xã theo phân cấp hiện hành. Không dùng hướng dẫn cũ ghi cấp huyện nếu có công bố mới hơn.",
+      "source_ids": [
+        "S024",
+        "S025",
+        "S042"
+      ],
+      "keywords": [
+        "đăng ký xe",
+        "cấp xã",
+        "biển số"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "DD-001",
+      "domain": "dat_dai",
+      "title": "Trục pháp luật đất đai hiện hành",
+      "content": "Luật Đất đai 31/2024/QH15 phải đọc cùng Luật 43/2024/QH15 và các nghị định hướng dẫn/sửa đổi như NĐ 102/2024, NĐ 151/2025, NĐ 226/2025. Giai đoạn 2025–2026 có nhiều thay đổi về thẩm quyền nên câu hỏi thủ tục/thẩm quyền phải tra live.",
+      "source_ids": [
+        "S026",
+        "S027",
+        "S028",
+        "S029",
+        "S030"
+      ],
+      "keywords": [
+        "đất đai",
+        "sổ đỏ",
+        "thẩm quyền"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "DD-002",
+      "domain": "dat_dai",
+      "title": "Xử phạt đất đai đã đổi từ 31/08/2026",
+      "content": "NĐ 123/2024/NĐ-CP về xử phạt VPHC đất đai đã được sửa đổi bởi NĐ 281/2026/NĐ-CP có hiệu lực 31/08/2026. Sau ngày này không dùng bảng mức phạt cũ chưa cập nhật.",
+      "source_ids": [
+        "S032",
+        "S033"
+      ],
+      "keywords": [
+        "xử phạt đất đai",
+        "281/2026",
+        "123/2024"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "DD-003",
+      "domain": "dat_dai",
+      "title": "Phân luồng tranh chấp đất",
+      "content": "Chatbot Công an xã không được tự phân xử quyền sử dụng đất hoặc ranh giới. Tranh chấp thuần túy phải chuyển theo cơ chế đất đai/dân sự phù hợp; nếu có dấu hiệu lừa đảo, giả mạo giấy tờ, hủy hoại, gây rối, cố ý gây thương tích thì mới phân tích thêm góc độ hình sự/ANTT.",
+      "source_ids": [
+        "S026",
+        "S010",
+        "S001"
+      ],
+      "keywords": [
+        "tranh chấp đất",
+        "ranh đất",
+        "Công an xã"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "PCCC-001",
+      "domain": "pccc",
+      "title": "Nguồn PCCC hiện hành",
+      "content": "Luật PCCC và CNCH 55/2024/QH15 có hiệu lực 01/07/2025; NĐ 105/2025/NĐ-CP quy định chi tiết. Với tình huống cháy đang xảy ra, ưu tiên hướng dẫn an toàn và báo lực lượng chức năng trước phần giải thích pháp lý.",
+      "source_ids": [
+        "S035",
+        "S036"
+      ],
+      "keywords": [
+        "PCCC",
+        "cháy",
+        "cứu nạn"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "ANM-001",
+      "domain": "an_ninh_mang",
+      "title": "Luật An ninh mạng 2025",
+      "content": "Luật An ninh mạng 116/2025/QH15 có hiệu lực 01/07/2026. Chatbot chỉ hướng dẫn an toàn số và pháp luật công khai, không hướng dẫn xâm nhập, đánh cắp dữ liệu hoặc phá hoại hệ thống.",
+      "source_ids": [
+        "S037"
+      ],
+      "keywords": [
+        "an ninh mạng",
+        "hack",
+        "dữ liệu"
+      ],
+      "risk_level": "high",
+      "requires_live_check": true,
+      "as_of": "2026-09-05"
+    },
+    {
+      "id": "BMNN-001",
+      "domain": "bi_mat_nha_nuoc",
+      "title": "Không đưa bí mật nhà nước vào KB công khai",
+      "content": "Luật Bảo vệ bí mật nhà nước 117/2025/QH15 có hiệu lực 01/03/2026. Kho tri thức dùng dịch vụ AI bên ngoài chỉ được chứa tài liệu công khai/được phép; không đưa tài liệu nghiệp vụ hoặc bí mật nhà nước để 'AI học'.",
+      "source_ids": [
+        "S038"
+      ],
+      "keywords": [
+        "bí mật nhà nước",
+        "tài liệu nội bộ",
+        "AI"
+      ],
+      "risk_level": "high",
+      "requires_live_check": false,
+      "as_of": "2026-09-05"
+    }
+  ]
+}
