@@ -27,13 +27,32 @@ PLAN_SCHEMA = {
 }
 
 
+def _fix_common_typos(text):
+    """Chuẩn hóa một số lỗi gõ rất thường gặp trước khi phân loại ý định."""
+    q = str(text or "")
+    replacements = {
+        "thuong chu": "thuong tru",
+        "thuong trú": "thuong tru",
+        "tam chu": "tam tru",
+        "vne id": "vneid",
+        "vne-id": "vneid",
+        "vned": "vneid",
+        "can cuoc cong dan": "can cuoc",
+        "ho khau thuong chu": "ho khau thuong tru",
+    }
+    for old, new in replacements.items():
+        q = q.replace(old, new)
+    return q
+
+
 def _norm(text):
     text = str(text or "").lower()
     text = unicodedata.normalize("NFD", text)
     text = "".join(c for c in text if unicodedata.category(c) != "Mn")
     text = text.replace("đ", "d")
-    text = re.sub(r"[^a-z0-9%\s]", " ", text)
-    return re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"[^a-z0-9%\s-]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return _fix_common_typos(text)
 
 
 # Từ vựng này chỉ dùng để tạo truy vấn tìm nguồn, không phải câu trả lời mẫu.
