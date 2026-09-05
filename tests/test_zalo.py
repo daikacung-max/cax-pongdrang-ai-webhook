@@ -1,0 +1,52 @@
+import threading
+import time
+import unittest
+
+from adapters.zalo import PendingZaloMessages
+from app import app, split_zalo_messages
+
+
+class ZaloAdapterTests(unittest.TestCase):
+    def test_pending_wait_handles_get_before_webhook(self):
+        queue = PendingZaloMessages()
+
+        def push_later():
+            time.sleep(0.05)
+            queue.push("user-1", "Xin chào", msg_id="msg-1")
+
+        thread = threading.Thread(target=push_later)
+        thread.start()
+        item = queue.pop(user_id="user-1", wait_seconds=0.5)
+        thread.join()
+        self.assertIsNotNone(item)
+        self.assertEqual(item["text"], "Xin chào")
+
+    def test_zalo_response_remains_text_chat(self):
+        parts = split_zalo_messages("Anh/chị vui lòng giữ nguyên file camera và sao lưu thêm một bản.")
+        self.assertEqual(len(parts), 1)
+        self.assertIsInstance(parts[0], str)
+
+    def test_long_sentence_is_split_within_zalo_limit(self):
+        parts = split_zalo_messages("từ " * 500)
+        self.assertGreater(len(parts), 1)
+        self.assertTrue(all(len(part) <= 650 for part in parts))
+
+    def test_pending_missing_keeps_dynamic_contract(self):
+        with app.test_client() as client:
+            response = client.get("/zalo/ai?uid=missing-test-user")
+        body = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(body["content"]["messages"][0]["type"], "text")
+
+    def test_health_and_article_134(self):
+        with app.test_client() as client:
+            health = client.get("/health")
+            article = client.get("/debug/article/134")
+        self.assertEqual(health.status_code, 200)
+        self.assertEqual(health.get_json()["status"], "ok")
+        self.assertEqual(article.status_code, 200)
+        self.assertTrue(article.get_json()["found"])
+
+
+if __name__ == "__main__":
+    unittest.main()

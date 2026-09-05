@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from pathlib import Path
+import time
 import re
 
 from config import (
@@ -7,6 +8,9 @@ from config import (
     HOTLINE,
     ANSWER_MODEL,
     DYNAMIC_ANSWER_MODEL,
+    DYNAMIC_CANDIDATE_MODEL,
+    FULL_CORE_CANDIDATE_MODEL,
+    ESCALATION_MODEL,
     MAX_ZALO_MESSAGES,
     TARGET_ZALO_CHARS,
     MAX_ZALO_TOTAL_CHARS,
@@ -15,6 +19,9 @@ from core import db
 from core.ingest import import_article_index
 from core.verified_sources import ensure_verified_sources
 from core.service import core
+from core.llm import LLMTimeout
+from core.providers import provider_name_for_model
+from core.telemetry import log_zalo_latency, new_trace_id
 from adapters.zalo import pending
 
 app = Flask(__name__)
@@ -62,7 +69,18 @@ def split_zalo_messages(text):
     if len(text) <= TARGET_ZALO_CHARS:
         return [text]
 
-    parts = re.split(r"(?<=[.!?;])\s+|\n+", text)
+    sentence_parts = re.split(r"(?<=[.!?;])\s+|\n+", text)
+    parts = []
+    for part in sentence_parts:
+        part = part.strip()
+        while len(part) > TARGET_ZALO_CHARS:
+            cut = part.rfind(" ", 0, TARGET_ZALO_CHARS + 1)
+            if cut < int(TARGET_ZALO_CHARS * 0.5):
+                cut = TARGET_ZALO_CHARS
+            parts.append(part[:cut].strip())
+            part = part[cut:].strip()
+        if part:
+            parts.append(part)
     result = []
     current = ""
     for part in parts:
@@ -122,6 +140,12 @@ def health():
         "zalo_dynamic_adapter": "/zalo/ai",
         "core_answer_model": ANSWER_MODEL,
         "dynamic_answer_model": DYNAMIC_ANSWER_MODEL,
+        "core_answer_provider": provider_name_for_model(ANSWER_MODEL),
+        "dynamic_answer_provider": provider_name_for_model(DYNAMIC_ANSWER_MODEL),
+        "dynamic_candidate_model": DYNAMIC_CANDIDATE_MODEL,
+        "full_core_candidate_model": FULL_CORE_CANDIDATE_MODEL,
+        "escalation_model": ESCALATION_MODEL,
+        "history_backend": s.get("history_backend"),
         "dynamic_mode": "single_call_grounded_verified",
     }), 200
 
@@ -135,6 +159,7 @@ def api_chat():
         return jsonify({"error": "user_id và message là bắt buộc."}), 400
     try:
         result = core.chat(user_id, message, dynamic=False)
+        result.pop("_telemetry", None)
         return jsonify(result), 200
     except Exception as exc:
         app.logger.error("AI Core API error type=%s", type(exc).__name__)
@@ -162,20 +187,44 @@ def zalo_webhook():
 
 @app.route("/zalo/ai", methods=["GET", "POST"])
 def zalo_dynamic():
+    request_started = time.perf_counter()
+    trace_id = new_trace_id()
     uid = str(
         request.args.get("uid")
         or request.headers.get("X-Zalo-User-ID")
         or ""
     ).strip()
+    pending_started = time.perf_counter()
     item = pending.pop(user_id=uid or None)
+    pending_wait_ms = round((time.perf_counter() - pending_started) * 1000, 2)
     if not item:
+        log_zalo_latency(app.logger, {
+            "trace_id": trace_id,
+            "pending_wait_ms": pending_wait_ms,
+            "total_ms": round((time.perf_counter() - request_started) * 1000, 2),
+            "fallback_reason": "pending_missing",
+            "model_used": DYNAMIC_ANSWER_MODEL,
+            "retrieved_unit_count": 0,
+        })
         return dynamic_response("Anh/chị vui lòng nhập câu hỏi cần hỗ trợ.")
     try:
-        result = core.chat(item["user_id"], item["text"], dynamic=True)
+        result = core.chat(item["user_id"], item["text"], dynamic=True, trace_id=trace_id)
+        telemetry = result.pop("_telemetry", {})
+        telemetry["pending_wait_ms"] = pending_wait_ms
+        telemetry["total_ms"] = round((time.perf_counter() - request_started) * 1000, 2)
+        log_zalo_latency(app.logger, telemetry)
         return dynamic_response(result["answer"])
     except Exception as exc:
         # Không ghi nội dung câu hỏi hoặc dữ liệu cá nhân vào log.
-        app.logger.error("Zalo AI Core error type=%s detail=%s", type(exc).__name__, str(exc)[:160])
+        log_zalo_latency(app.logger, {
+            "trace_id": trace_id,
+            "pending_wait_ms": pending_wait_ms,
+            "total_ms": round((time.perf_counter() - request_started) * 1000, 2),
+            "fallback_reason": "llm_timeout" if isinstance(exc, LLMTimeout) else "llm_error",
+            "model_used": DYNAMIC_ANSWER_MODEL,
+            "retrieved_unit_count": 0,
+        })
+        app.logger.error("Zalo AI Core error type=%s trace_id=%s", type(exc).__name__, trace_id)
         return dynamic_response(
             f"Trợ lý AI tạm thời chưa hoàn tất được phần phân tích. "
             f"Nếu cần trao đổi trực tiếp, người dân có thể liên hệ trực ban "
