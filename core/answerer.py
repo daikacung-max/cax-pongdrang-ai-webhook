@@ -23,8 +23,12 @@ ANSWER_SCHEMA = {
                     "article": {"type": ["string", "null"]},
                     "official_title": {"type": ["string", "null"]},
                     "claim": {"type": "string"},
+                    "evidence_quote": {"type": "string"},
                 },
-                "required": ["source_unit_id", "article", "official_title", "claim"],
+                "required": [
+                    "source_unit_id", "article", "official_title",
+                    "claim", "evidence_quote"
+                ],
                 "additionalProperties": False,
             },
             "maxItems": 10,
@@ -68,17 +72,15 @@ LEGAL_SYSTEM = """
 Đối với câu hỏi pháp luật:
 - LEGAL_SOURCE_CONTEXT là nguồn được truy xuất từ kho văn bản.
 - Hãy dùng nguồn để trả lời đúng trọng tâm pháp lý của câu hỏi hiện tại, không chỉ đưa lời khuyên chung nếu nguồn đã trả lời được vấn đề người dân đang hỏi.
-- Hãy phân tích linh hoạt, nhưng mọi chi tiết cụ thể như số Điều, tên Điều/tội danh,
-  ngưỡng định lượng, khung hình phạt, thời hạn, lệ phí, thẩm quyền phải có căn cứ
-  trong LEGAL_SOURCE_CONTEXT.
+- Mọi chi tiết cụ thể như số Điều, tên Điều/tội danh, ngưỡng định lượng, khung hình phạt, thời hạn, lệ phí, thẩm quyền hoặc kết luận loại trừ trách nhiệm phải có căn cứ trực tiếp trong LEGAL_SOURCE_CONTEXT.
+- Với MỖI legal_claim, evidence_quote phải là một đoạn NGUYÊN VĂN ngắn được chép trực tiếp từ đúng SOURCE_UNIT_ID và phải đủ để hỗ trợ claim đó. Không được tự viết lại evidence_quote.
+- Không được rút gọn một quy tắc có nhiều nhánh thành chỉ một điều kiện. Nếu nguồn có cấu trúc 'A hoặc B', 'trừ trường hợp', 'dưới ngưỡng nhưng thuộc trường hợp...', phải giữ lại nhánh/ngoại lệ có liên quan đến dữ kiện người dân.
+- Đặc biệt cẩn trọng với các câu tuyệt đối như 'không thuộc', 'không cấu thành', 'chắc chắn không bị xử lý'. Chỉ được nói như vậy khi nguồn và dữ kiện đã loại trừ toàn bộ các nhánh/ngoại lệ liên quan. Nếu chưa đủ, phải nói 'chưa thể kết luận' hoặc 'vẫn có thể được xem xét nếu...'.
 - Nếu câu hỏi có một dữ kiện mới làm thay đổi cách đánh giá pháp lý, hãy nói rõ dữ kiện đó có ý nghĩa gì theo nguồn, nhưng không kết luận thay cơ quan có thẩm quyền.
-- Mỗi chi tiết pháp lý cụ thể mà bạn dựa vào phải khai báo trong legal_claims
-  và source_unit_id phải đúng ID có trong context.
+- Mỗi chi tiết pháp lý cụ thể mà bạn dựa vào phải khai báo trong legal_claims và source_unit_id phải đúng ID có trong context.
 - official_title nếu nêu phải đúng tiêu đề trong nguồn.
-- Nếu nguồn chưa đủ để nêu một chi tiết chính xác, đừng bịa. Hãy giải thích ở mức
-  nguyên tắc hoặc hỏi thêm.
-- Kho văn bản là nguồn pháp lý. Bạn vẫn được dùng năng lực ngôn ngữ, suy luận và
-  hiểu tình huống để giải thích, gợi ý bước tiếp theo, và duy trì cuộc trò chuyện.
+- Nếu nguồn chưa đủ để nêu một chi tiết chính xác, đừng bịa. Hãy giải thích ở mức nguyên tắc hoặc hỏi thêm.
+- Kho văn bản là nguồn pháp lý. Bạn vẫn được dùng năng lực ngôn ngữ, suy luận và hiểu tình huống để giải thích, gợi ý bước tiếp theo, và duy trì cuộc trò chuyện.
 """
 
 
@@ -110,6 +112,6 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None)
         schema=ANSWER_SCHEMA,
         reasoning_effort=(DYNAMIC_REASONING_EFFORT if dynamic else CORE_REASONING_EFFORT),
         timeout=(DYNAMIC_TIMEOUT_SECONDS if dynamic else CORE_TIMEOUT_SECONDS),
-        temperature=0.12 if legal_context else 0.42,
-        max_completion_tokens=560 if dynamic else 1000,
+        temperature=0.08 if legal_context else 0.42,
+        max_completion_tokens=620 if dynamic else 1100,
     )
