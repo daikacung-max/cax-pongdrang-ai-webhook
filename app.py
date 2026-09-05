@@ -32,7 +32,9 @@ MODEL = "openai/gpt-oss-20b"
 GROQ_TIMEOUT_SECONDS = 1.45
 
 MAX_HISTORY_MESSAGES = 6
-MAX_ZALO_CHARS = 1050
+MAX_ZALO_CHARS = 2600
+MAX_ZALO_MESSAGES = 4
+TARGET_MESSAGE_CHARS = 650
 PENDING_TTL_SECONDS = 25
 
 # Tái sử dụng kết nối HTTP để giảm độ trễ.
@@ -401,6 +403,10 @@ PHONG CÁCH:
 - Không lặp câu chào ở mỗi lượt.
 - Không nhắc đến model, prompt hoặc Knowledge Base trừ khi được hỏi.
 - Không trình bày quá trình suy luận nội bộ.
+- Chỉ xuất văn bản thuần túy, KHÔNG dùng Markdown.
+- Không dùng dấu *, **, #, _, `, > hoặc ký hiệu gạch đầu dòng Markdown.
+- Nếu cần liệt kê, dùng dạng: "1. Nội dung; 2. Nội dung; 3. Nội dung."
+- Ưu tiên dấu câu tiếng Việt thông thường như . , ; : ? !
 """
 
 
@@ -463,15 +469,65 @@ hãy nói rõ cần kiểm tra nguồn chính thức, không tự đoán.
 # CẮT CÂU TRẢ LỜI GỌN, KHÔNG CẮT NGANG Ý
 # =========================================================
 
+def clean_plain_text(text):
+    """
+    Chuyển câu trả lời về văn bản thuần.
+    Mục tiêu: không để Markdown như **in đậm**, *, #, `...`
+    xuất hiện trên Zalo.
+    """
+    text = str(text or "").strip()
+
+    # Bỏ fenced code / inline code marker
+    text = text.replace("```", "")
+    text = text.replace("`", "")
+
+    # Bỏ markdown bold/italic
+    text = text.replace("**", "")
+    text = text.replace("__", "")
+    text = text.replace("*", "")
+    text = text.replace("_", "")
+
+    # Bỏ heading Markdown ở đầu dòng
+    text = re.sub(
+        r"(?m)^\s{0,3}#{1,6}\s*",
+        "",
+        text
+    )
+
+    # Bỏ blockquote Markdown
+    text = re.sub(
+        r"(?m)^\s*>\s?",
+        "",
+        text
+    )
+
+    # Chuyển bullet -, + thành câu thường
+    text = re.sub(
+        r"(?m)^\s*[-+]\s+",
+        "",
+        text
+    )
+
+    # Chuẩn hóa khoảng trắng và xuống dòng
+    text = re.sub(
+        r"[ \t]+",
+        " ",
+        text
+    )
+    text = re.sub(
+        r"\n{3,}",
+        "\n\n",
+        text
+    )
+
+    return text.strip()
+
+
 def smart_trim(
     text,
     max_chars=MAX_ZALO_CHARS
 ):
-    text = re.sub(
-        r"\n{3,}",
-        "\n\n",
-        str(text or "").strip()
-    )
+    text = clean_plain_text(text)
 
     if len(text) <= max_chars:
         return text
@@ -482,22 +538,116 @@ def smart_trim(
         clipped.rfind(". "),
         clipped.rfind("? "),
         clipped.rfind("! "),
+        clipped.rfind("; "),
         clipped.rfind("\n"),
     ]
 
     cut = max(candidates)
 
-    if cut >= int(
-        max_chars * 0.60
-    ):
-        clipped = clipped[
-            :cut + 1
+    if cut >= int(max_chars * 0.60):
+        clipped = clipped[:cut + 1]
+
+    return clipped.rstrip()
+
+
+def split_zalo_messages(
+    text,
+    max_messages=MAX_ZALO_MESSAGES,
+    target_chars=TARGET_MESSAGE_CHARS
+):
+    """
+    Chia câu trả lời thành tối đa 4 tin nhắn Zalo.
+    Không cắt ngang câu nếu có thể.
+    """
+    text = smart_trim(text)
+
+    if not text:
+        return [
+            "Anh/chị vui lòng nhập nội dung cần hỗ trợ."
         ]
 
-    return (
-        clipped.rstrip()
-        + "…"
+    if len(text) <= target_chars:
+        return [text]
+
+    # Ưu tiên chia theo đoạn, sau đó theo câu.
+    paragraphs = [
+        p.strip()
+        for p in re.split(r"\n\s*\n", text)
+        if p.strip()
+    ]
+
+    units = []
+
+    for paragraph in paragraphs:
+        if len(paragraph) <= target_chars:
+            units.append(paragraph)
+            continue
+
+        sentences = re.split(
+            r"(?<=[.!?;])\s+",
+            paragraph
+        )
+
+        current = ""
+
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+
+            candidate = (
+                sentence
+                if not current
+                else current + " " + sentence
+            )
+
+            if len(candidate) <= target_chars:
+                current = candidate
+            else:
+                if current:
+                    units.append(current.strip())
+                current = sentence
+
+        if current:
+            units.append(current.strip())
+
+    # Gộp các unit quá nhỏ để tránh quá nhiều bong bóng.
+    merged = []
+
+    for unit in units:
+        if (
+            merged
+            and len(merged[-1]) + 1 + len(unit)
+            <= target_chars
+        ):
+            merged[-1] = merged[-1] + " " + unit
+        else:
+            merged.append(unit)
+
+    if len(merged) <= max_messages:
+        return merged
+
+    # Giữ các bong bóng đầu, gộp phần còn lại vào bong bóng cuối.
+    result = merged[:max_messages - 1]
+
+    tail = " ".join(
+        merged[max_messages - 1:]
+    ).strip()
+
+    # Bong bóng cuối có thể dài hơn một chút, nhưng vẫn không cắt ngang ý.
+    tail_limit = int(target_chars * 1.35)
+    result.append(
+        smart_trim(
+            tail,
+            max_chars=tail_limit
+        )
     )
+
+    return [
+        item
+        for item in result
+        if item
+    ][:max_messages]
 
 
 # =========================================================
@@ -651,7 +801,7 @@ def ask_groq(
             0.08
             if legal_mode
             else 0.35,
-        "max_completion_tokens": 260,
+        "max_completion_tokens": 440,
         "reasoning_effort": "low",
     }
 
@@ -736,14 +886,17 @@ def ask_groq(
 # =========================================================
 
 def chatbot_response(text):
+    parts = split_zalo_messages(text)
+
     return jsonify({
         "version": "chatbot",
         "content": {
             "messages": [
                 {
                     "type": "text",
-                    "text": str(text)
+                    "text": part
                 }
+                for part in parts
             ]
         }
     }), 200
@@ -839,7 +992,7 @@ def health():
     return jsonify({
         "status": "ok",
         "mode":
-            "competition_stable",
+            "competition_stable_v2",
         "groq":
             bool(GROQ_API_KEY),
         "kb_loaded":
@@ -858,6 +1011,10 @@ def health():
             False,
         "background_queue":
             False,
+        "max_messages":
+            MAX_ZALO_MESSAGES,
+        "plain_text_only":
+            True,
     }), 200
 
 
