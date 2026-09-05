@@ -51,6 +51,50 @@ def ensure_verified_sources():
     ])
 
     # ------------------------------------------------------------------
+    # 0.1) CẤP LẠI THẺ CĂN CƯỚC BỊ MẤT (CẤP TỈNH)
+    # ------------------------------------------------------------------
+    # Chỉ dùng cho đúng ý định cấp lại/mất thẻ. Không suy diễn thủ tục này
+    # sang cấp mới hoặc cấp đổi, và không nói Công an cấp xã trực tiếp cấp lại.
+    db.upsert_document({
+        "id": "CITIZEN_ID_REISSUE_PROVINCIAL_2026",
+        "title": "Cấp lại thẻ căn cước (thực hiện tại cấp tỉnh)",
+        "number": "Mã thủ tục 2.001194",
+        "issuer": "Bộ Công an",
+        "effective_from": None,
+        "source_path": "https://dichvucong.bocongan.gov.vn/bocongan/bothutuc/tthc?matt=26093",
+        "sha256": None,
+        "metadata": {"checked": "2026-09-05", "official": True},
+    })
+    db.replace_document_units("CITIZEN_ID_REISSUE_PROVINCIAL_2026", [
+        {
+            "id": "CITIZEN_ID_REISSUE_PROVINCIAL_2026:channels",
+            "unit_type": "procedure",
+            "title": "Cấp lại thẻ căn cước bị mất: nơi và cách thực hiện",
+            "text": (
+                "Thủ tục cấp lại thẻ căn cước thực hiện tại cơ quan quản lý căn cước của Công an cấp tỉnh. "
+                "Công dân có thể đến trực tiếp hoặc sử dụng Cổng dịch vụ công quốc gia, Cổng dịch vụ công Bộ Công an "
+                "hoặc ứng dụng định danh quốc gia để chọn thủ tục cấp lại, kiểm tra thông tin và chuyển đề nghị đến cơ quan quản lý căn cước của Công an cấp tỉnh."
+            ),
+        },
+        {
+            "id": "CITIZEN_ID_REISSUE_PROVINCIAL_2026:lost_card",
+            "unit_type": "procedure",
+            "title": "Cấp lại khi bị mất hoặc thẻ hư hỏng không dùng được",
+            "text": (
+                "Trường hợp cấp lại do mất thẻ căn cước hoặc thẻ hư hỏng không sử dụng được, cán bộ thu nhận sử dụng "
+                "thông tin về ảnh khuôn mặt, vân tay, mống mắt đã thu nhận gần nhất cùng các thông tin trong Cơ sở dữ liệu quốc gia về dân cư, "
+                "Cơ sở dữ liệu căn cước để thực hiện cấp lại."
+            ),
+        },
+        {
+            "id": "CITIZEN_ID_REISSUE_PROVINCIAL_2026:time",
+            "unit_type": "procedure",
+            "title": "Thời hạn giải quyết cấp lại thẻ căn cước",
+            "text": "Thời hạn giải quyết thủ tục cấp lại thẻ căn cước là 07 ngày làm việc, thực hiện trực tiếp hoặc trực tuyến.",
+        },
+    ])
+
+    # ------------------------------------------------------------------
     # 1) CƯ TRÚ HIỆN HÀNH TỪ 01/07/2026
     # ------------------------------------------------------------------
     db.upsert_document({

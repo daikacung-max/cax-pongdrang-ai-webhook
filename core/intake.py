@@ -31,6 +31,16 @@ PROCEDURES = (
         ),
     },
     {
+        "code": "identity_card_reissue",
+        "name": "Cấp lại thẻ căn cước bị mất hoặc hư hỏng",
+        "queue": "ADMIN_IDENTITY",
+        "source_ready": True,
+        "keywords": ("mat can cuoc", "mat cccd", "cap lai can cuoc", "cap lai cccd", "can cuoc hu hong", "cccd hu hong"),
+        "fields": (
+            ("reissue_reason", "anh/chị bị mất thẻ hay thẻ bị hư hỏng không sử dụng được", ("mat", "hu hong", "khong su dung duoc")),
+        ),
+    },
+    {
         "code": "identity_card",
         "name": "Căn cước: cấp, đổi, cấp lại hoặc điều chỉnh thông tin",
         "queue": "ADMIN_IDENTITY",
@@ -79,7 +89,7 @@ PROCEDURES = (
         "keywords": ("to giac", "tin bao toi pham", "trinh bao toi pham", "bi de doa", "de doa", "bi trom"),
         "fields": (
             ("incident_type", "sự việc chính anh/chị muốn trình báo là gì", ("lua dao", "danh", "de doa", "trom", "mat")),
-            ("time_place", "sự việc xảy ra khi nào và ở đâu", ("hom nay", "hom qua", "ngay", "tai", "o " , "luc")),
+            ("time_place", "sự việc xảy ra khi nào và ở đâu", ("hom nay", "hom qua", "ngay", "tai", "luc")),
         ),
     },
     {
@@ -112,7 +122,7 @@ PROCEDURES = (
         "keywords": ("mat giay to", "mat can cuoc", "mat cccd", "mat tai san", "mat dien thoai", "mat xe", "that lac"),
         "fields": (
             ("lost_item", "anh/chị bị mất loại giấy tờ hoặc tài sản nào", ("can cuoc", "cccd", "giay", "tai san", "dien thoai", "xe")),
-            ("time_place", "anh/chị mất vào khi nào và ở khu vực nào", ("hom nay", "hom qua", "ngay", "tai", "o ", "luc")),
+            ("time_place", "anh/chị mất vào khi nào và ở khu vực nào", ("hom nay", "hom qua", "ngay", "tai", "luc")),
         ),
     },
 )
@@ -166,7 +176,9 @@ def assess(question, history):
     by_code = {item["code"]: item for item in matches}
     # Tin báo sự việc luôn ưu tiên hơn thủ tục có cùng tên tài sản (ví dụ mất xe
     # không phải là yêu cầu đăng ký xe). Những nhánh cụ thể vẫn ưu tiên tiếp.
-    if any(x in text for x in ("bi trom", "bi de doa", "de doa")) and "crime_report" in by_code:
+    if "identity_card_reissue" in by_code:
+        chosen = by_code["identity_card_reissue"]
+    elif any(x in text for x in ("bi trom", "bi de doa", "de doa")) and "crime_report" in by_code:
         chosen = by_code["crime_report"]
     elif any(x in text for x in ("mat dien thoai", "mat xe", "mat tai san")) and "lost_document" in by_code:
         chosen = by_code["lost_document"]

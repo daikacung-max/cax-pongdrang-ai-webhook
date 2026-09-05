@@ -25,6 +25,12 @@ def _no_source_answer(intake):
             "Tôi chưa thể kết luận trách nhiệm hay tội danh chỉ từ nội dung ban đầu. "
             "Sự việc xảy ra khi nào và ở đâu?"
         )
+    if intake.get("procedure_code") == "assault_evidence":
+        return (
+            "Tôi đã ghi nhận anh/chị có hình ảnh hoặc video liên quan đến một sự việc. "
+            "Anh/chị nên giữ nguyên file gốc, không chỉnh sửa và sao lưu thêm một bản; "
+            "camera ghi lại sự việc gì để tôi hướng dẫn bước tiếp theo phù hợp?"
+        )
     if intake.get("procedure_code") == "vehicle_registration":
         return (
             "Tôi đã ghi nhận anh/chị cần sang tên hoặc cấp đổi giấy tờ xe. "

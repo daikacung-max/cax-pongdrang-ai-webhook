@@ -241,6 +241,14 @@ def grounded_dynamic_fallback(question, retrieved_units):
 
     q = norm(question)
 
+    if any(unit.get("document_id") == "CITIZEN_ID_REISSUE_PROVINCIAL_2026" for unit in retrieved_units):
+        return (
+            "Trường hợp mất thẻ Căn cước, thủ tục cấp lại hiện được thực hiện tại cơ quan quản lý căn cước của Công an cấp tỉnh. "
+            "Anh/chị có thể đến trực tiếp hoặc đăng ký qua Cổng Dịch vụ công quốc gia, Cổng Dịch vụ công Bộ Công an hoặc ứng dụng VNeID; "
+            "thời hạn giải quyết là 07 ngày làm việc. "
+            "Khi bị mất thẻ, cơ quan tiếp nhận đối chiếu dữ liệu căn cước đã có để thực hiện thủ tục; anh/chị đang mất thẻ hay thẻ bị hư hỏng không sử dụng được?"
+        )
+
     if _has_vneid_source(retrieved_units):
         if any(x in q for x in ["muc 2", "muc do 2", "muc 02", "muc do 02"]):
             return (

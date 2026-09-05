@@ -10,10 +10,11 @@ class DomainBoundaryTests(unittest.TestCase):
     def setUpClass(cls):
         ensure_legal_db()
 
-    def test_lost_identity_card_cannot_fall_through_to_criminal_documents(self):
+    def test_lost_identity_card_uses_reissue_source_not_criminal_documents(self):
         question = "Tôi bị mất căn cước"
         units = retrieve(plan(question, [], dynamic=True), question)
-        self.assertEqual(units, [])
+        self.assertTrue(units)
+        self.assertTrue(all(unit["document_id"] == "CITIZEN_ID_REISSUE_PROVINCIAL_2026" for unit in units))
 
     def test_vehicle_transfer_cannot_use_first_registration_source(self):
         question = "Tôi muốn sang tên xe máy"

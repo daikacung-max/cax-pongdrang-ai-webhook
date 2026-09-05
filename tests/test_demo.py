@@ -25,11 +25,12 @@ class DemoTests(unittest.TestCase):
         self.assertEqual(result["handoff_status"], "needs_information")
         self.assertIn("chỗ ở", result["answer"])
 
-    def test_lost_identity_card_never_retrieves_criminal_law(self):
+    def test_lost_identity_card_uses_verified_reissue_guidance_not_criminal_law(self):
         result = respond(str(uuid.uuid4()), "Tôi bị mất căn cước")
         self.assertEqual(result["mode"], "advice_only")
-        self.assertEqual(result["source_state"], "no_source")
-        self.assertIn("mất thẻ Căn cước", result["answer"])
+        self.assertEqual(result["source_state"], "grounded")
+        self.assertIn("Công an cấp tỉnh", result["answer"])
+        self.assertIn("07 ngày làm việc", result["answer"])
         self.assertNotIn("Điều 134", result["answer"])
 
     def test_assault_starts_with_evidence_and_one_followup(self):

@@ -51,6 +51,11 @@ def _detect_domain_in_text(text):
         return "vneid", ["VNEID_2026", "VNEID_SIM_GUIDANCE_2026"]
     if "can cuoc" in q and any(x in q for x in ["duoi 14", "tre em", "con toi", "be nha toi"]):
         return "identity_under14", ["CITIZEN_ID_UNDER14_2026"]
+    if any(x in q for x in ["mat can cuoc", "mat cccd", "cap lai can cuoc", "cap lai cccd"]) or (
+        any(x in q for x in ["can cuoc", "cccd"])
+        and any(x in q for x in ["hu hong", "khong su dung duoc"])
+    ):
+        return "identity_reissue", ["CITIZEN_ID_REISSUE_PROVINCIAL_2026"]
     # Chỉ có nguồn đã duyệt cho căn cước dưới 14 tuổi. Với các tình huống căn
     # cước khác (ví dụ mất thẻ), tuyệt đối không tìm toàn kho vì từ "căn cứ"
     # trong văn bản hình sự có thể làm FTS trả sai Điều luật.
@@ -112,6 +117,12 @@ def _priority_unit_ids(domain, question):
             "CITIZEN_ID_UNDER14_2026:scope",
             "CITIZEN_ID_UNDER14_2026:data_and_representative",
             "CITIZEN_ID_UNDER14_2026:time",
+        ]
+    if domain == "identity_reissue":
+        return [
+            "CITIZEN_ID_REISSUE_PROVINCIAL_2026:channels",
+            "CITIZEN_ID_REISSUE_PROVINCIAL_2026:lost_card",
+            "CITIZEN_ID_REISSUE_PROVINCIAL_2026:time",
         ]
     if domain == "crime_report":
         return [
