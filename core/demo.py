@@ -47,7 +47,8 @@ def _no_source_answer(intake):
             )
         return (
             "Tôi đã ghi nhận nhu cầu tiếp nhận của anh/chị. Kho dữ liệu demo chưa có nguồn đã kiểm chứng đủ gần "
-            "để hướng dẫn chi tiết nội dung này, nên tôi sẽ không tự đoán thủ tục hoặc giấy tờ."
+            "để hướng dẫn chi tiết nội dung này, nên tôi sẽ không tự đoán thủ tục hoặc giấy tờ. "
+            "Yêu cầu này chỉ ở trạng thái mô phỏng; cán bộ cần xác nhận trước khi tiếp nhận thật."
         )
     return (
         "Kho dữ liệu demo chưa có nguồn đã kiểm chứng đủ gần để tôi hướng dẫn chi tiết nội dung này. "
