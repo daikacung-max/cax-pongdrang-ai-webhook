@@ -17,13 +17,33 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual(result["procedure_code"], "assault_evidence")
         self.assertIn("injury", result["missing_field_ids"])
         self.assertIn("evidence", result["missing_field_ids"])
-        self.assertIn("đã đi khám", prompt_hint(result))
+        self.assertEqual(result["conversation_mode"], "advice_only")
+        self.assertEqual(prompt_hint(result), "")
 
     def test_unclassified_goes_to_human_triage(self):
         result = assess("Xin chào", [])
-        self.assertEqual(result["handoff_status"], "needs_human_triage")
-        self.assertEqual(result["handoff_queue"], "GENERAL_INTAKE")
+        self.assertEqual(result["conversation_mode"], "advice_only")
+        self.assertEqual(result["handoff_status"], "not_requested")
+        self.assertIsNone(result["handoff_queue"])
         self.assertNotIn("procedure_name", result)
+
+    def test_information_question_never_creates_a_case(self):
+        result = assess("Làm VNeID mức 2 cần gì?", [])
+        self.assertEqual(result["conversation_mode"], "advice_only")
+        self.assertEqual(result["handoff_status"], "not_requested")
+        self.assertEqual(result["next_question"], None)
+
+    def test_explicit_procedure_request_waits_for_missing_information(self):
+        result = assess("Tôi muốn nộp hồ sơ đăng ký tạm trú.", [])
+        self.assertEqual(result["conversation_mode"], "intake_requested")
+        self.assertEqual(result["handoff_status"], "needs_information")
+        self.assertIn("accommodation", result["missing_field_ids"])
+        self.assertIn("chỗ ở", prompt_hint(result))
+
+    def test_explicit_request_can_be_ready_for_officer(self):
+        result = assess("Tôi muốn nộp hồ sơ đăng ký tạm trú, hiện đang ở nhà thuê.", [])
+        self.assertEqual(result["conversation_mode"], "intake_requested")
+        self.assertEqual(result["handoff_status"], "ready_for_officer")
 
 
 if __name__ == "__main__":

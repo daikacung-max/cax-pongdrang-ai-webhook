@@ -8,6 +8,8 @@ Xây dựng trợ lý AI Công an xã Pơng Drang phục vụ qua Zalo OA bằng
 
 AI chỉ tư vấn và hỗ trợ tiếp nhận; không thay cán bộ quyết định, không kết luận tội phạm, không tự xác nhận hồ sơ đã được giải quyết.
 
+Mặc định mọi cuộc trò chuyện là tư vấn. Chỉ tạo phiếu tiếp nhận hoặc chuyển cán bộ khi người dân thể hiện rõ nhu cầu nộp thủ tục, trình báo/tố giác hoặc đề nghị cán bộ xử lý; câu hỏi thông thường chỉ được lưu trong lịch sử hội thoại.
+
 ## Đánh giá hiện tại
 
 Mức tổng thể ước tính: **25% mục tiêu toàn hệ thống**.
