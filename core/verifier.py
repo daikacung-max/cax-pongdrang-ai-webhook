@@ -268,6 +268,9 @@ def grounded_dynamic_fallback(question, retrieved_units):
     if any(unit.get("document_id") == "CITIZEN_ID_RENEWAL_PROVINCIAL_2026" for unit in retrieved_units):
         return "Cấp đổi thẻ Căn cước hiện được thực hiện tại cơ quan quản lý căn cước của Công an cấp tỉnh. Anh/chị có thể đến trực tiếp hoặc đăng ký thời gian, địa điểm qua Cổng Dịch vụ công quốc gia, Cổng Dịch vụ công Bộ Công an hoặc ứng dụng VNeID; thời hạn giải quyết là 07 ngày làm việc. Anh/chị cần đổi do thông tin thay đổi, thẻ sắp hết hạn hay vì lý do khác?"
 
+    if any(unit.get("document_id") == "FRAUD_TRANSFER_GUIDANCE_2026" for unit in retrieved_units):
+        return "Tôi đã ghi nhận anh/chị nghi bị lừa qua chuyển khoản. Anh/chị nên liên hệ ngay ngân hàng để đề nghị hỗ trợ tạm dừng hoặc phong tỏa giao dịch nếu còn khả năng; đồng thời lưu tin nhắn, số tài khoản, mã QR, đường dẫn và chứng từ giao dịch liên quan. Tôi chưa thể xác định tội danh từ thông tin ban đầu; anh/chị chuyển khoản vào thời điểm nào?"
+
     if _has_vneid_source(retrieved_units):
         if any(x in q for x in ["muc 2", "muc do 2", "muc 02", "muc do 02"]):
             return (

@@ -457,3 +457,6 @@ def ensure_verified_sources():
             "text": "Công an xã, phường, thị trấn, Đồn Công an nằm trong danh sách đơn vị tiếp nhận tố giác, tin báo về tội phạm theo hướng dẫn của Bộ Công an.",
         },
     ])
+
+    db.upsert_document({"id":"FRAUD_TRANSFER_GUIDANCE_2026","title":"Khuyến cáo xử lý khi nghi bị lừa đảo chuyển khoản","number":"Khuyến cáo Bộ Công an 2026","issuer":"Bộ Công an","effective_from":None,"source_path":"https://bocongan.gov.vn/bai-viet/tp-can-tho-canh-giac-voi-cac-chieu-tro-lua-dao-mua-tuu-truong-1785748998","sha256":None,"metadata":{"checked":"2026-09-05","official":True}})
+    db.replace_document_units("FRAUD_TRANSFER_GUIDANCE_2026", [{"id":"FRAUD_TRANSFER_GUIDANCE_2026:response","unit_type":"guidance","title":"Xử lý an toàn khi nghi bị lừa đảo chuyển khoản","text":"Khi nghi bị lừa đảo, người dân nhanh chóng liên hệ ngân hàng để đề nghị hỗ trợ tạm dừng hoặc phong tỏa giao dịch nếu có; lưu giữ tin nhắn, số điện thoại, tài khoản ngân hàng, mã QR, đường dẫn và thông tin liên quan; trình báo cơ quan Công an nơi gần nhất để được hướng dẫn, tiếp nhận, xác minh và xử lý theo quy định."}])
