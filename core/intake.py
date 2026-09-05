@@ -12,7 +12,8 @@ def _norm(text):
     text = unicodedata.normalize("NFD", str(text or "").lower())
     text = "".join(char for char in text if unicodedata.category(char) != "Mn")
     text = text.replace("đ", "d")
-    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9%\s]", " ", text)).strip()
+    text = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9%\s]", " ", text)).strip()
+    return text.replace("vne id", "vneid").replace("vnied", "vneid").replace("vned", "vneid")
 
 
 # `source_ready=False` có nghĩa AI chỉ được ghi nhận nhu cầu và hướng dẫn chuyển

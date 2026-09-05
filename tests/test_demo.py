@@ -19,6 +19,19 @@ class DemoTests(unittest.TestCase):
         self.assertEqual(result["handoff_status"], "not_requested")
         self.assertEqual(result["source_state"], "grounded")
 
+    def test_vague_registration_question_asks_for_the_registration_type(self):
+        result = respond(str(uuid.uuid4()), "Bạn cho tôi biết cần những giấy tờ gì để đăng ký")
+        self.assertEqual(result["source_state"], "no_source")
+        self.assertEqual(result["handoff_status"], "not_requested")
+        self.assertIn("tạm trú", result["answer"])
+        self.assertIn("thường trú", result["answer"])
+        self.assertIn("VNeID", result["answer"])
+
+    def test_common_vneid_typo_is_routed_to_vneid_guidance(self):
+        result = respond(str(uuid.uuid4()), "Tôi muốn đăng ký vnied")
+        self.assertEqual(result["source_state"], "grounded")
+        self.assertIn("VNeID", result["answer"])
+
     def test_demo_explicit_intake_is_only_a_simulation(self):
         result = respond(str(uuid.uuid4()), "Tôi muốn nộp hồ sơ đăng ký tạm trú.")
         self.assertEqual(result["mode"], "intake_requested")

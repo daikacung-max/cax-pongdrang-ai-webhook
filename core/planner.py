@@ -42,6 +42,7 @@ def _fix_common_typos(text):
         "vne id": "vneid",
         "vne-id": "vneid",
         "vned": "vneid",
+        "vnied": "vneid",
         "can cuoc cong dan": "can cuoc",
         "ho khau thuong chu": "ho khau thuong tru",
     }
@@ -88,8 +89,8 @@ SEARCH_VOCAB = [
 
 LEGAL_HINTS = [
     "luat", "bo luat", "dieu ", "xu phat", "toi pham", "cong an", "tam tru", "thuong tru", "cu tru",
-    "dang ky xe", "can cuoc", "to giac", "thuong tich", "bi thuong", "bi danh", "nguoi khac danh", "dung dao", "hung khi",
-    "bi lua", "bi lua chuyen khoan", "trom", "ma tuy", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid",
+    "dang ky xe", "sang ten", "chuyen nhuong", "thu hoi", "can cuoc", "to giac", "thuong tich", "bi thuong", "bi danh", "nguoi khac danh", "hanh hung", "camera", "dung dao", "hung khi",
+    "bi lua", "bi lua chuyen khoan", "nguoi lua dao", "chuyen tien", "chuyen khoan", "bi scam", "trom", "ma tuy", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid",
     "dinh danh dien tu", "tai khoan dinh danh", "xe mo to", "xe may", "xe gan may", "bien so xe", "ho khau", "nhap khau",
 ]
 

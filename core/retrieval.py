@@ -18,7 +18,8 @@ def _norm(text):
     text = "".join(c for c in text if unicodedata.category(c) != "Mn")
     text = text.replace("đ", "d")
     text = re.sub(r"[^a-z0-9\s]", " ", text)
-    return re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
+    return text.replace("vne id", "vneid").replace("vnied", "vneid").replace("vned", "vneid")
 
 
 def _fts_query(text):
@@ -49,9 +50,12 @@ def _detect_domain_in_text(text):
         return "temporary_residence", ["RESIDENCE_GUIDANCE_2026", "TTHC_TEMP_RESIDENCE_2026"]
     if any(x in q for x in ["vneid", "dinh danh dien tu", "tai khoan dinh danh", "muc do 1", "muc do 01", "muc do 2", "muc do 02"]):
         return "vneid", ["VNEID_2026", "VNEID_SIM_GUIDANCE_2026"]
-    if "can cuoc" in q and any(x in q for x in ["duoi 14", "tre em", "con toi", "be nha toi"]):
+    if "can cuoc" in q and (
+        any(x in q for x in ["duoi 14", "tre em", "con toi", "be nha toi", "nguoi dai dien", "nguoi giam ho"])
+        or re.search(r"\b(?:con|be)\s+\d{1,2}\s+tuoi\b", q)
+    ):
         return "identity_under14", ["CITIZEN_ID_UNDER14_2026"]
-    if any(x in q for x in ["mat can cuoc", "mat cccd", "cap lai can cuoc", "cap lai cccd"]) or (
+    if any(x in q for x in ["mat can cuoc", "mat cccd", "cap lai can cuoc", "cap lai the can cuoc", "cap lai cccd", "lam lai can cuoc", "lam lai cccd"]) or (
         any(x in q for x in ["can cuoc", "cccd"])
         and any(x in q for x in ["hu hong", "khong su dung duoc"])
     ):
@@ -62,7 +66,7 @@ def _detect_domain_in_text(text):
         and not any(x in q for x in ["mat", "cap lai", "hu hong", "doi"])
     ):
         return "identity_over14_new", ["CITIZEN_ID_OVER14_PROVINCIAL_2026"]
-    if any(x in q for x in ["doi can cuoc", "doi cccd", "cap doi can cuoc", "cap doi cccd"]):
+    if any(x in q for x in ["doi can cuoc", "doi cccd", "cap doi can cuoc", "cap doi the can cuoc", "cap doi cccd", "thong tin thay doi", "sap het han"]):
         return "identity_renewal", ["CITIZEN_ID_RENEWAL_PROVINCIAL_2026"]
     # Chỉ có nguồn đã duyệt cho căn cước dưới 14 tuổi. Với các tình huống căn
     # cước khác (ví dụ mất thẻ), tuyệt đối không tìm toàn kho vì từ "căn cứ"
@@ -73,9 +77,9 @@ def _detect_domain_in_text(text):
     # nếu không FTS có thể kéo nhầm sang thủ tục đăng ký xe.
     if any(x in q for x in ["bi trom", "bi de doa", "mat tai san", "mat xe", "mat dien thoai"]):
         return "incident_report", ["BLHS_2025"]
-    if any(x in q for x in ["lua dao chuyen khoan", "bi lua", "chuyen khoan", "chuyen tien", "bi scam"]):
+    if any(x in q for x in ["lua dao chuyen khoan", "bi lua", "nguoi lua dao", "chuyen khoan", "chuyen tien", "bi scam", "scam chuyen khoan"]):
         return "fraud_transfer", ["FRAUD_TRANSFER_GUIDANCE_2026"]
-    if "sang ten" in q and any(x in q for x in ["xe", "dang ky xe", "bien so"]):
+    if any(x in q for x in ["sang ten", "chuyen nhuong", "thu hoi"]) and any(x in q for x in ["xe", "dang ky xe", "bien so"]):
         return "vehicle_transfer", ["VEHICLE_TRANSFER_LOCAL_2026"]
     if "cap doi" in q and any(
         x in q for x in ["xe", "dang ky xe", "bien so"]
@@ -87,7 +91,7 @@ def _detect_domain_in_text(text):
         return "residence", ["RESIDENCE_GUIDANCE_2026", "RESIDENCE_PERMANENT_2026", "TTHC_TEMP_RESIDENCE_2026"]
     if any(x in q for x in ["to giac", "tin bao toi pham", "trinh bao toi pham"]):
         return "crime_report", ["CRIME_REPORT_GUIDANCE_2025"]
-    if any(x in q for x in ["toi pham", "bo luat hinh su", "blhs", "bi danh", "danh nguoi", "nguoi khac danh", "thuong tich", "dung dao", "hung khi", "trom", "lua dao", "bi lua chuyen khoan", "lam dung tin nhiem", "gay roi", "huy hoai", "de doa giet"]):
+    if any(x in q for x in ["toi pham", "bo luat hinh su", "blhs", "bi danh", "danh nguoi", "nguoi khac danh", "hanh hung", "camera", "thuong tich", "dung dao", "hung khi", "trom", "lua dao", "bi lua chuyen khoan", "lam dung tin nhiem", "gay roi", "huy hoai", "de doa giet"]):
         return "criminal", ["BLHS_2025"]
     return None, None
 
@@ -155,6 +159,11 @@ def _priority_unit_ids(domain, question):
         return ["VEHICLE_REGISTRATION_2026:first_registration_documents", "VEHICLE_REGISTRATION_2026:authority"]
     if domain == "vehicle_transfer":
         return ["VEHICLE_TRANSFER_LOCAL_2026:scope", "VEHICLE_TRANSFER_LOCAL_2026:documents", "VEHICLE_TRANSFER_LOCAL_2026:time"]
+    if domain == "criminal" and any(x in q for x in ["bi danh", "hanh hung", "thuong tich", "dung dao", "camera", "video", "clip"]):
+        # Camera/video chỉ là dữ kiện chứng cứ, không đủ để gán một tội danh.
+        # Ưu tiên Điều 134 để chuỗi hành hung -> thương tích -> dao -> camera
+        # không bị FTS kéo sang một điều luật hình sự không liên quan.
+        return ["BLHS_2025:article:134"]
     return []
 
 

@@ -35,8 +35,18 @@
     const input = document.getElementById('message');
     const status = document.getElementById('status');
     const newChat = document.getElementById('new-chat');
+    const demoVersion = '2026-09-05.2';
     let sessionId = localStorage.getItem('caxDemoSession');
-    if (!sessionId) { sessionId = crypto.randomUUID(); localStorage.setItem('caxDemoSession', sessionId); }
+    // Mỗi lần bản demo sửa logic hội thoại, bắt đầu một phiên mới để lịch sử
+    // câu trả lời cũ không bị hiển thị như thể đó là kết quả của phiên bản mới.
+    if (localStorage.getItem('caxDemoVersion') !== demoVersion) {
+      sessionId = crypto.randomUUID();
+      localStorage.setItem('caxDemoSession', sessionId);
+      localStorage.setItem('caxDemoVersion', demoVersion);
+    } else if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      localStorage.setItem('caxDemoSession', sessionId);
+    }
 
     function addMessage(role, text, label = '') {
       if (label) { const tag = document.createElement('div'); tag.className = 'meta ' + (label.includes('tiếp nhận') ? 'intake' : label.includes('bổ sung') ? 'pending' : ''); tag.textContent = label; messages.append(tag); messages.append(document.createElement('br')); }

@@ -238,6 +238,11 @@ def verify_dynamic_text(answer, retrieved_units, question=""):
 
 def grounded_dynamic_fallback(question, retrieved_units):
     if not retrieved_units:
+        if "dang ky" in norm(question):
+            return (
+                "Anh/chị muốn đăng ký tạm trú, thường trú, xe máy mới, sang tên xe hay VNeID? "
+                "Mỗi trường hợp có giấy tờ khác nhau; anh/chị cho biết đúng nội dung cần đăng ký để tôi hướng dẫn chính xác."
+            )
         return (
             "Kho dữ liệu hiện chưa có nguồn đã kiểm chứng đủ gần để tôi khẳng định chi tiết nội dung này. "
             "Tôi sẽ không tự đoán giấy tờ, điều luật, mức phạt hoặc thẩm quyền khi chưa có nguồn phù hợp."

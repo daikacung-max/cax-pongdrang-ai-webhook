@@ -29,7 +29,7 @@ def _safe_question_for_fallback(question):
     q = str(question or "")
     q = q.replace("thường chú", "thường trú").replace("thuong chu", "thuong tru")
     q = q.replace("tạm chú", "tạm trú").replace("tam chu", "tam tru")
-    q = q.replace("vne id", "vneid").replace("VNe ID", "VNeID")
+    q = q.replace("vne id", "vneid").replace("VNe ID", "VNeID").replace("vnied", "vneid")
     return q
 
 

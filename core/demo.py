@@ -7,8 +7,15 @@ from core.retrieval import retrieve
 from core.verifier import finalize, grounded_dynamic_fallback
 
 
-def _no_source_answer(intake):
+def _no_source_answer(intake, question=""):
+    question_norm = str(question or "").casefold()
     if intake.get("procedure_code") == "unclassified":
+        if "đăng ký" in question_norm or "dang ky" in question_norm:
+            return (
+                "Anh/chị muốn đăng ký nội dung nào: tạm trú, thường trú, xe máy mới, "
+                "sang tên xe hay VNeID? Mỗi trường hợp có giấy tờ khác nhau; anh/chị cho biết "
+                "đúng nội dung cần đăng ký để tôi hướng dẫn chính xác."
+            )
         return (
             "Anh/chị cần tôi hỗ trợ nội dung nào: căn cước, VNeID, cư trú, đăng ký xe, "
             "trình báo hoặc tố giác?"
@@ -71,7 +78,7 @@ def respond(demo_session_id, message):
         answer = grounded_dynamic_fallback(message, units)
         source_state = "grounded"
     else:
-        answer = _no_source_answer(intake)
+        answer = _no_source_answer(intake, message)
         source_state = "no_source"
     if intake.get("conversation_mode") == "intake_requested" and intake.get("next_question"):
         question = intake["next_question"]
