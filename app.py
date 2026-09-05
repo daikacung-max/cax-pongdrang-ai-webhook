@@ -2,1313 +2,413 @@ from flask import Flask, request, jsonify
 from pathlib import Path
 from collections import deque
 from threading import Lock
-import json
-import os
-import re
-import time
-import unicodedata
-import requests
+import json, os, re, time, unicodedata, requests
 
 app = Flask(__name__)
-
-# =========================================================
-# BẢN THI CÔNG AN TỈNH — ƯU TIÊN ỔN ĐỊNH
-# =========================================================
 
 BASE_DIR = Path(__file__).resolve().parent
 KB_FILE = BASE_DIR / "knowledge_base.json"
 
-GROQ_API_KEY = "".join(
-    (os.getenv("GROQ_API_KEY") or "").split()
-)
-
+GROQ_API_KEY = "".join((os.getenv("GROQ_API_KEY") or "").split())
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-
-# Model 20B đã được kiểm tra thực tế với luồng Zalo Dynamic.
-# Chọn tốc độ + độ ổn định thay vì ép reasoning dài.
-MODEL = "openai/gpt-oss-20b"
-
-# Dynamic API cần phản hồi rất nhanh.
+GENERAL_MODEL = "openai/gpt-oss-20b"
 GROQ_TIMEOUT_SECONDS = 1.45
 
-MAX_HISTORY_MESSAGES = 6
-MAX_ZALO_CHARS = 2600
 MAX_ZALO_MESSAGES = 4
 TARGET_MESSAGE_CHARS = 650
+MAX_TOTAL_CHARS = 2400
+MAX_HISTORY_MESSAGES = 4
 PENDING_TTL_SECONDS = 25
 
-# Tái sử dụng kết nối HTTP để giảm độ trễ.
 HTTP = requests.Session()
 
-
-# =========================================================
-# NẠP KNOWLEDGE BASE
-# =========================================================
-
 try:
-    KB = json.loads(
-        KB_FILE.read_text(encoding="utf-8")
-    )
+    KB = json.loads(KB_FILE.read_text(encoding="utf-8"))
 except Exception:
     KB = {}
 
-SOURCES_LIST = KB.get("sources", [])
-SOURCES = {
-    str(item.get("id")): item
-    for item in SOURCES_LIST
-    if item.get("id")
-}
+VERSION = KB.get("version", {})
+SYSTEM_PROMPT = KB.get("system_prompt", "")
+SOURCES = {str(x.get("id")): x for x in KB.get("sources", []) if x.get("id")}
 CHUNKS = KB.get("chunks", [])
 ROUTER = KB.get("router", {"rules": []})
-VERSION = KB.get("version", {})
-
-KB_SYSTEM_PROMPT = KB.get(
-    "system_prompt",
-    "Không được bịa căn cứ pháp luật."
-)
-
-print(
-    "COMPETITION MODE READY:",
-    "GROQ:", bool(GROQ_API_KEY),
-    "KB:", bool(CHUNKS),
-    "CHUNKS:", len(CHUNKS),
-    "SOURCES:", len(SOURCES),
-    "MODEL:", MODEL,
-    flush=True
-)
-
-
-# =========================================================
-# BỘ NHỚ TẠM
-# =========================================================
 
 conversation_history = {}
 pending_questions = deque()
 seen_message_ids = {}
-
 state_lock = Lock()
-
-
-# =========================================================
-# CHUẨN HÓA
-# =========================================================
 
 def normalize_text(text):
     text = str(text or "").lower().strip()
     text = unicodedata.normalize("NFD", text)
-
-    text = "".join(
-        ch for ch in text
-        if unicodedata.category(ch) != "Mn"
-    )
-
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
     text = text.replace("đ", "d")
     text = re.sub(r"[^a-z0-9\s]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
+    return re.sub(r"\s+", " ", text).strip()
 
-    return text
-
-
-STOP_WORDS = {
-    "toi", "ban", "anh", "chi", "la", "va", "voi", "cua",
-    "co", "khong", "duoc", "cho", "ve", "thi", "the", "nao",
-    "gi", "can", "muon", "hoi", "mot", "nhung", "cac", "nay",
-    "do", "o", "tai", "den", "tu", "khi"
+STOP = {
+    "toi","ban","anh","chi","la","va","voi","cua","co","khong","duoc","cho","ve",
+    "thi","the","nao","gi","can","muon","hoi","mot","nhung","cac","nay","do","o",
+    "tai","den","tu","khi","lam","xin"
 }
 
+def token_set(text):
+    return {w for w in normalize_text(text).split() if len(w) >= 2 and w not in STOP}
 
-def tokens(text):
-    return {
-        word
-        for word in normalize_text(text).split()
-        if len(word) >= 2
-        and word not in STOP_WORDS
-    }
+def clean_plain_text(text):
+    text = str(text or "").strip()
+    for mark in ("```","**","__","`","*"):
+        text = text.replace(mark, "")
+    text = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", text)
+    text = re.sub(r"(?m)^\s*>\s?", "", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
+def split_zalo_messages(text):
+    text = clean_plain_text(text)
+    if len(text) > MAX_TOTAL_CHARS:
+        cut = text[:MAX_TOTAL_CHARS]
+        pos = max(cut.rfind(". "), cut.rfind("? "), cut.rfind("! "), cut.rfind("; "), cut.rfind("\n"))
+        text = cut[:pos+1].strip() if pos > int(MAX_TOTAL_CHARS*0.6) else cut.strip()
 
-# =========================================================
-# PHÂN LOẠI CÂU HỎI
-# =========================================================
+    if len(text) <= TARGET_MESSAGE_CHARS:
+        return [text]
+
+    sentences = re.split(r"(?<=[.!?;])\s+|\n+", text)
+    units, current = [], ""
+    for s in sentences:
+        s = s.strip()
+        if not s:
+            continue
+        candidate = s if not current else current + " " + s
+        if len(candidate) <= TARGET_MESSAGE_CHARS:
+            current = candidate
+        else:
+            if current:
+                units.append(current)
+            current = s
+    if current:
+        units.append(current)
+
+    if len(units) <= MAX_ZALO_MESSAGES:
+        return units
+
+    result = units[:MAX_ZALO_MESSAGES-1]
+    tail = " ".join(units[MAX_ZALO_MESSAGES-1:])
+    if len(tail) > int(TARGET_MESSAGE_CHARS*1.3):
+        tail = tail[:int(TARGET_MESSAGE_CHARS*1.3)]
+        p = max(tail.rfind(". "), tail.rfind("? "), tail.rfind("! "), tail.rfind("; "))
+        if p > 350:
+            tail = tail[:p+1]
+    result.append(tail.strip())
+    return result[:MAX_ZALO_MESSAGES]
+
+def chatbot_response(text):
+    parts = [p for p in split_zalo_messages(text) if p]
+    return jsonify({
+        "version": "chatbot",
+        "content": {"messages": [{"type":"text","text":p} for p in parts]}
+    }), 200
 
 def detect_domains(question):
     q = normalize_text(question)
-    matched = []
-
+    found = []
     for rule in ROUTER.get("rules", []):
         score = 0
-
-        for keyword in rule.get("keywords", []):
-            kw = normalize_text(keyword)
-
-            if kw and kw in q:
-                score += max(
-                    2,
-                    len(kw.split())
-                )
-
-        if score > 0:
-            matched.append(
-                (score, rule.get("domain", ""))
-            )
-
-    matched.sort(reverse=True)
-
-    result = []
-
-    for _, domain in matched:
-        if domain and domain not in result:
-            result.append(domain)
-
-    return result[:3]
-
+        for kw in rule.get("keywords", []):
+            n = normalize_text(kw)
+            if n and n in q:
+                score += max(3, len(n.split())*2)
+        if score:
+            found.append((score, rule.get("domain","")))
+    found.sort(reverse=True)
+    return [d for _,d in found[:3] if d]
 
 LEGAL_DOMAINS = {
-    "hinh_su",
-    "to_tung_hinh_su",
-    "ma_tuy",
-    "hanh_chinh",
-    "cu_tru",
-    "can_cuoc_vneid",
-    "giao_thong",
-    "dat_dai",
-    "pccc_vu_khi_mang",
-    "dinh_danh_dien_tu",
-    "dang_ky_xe",
-    "pccc",
-    "an_ninh_mang",
-    "bi_mat_nha_nuoc",
+    "cu_tru","dang_ky_xe","can_cuoc","vneid","to_tung_hinh_su","hinh_su",
+    "xu_ly_vphc","ma_tuy","giao_thong","dat_dai","pccc","vu_khi",
+    "khieu_nai_to_cao","nguoi_chua_thanh_nien","an_ninh_mang","bi_mat_nha_nuoc",
+    "thi_hanh_an_hinh_su","tam_giu_tam_giam"
 }
 
+LEGAL_HINTS = [
+    "phap luat","dieu luat","nghi dinh","thong tu","bo luat","luat ",
+    "xu phat","muc phat","tham quyen","thu tuc","cong an","khoi to",
+    "toi pham","to giac","can cuoc","tam tru","thuong tru","dang ky xe","vneid"
+]
 
-def is_legal_or_police_question(
-    question,
-    domains
-):
-    if any(
-        domain in LEGAL_DOMAINS
-        for domain in domains
-    ):
+def is_legal(question, domains):
+    if any(d in LEGAL_DOMAINS for d in domains):
         return True
-
     q = normalize_text(question)
+    return any(x in q for x in LEGAL_HINTS)
 
-    keywords = [
-        "cong an",
-        "phap luat",
-        "dieu luat",
-        "bo luat",
-        "nghi dinh",
-        "thong tu",
-        "xu phat",
-        "toi pham",
-        "khoi to",
-        "to giac",
-        "tam tru",
-        "thuong tru",
-        "can cuoc",
-        "vneid",
-        "ma tuy",
-        "dat dai",
-        "dang ky xe",
-        "pccc",
-        "an ninh trat tu",
-    ]
-
-    return any(
-        keyword in q
-        for keyword in keywords
-    )
-
-
-# =========================================================
-# RAG CỤC BỘ
-# =========================================================
-
-def chunk_score(
-    question,
-    chunk,
-    domains
-):
-    q_normalized = normalize_text(
-        question
-    )
-
-    q_tokens = tokens(
-        question
-    )
-
-    title = normalize_text(
-        chunk.get("title", "")
-    )
-
-    content = normalize_text(
-        chunk.get("content", "")
-    )
-
-    keyword_text = " ".join(
-        normalize_text(item)
-        for item in chunk.get(
-            "keywords",
-            []
-        )
-    )
-
-    chunk_tokens = tokens(
-        title
-        + " "
-        + keyword_text
-        + " "
-        + content
-    )
-
+def chunk_score(question, chunk, domains):
+    qn = normalize_text(question)
+    qt = token_set(question)
     score = 0.0
 
-    score += (
-        len(
-            q_tokens
-            & chunk_tokens
-        )
-        * 2.4
-    )
+    if chunk.get("domain") in domains:
+        score += 8.0
 
-    for keyword in chunk.get(
-        "keywords",
-        []
-    ):
-        kw = normalize_text(
-            keyword
-        )
+    for p in chunk.get("exact_patterns", []):
+        pn = normalize_text(p)
+        if pn and (pn in qn or qn in pn):
+            score += 35.0
+        else:
+            pt = token_set(p)
+            if pt:
+                overlap = len(qt & pt) / max(1, len(pt))
+                if overlap >= 0.75:
+                    score += 22.0
+                elif overlap >= 0.5:
+                    score += 10.0
 
-        if kw and kw in q_normalized:
-            score += 5.5
+    for kw in chunk.get("keywords", []):
+        kn = normalize_text(kw)
+        if kn and kn in qn:
+            score += 7.0
+        kt = token_set(kw)
+        if kt:
+            score += len(qt & kt) * 1.5
 
-    if (
-        chunk.get("domain")
-        in domains
-    ):
-        score += 5.0
-
-    for word in q_tokens:
-        if word in title:
-            score += 0.8
-
+    title_tokens = token_set(chunk.get("title",""))
+    answer_tokens = token_set(chunk.get("verified_answer",""))
+    score += len(qt & title_tokens) * 2.5
+    score += len(qt & answer_tokens) * 0.5
     return score
 
-
-def retrieve_chunks(
-    question,
-    domains,
-    top_k=4
-):
+def retrieve_verified(question, domains, top_k=3):
     ranked = []
+    for ch in CHUNKS:
+        s = chunk_score(question, ch, domains)
+        if s > 0:
+            ranked.append((s, ch))
+    ranked.sort(key=lambda x:x[0], reverse=True)
+    return ranked[:top_k]
 
-    for chunk in CHUNKS:
-        score = chunk_score(
-            question,
-            chunk,
-            domains
-        )
+def source_labels(chunk):
+    labels = []
+    for sid in chunk.get("source_ids", []):
+        src = SOURCES.get(str(sid))
+        if not src:
+            continue
+        num = src.get("number","")
+        title = src.get("title","")
+        labels.append((num + " " + title).strip())
+    return labels
 
-        if score > 0:
-            ranked.append(
-                (score, chunk)
-            )
+def deterministic_answer(question, ranked):
+    if not ranked:
+        return None
 
-    ranked.sort(
-        key=lambda item: item[0],
-        reverse=True
-    )
+    score, best = ranked[0]
+    if not best.get("answerable", False):
+        return None
 
-    return [
-        item[1]
-        for item in ranked[:top_k]
-    ]
+    # Chỉ dùng câu trả lời đóng khi độ khớp cao.
+    if score >= 22:
+        return clean_plain_text(best.get("verified_answer",""))
+    return None
 
-
-def compact_rag_context(
-    chunks_found
-):
+def verified_context(ranked):
     blocks = []
-
-    for chunk in chunks_found:
-        source_labels = []
-
-        for source_id in chunk.get(
-            "source_ids",
-            []
-        ):
-            source = SOURCES.get(
-                str(source_id)
-            )
-
-            if not source:
-                continue
-
-            label = (
-                f"{source.get('number', '')} "
-                f"{source.get('title', '')}"
-            ).strip()
-
-            if label:
-                source_labels.append(
-                    label
-                )
-
+    for score, ch in ranked:
+        if score < 12 or not ch.get("answerable", False):
+            continue
+        facts = ch.get("verified_facts") or []
+        refs = ch.get("article_refs") or []
         blocks.append(
-            "\n".join([
-                f"[{chunk.get('id', '')}] "
-                f"{chunk.get('title', '')}",
-                str(
-                    chunk.get(
-                        "content",
-                        ""
-                    )
-                ),
-                (
-                    "Nguồn: "
-                    + "; ".join(
-                        source_labels[:3]
-                    )
-                    if source_labels
-                    else ""
-                )
-            ]).strip()
+            "CHUNK " + str(ch.get("id")) + "\n"
+            "ĐIỂM KHỚP: " + str(round(score,1)) + "\n"
+            "NỘI DUNG ĐÃ XÁC MINH: " + str(ch.get("verified_answer","")) + "\n"
+            "SỰ KIỆN ĐÃ XÁC MINH: " + " | ".join(facts) + "\n"
+            "CĂN CỨ ĐƯỢC PHÉP NÊU: " + " | ".join(refs) + "\n"
+            "CẤM SUY DIỄN: " + " | ".join(ch.get("prohibited_claims") or [])
         )
+    return "\n\n".join(blocks)
 
-    return "\n\n".join(
-        blocks
+SAFE_REFUSAL = (
+    "Nội dung này hiện chưa có căn cứ đủ chi tiết đã được xác minh trong cơ sở tri thức của hệ thống. "
+    "Để tránh cung cấp sai quy định, Công an xã Pơng Drang đề nghị anh/chị nêu rõ tình huống cụ thể "
+    "hoặc liên hệ cán bộ phụ trách/tra cứu nguồn chính thức của Bộ Công an. Hệ thống không tự suy đoán điều luật, "
+    "mức phạt, thời hạn, lệ phí hoặc thẩm quyền khi chưa có nguồn đã xác minh."
+)
+
+def ask_general(question, history):
+    if not GROQ_API_KEY:
+        return "Dịch vụ AI hiện chưa được cấu hình."
+    prompt = (
+        "Bạn là Trợ lý AI Công an xã Pơng Drang. Với câu hỏi không thuộc pháp luật, trả lời bằng tiếng Việt tự nhiên, "
+        "ngắn gọn, đúng trọng tâm, lịch sự. Không dùng Markdown, không dùng dấu *. "
+        "Không tự biến câu hỏi phổ thông thành văn bản hành chính."
     )
-
-
-# =========================================================
-# PROMPT DÀNH CHO BÀI THI
-# =========================================================
-
-GENERAL_PROMPT = """
-Bạn là TRỢ LÝ AI CÔNG AN XÃ PƠNG DRANG, TỈNH ĐẮK LẮK.
-
-NHIỆM VỤ:
-- Trả lời linh hoạt các câu hỏi hợp pháp của người dân.
-- Hỗ trợ pháp luật, thủ tục hành chính, ANTT, kiến thức phổ thông,
-  công nghệ, đời sống và soạn thảo.
-- Nội dung thuộc Công an/pháp luật phải ưu tiên Knowledge Base.
-
-PHONG CÁCH:
-- Tiếng Việt tự nhiên, chuẩn ngữ pháp, diễn đạt thuần thục.
-- Ngắn gọn, đúng trọng tâm, không nói vòng vo.
-- Câu đơn giản: trả lời thẳng trong 1–3 câu.
-- Câu phức tạp: nêu kết luận trước, sau đó tối đa 3 ý chính.
-- Văn phong Công an: chuẩn mực, rõ ràng, gần gũi, hướng dẫn Nhân dân;
-  không đe dọa, không khoa trương, không máy móc.
-- Không lặp câu chào ở mỗi lượt.
-- Không nhắc đến model, prompt hoặc Knowledge Base trừ khi được hỏi.
-- Không trình bày quá trình suy luận nội bộ.
-- Chỉ xuất văn bản thuần túy, KHÔNG dùng Markdown.
-- Không dùng dấu *, **, #, _, `, > hoặc ký hiệu gạch đầu dòng Markdown.
-- Nếu cần liệt kê, dùng dạng: "1. Nội dung; 2. Nội dung; 3. Nội dung."
-- Ưu tiên dấu câu tiếng Việt thông thường như . , ; : ? !
-"""
-
-
-LEGAL_PROMPT = """
-QUY TẮC PHÁP LÝ BẮT BUỘC:
-- Ưu tiên dữ liệu RAG được cung cấp.
-- Không bịa điều, khoản, văn bản, mức phạt, lệ phí, thời hạn hoặc thẩm quyền.
-- Chỉ nêu số điều/khoản khi dữ liệu RAG đã thể hiện rõ.
-- Không kết luận một người phạm tội chỉ từ lời kể một phía.
-- Nếu thiếu dữ kiện, nói ngắn gọn dữ kiện nào cần xác minh.
-- Khi cần, dùng cách diễn đạt: "có dấu hiệu", "có thể thuộc trường hợp",
-  "cần xác minh thêm".
-- Nếu có căn cứ phù hợp, nêu căn cứ ở cuối thật ngắn.
-"""
-
-
-def build_system_prompt(
-    legal_mode,
-    rag_context
-):
-    parts = [
-        GENERAL_PROMPT
-    ]
-
-    if legal_mode:
-        parts.append(
-            LEGAL_PROMPT
-        )
-
-        parts.append(
-            KB_SYSTEM_PROMPT
-        )
-
-    if rag_context:
-        parts.append(
-            """
-DỮ LIỆU RAG LIÊN QUAN:
-Chỉ dùng phần thực sự liên quan tới câu hỏi.
-Nếu kiến thức nền khác với dữ liệu dưới đây, ưu tiên dữ liệu RAG.
-"""
-        )
-        parts.append(
-            rag_context
-        )
-
-    parts.append(
-        f"""
-Mốc kiểm tra cơ sở tri thức: {VERSION.get('as_of', 'không rõ')}.
-Nếu người dùng hỏi dữ liệu sau mốc này mà chưa có căn cứ,
-hãy nói rõ cần kiểm tra nguồn chính thức, không tự đoán.
-"""
-    )
-
-    return "\n\n".join(
-        parts
-    )
-
-
-# =========================================================
-# CẮT CÂU TRẢ LỜI GỌN, KHÔNG CẮT NGANG Ý
-# =========================================================
-
-def clean_plain_text(text):
-    """
-    Chuyển câu trả lời về văn bản thuần.
-    Mục tiêu: không để Markdown như **in đậm**, *, #, `...`
-    xuất hiện trên Zalo.
-    """
-    text = str(text or "").strip()
-
-    # Bỏ fenced code / inline code marker
-    text = text.replace("```", "")
-    text = text.replace("`", "")
-
-    # Bỏ markdown bold/italic
-    text = text.replace("**", "")
-    text = text.replace("__", "")
-    text = text.replace("*", "")
-    text = text.replace("_", "")
-
-    # Bỏ heading Markdown ở đầu dòng
-    text = re.sub(
-        r"(?m)^\s{0,3}#{1,6}\s*",
-        "",
-        text
-    )
-
-    # Bỏ blockquote Markdown
-    text = re.sub(
-        r"(?m)^\s*>\s?",
-        "",
-        text
-    )
-
-    # Chuyển bullet -, + thành câu thường
-    text = re.sub(
-        r"(?m)^\s*[-+]\s+",
-        "",
-        text
-    )
-
-    # Chuẩn hóa khoảng trắng và xuống dòng
-    text = re.sub(
-        r"[ \t]+",
-        " ",
-        text
-    )
-    text = re.sub(
-        r"\n{3,}",
-        "\n\n",
-        text
-    )
-
-    return text.strip()
-
-
-def smart_trim(
-    text,
-    max_chars=MAX_ZALO_CHARS
-):
-    text = clean_plain_text(text)
-
-    if len(text) <= max_chars:
-        return text
-
-    clipped = text[:max_chars]
-
-    candidates = [
-        clipped.rfind(". "),
-        clipped.rfind("? "),
-        clipped.rfind("! "),
-        clipped.rfind("; "),
-        clipped.rfind("\n"),
-    ]
-
-    cut = max(candidates)
-
-    if cut >= int(max_chars * 0.60):
-        clipped = clipped[:cut + 1]
-
-    return clipped.rstrip()
-
-
-def split_zalo_messages(
-    text,
-    max_messages=MAX_ZALO_MESSAGES,
-    target_chars=TARGET_MESSAGE_CHARS
-):
-    """
-    Chia câu trả lời thành tối đa 4 tin nhắn Zalo.
-    Không cắt ngang câu nếu có thể.
-    """
-    text = smart_trim(text)
-
-    if not text:
-        return [
-            "Anh/chị vui lòng nhập nội dung cần hỗ trợ."
-        ]
-
-    if len(text) <= target_chars:
-        return [text]
-
-    # Ưu tiên chia theo đoạn, sau đó theo câu.
-    paragraphs = [
-        p.strip()
-        for p in re.split(r"\n\s*\n", text)
-        if p.strip()
-    ]
-
-    units = []
-
-    for paragraph in paragraphs:
-        if len(paragraph) <= target_chars:
-            units.append(paragraph)
-            continue
-
-        sentences = re.split(
-            r"(?<=[.!?;])\s+",
-            paragraph
-        )
-
-        current = ""
-
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-
-            candidate = (
-                sentence
-                if not current
-                else current + " " + sentence
-            )
-
-            if len(candidate) <= target_chars:
-                current = candidate
-            else:
-                if current:
-                    units.append(current.strip())
-                current = sentence
-
-        if current:
-            units.append(current.strip())
-
-    # Gộp các unit quá nhỏ để tránh quá nhiều bong bóng.
-    merged = []
-
-    for unit in units:
-        if (
-            merged
-            and len(merged[-1]) + 1 + len(unit)
-            <= target_chars
-        ):
-            merged[-1] = merged[-1] + " " + unit
-        else:
-            merged.append(unit)
-
-    if len(merged) <= max_messages:
-        return merged
-
-    # Giữ các bong bóng đầu, gộp phần còn lại vào bong bóng cuối.
-    result = merged[:max_messages - 1]
-
-    tail = " ".join(
-        merged[max_messages - 1:]
-    ).strip()
-
-    # Bong bóng cuối có thể dài hơn một chút, nhưng vẫn không cắt ngang ý.
-    tail_limit = int(target_chars * 1.35)
-    result.append(
-        smart_trim(
-            tail,
-            max_chars=tail_limit
-        )
-    )
-
-    return [
-        item
-        for item in result
-        if item
-    ][:max_messages]
-
-
-# =========================================================
-# FALLBACK TỪ KNOWLEDGE BASE
-# =========================================================
-
-def kb_fallback_answer(
-    chunks_found
-):
-    if not chunks_found:
-        return (
-            "Trợ lý AI đang tạm thời chưa kết nối được dịch vụ xử lý. "
-            "Anh/chị vui lòng thử lại sau ít giây."
-        )
-
-    best = chunks_found[0]
-
-    content = str(
-        best.get(
-            "content",
-            ""
-        )
-    ).strip()
-
-    source_labels = []
-
-    for source_id in best.get(
-        "source_ids",
-        []
-    ):
-        source = SOURCES.get(
-            str(source_id)
-        )
-
-        if not source:
-            continue
-
-        number = str(
-            source.get(
-                "number",
-                ""
-            )
-        ).strip()
-
-        title = str(
-            source.get(
-                "title",
-                ""
-            )
-        ).strip()
-
-        if number:
-            source_labels.append(
-                number
-            )
-        elif title:
-            source_labels.append(
-                title
-            )
-
-    answer = (
-        "Công an xã Pơng Drang hướng dẫn: "
-        + content
-    )
-
-    if source_labels:
-        answer += (
-            "\nCăn cứ: "
-            + ", ".join(
-                source_labels[:2]
-            )
-            + "."
-        )
-
-    return smart_trim(
-        answer
-    )
-
-
-# =========================================================
-# GỌI GROQ — ĐƯỜNG NHANH
-# =========================================================
-
-def ask_groq(
-    question,
-    history
-):
-    domains = detect_domains(
-        question
-    )
-
-    legal_mode = (
-        is_legal_or_police_question(
-            question,
-            domains
-        )
-    )
-
-    chunks_found = (
-        retrieve_chunks(
-            question,
-            domains,
-            top_k=4
-        )
-        if legal_mode
-        else []
-    )
-
-    rag_context = (
-        compact_rag_context(
-            chunks_found
-        )
-    )
-
-    system_prompt = (
-        build_system_prompt(
-            legal_mode,
-            rag_context
-        )
-    )
-
-    messages = [
-        {
-            "role": "system",
-            "content": system_prompt
-        }
-    ]
-
-    messages.extend(
-        history[
-            -MAX_HISTORY_MESSAGES:
-        ]
-    )
-
-    messages.append({
-        "role": "user",
-        "content": question
-    })
-
-    headers = {
-        "Authorization":
-            f"Bearer {GROQ_API_KEY}",
-        "Content-Type":
-            "application/json",
-    }
-
+    messages = [{"role":"system","content":prompt}]
+    messages.extend(history[-MAX_HISTORY_MESSAGES:])
+    messages.append({"role":"user","content":question})
     payload = {
-        "model": MODEL,
-        "messages": messages,
-        "temperature":
-            0.08
-            if legal_mode
-            else 0.35,
-        "max_completion_tokens": 440,
-        "reasoning_effort": "low",
+        "model": GENERAL_MODEL, "messages": messages, "temperature": 0.3,
+        "max_completion_tokens": 320, "reasoning_effort":"low"
     }
+    r = HTTP.post(GROQ_URL, headers={
+        "Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type":"application/json"
+    }, json=payload, timeout=GROQ_TIMEOUT_SECONDS)
+    r.raise_for_status()
+    return clean_plain_text(r.json()["choices"][0]["message"]["content"])
 
-    response = HTTP.post(
-        GROQ_URL,
-        headers=headers,
-        json=payload,
-        timeout=GROQ_TIMEOUT_SECONDS
+def ask_legal_locked(question, history, ranked):
+    fixed = deterministic_answer(question, ranked)
+    if fixed:
+        return fixed, "deterministic"
+
+    context = verified_context(ranked)
+    if not context:
+        return SAFE_REFUSAL, "refusal"
+
+    if not GROQ_API_KEY:
+        # Không có model thì trả chunk tốt nhất thay vì tự sáng tạo.
+        for _, ch in ranked:
+            if ch.get("answerable"):
+                return clean_plain_text(ch.get("verified_answer","")), "kb_only"
+        return SAFE_REFUSAL, "refusal"
+
+    prompt = (
+        SYSTEM_PROMPT + "\n\n"
+        "NHIỆM VỤ LẦN NÀY: Chỉ được diễn đạt lại dữ liệu trong VERIFIED_CONTEXT. "
+        "Không được thêm bất kỳ quy định pháp luật nào từ trí nhớ riêng. "
+        "Nếu câu hỏi vượt quá dữ liệu, hãy nói phần nào chưa đủ căn cứ. "
+        "Không dùng Markdown.\n\nVERIFIED_CONTEXT:\n" + context
     )
+    messages = [{"role":"system","content":prompt}]
+    # Pháp lý không đưa câu trả lời cũ của model vào làm nguồn pháp luật.
+    messages.append({"role":"user","content":question})
+    payload = {
+        "model": GENERAL_MODEL, "messages": messages, "temperature":0.0,
+        "max_completion_tokens":420, "reasoning_effort":"low"
+    }
+    r = HTTP.post(GROQ_URL, headers={
+        "Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type":"application/json"
+    }, json=payload, timeout=GROQ_TIMEOUT_SECONDS)
+    r.raise_for_status()
+    answer = clean_plain_text(r.json()["choices"][0]["message"]["content"])
+    return answer, "source_locked_model"
 
-    if response.status_code >= 400:
-        try:
-            error_data = (
-                response.json()
-            )
-
-            error_message = (
-                error_data
-                .get("error", {})
-                .get("message")
-            )
-        except Exception:
-            error_message = (
-                response.text[:250]
-            )
-
-        print(
-            "GROQ ERROR:",
-            response.status_code,
-            str(
-                error_message
-            )[:250],
-            flush=True
-        )
-
-        response.raise_for_status()
-
-    data = response.json()
-
-    answer = (
-        data.get(
-            "choices",
-            [{}]
-        )[0]
-        .get(
-            "message",
-            {}
-        )
-        .get(
-            "content",
-            ""
-        )
-        .strip()
-    )
-
-    if not answer:
-        raise RuntimeError(
-            "Empty AI response"
-        )
-
-    return (
-        smart_trim(answer),
-        {
-            "legal_mode":
-                legal_mode,
-            "domains":
-                domains,
-            "chunks":
-                [
-                    item.get("id")
-                    for item
-                    in chunks_found
-                ],
-            "fallback_chunks":
-                chunks_found,
-        }
-    )
-
-
-# =========================================================
-# FORMAT ZALO
-# =========================================================
-
-def chatbot_response(text):
-    parts = split_zalo_messages(text)
-
-    return jsonify({
-        "version": "chatbot",
-        "content": {
-            "messages": [
-                {
-                    "type": "text",
-                    "text": part
-                }
-                for part in parts
-            ]
-        }
-    }), 200
-
-
-# =========================================================
-# QUẢN LÝ HÀNG ĐỢI
-# =========================================================
-
-def purge_state(
-    now=None
-):
+def purge_state(now=None):
     now = now or time.time()
-
-    while pending_questions:
-        first = (
-            pending_questions[0]
-        )
-
-        if (
-            now
-            - first.get(
-                "time",
-                0
-            )
-            <= PENDING_TTL_SECONDS
-        ):
-            break
-
+    while pending_questions and now - pending_questions[0].get("time",0) > PENDING_TTL_SECONDS:
         pending_questions.popleft()
-
-    expired_ids = [
-        msg_id
-        for msg_id, seen_at
-        in seen_message_ids.items()
-        if (
-            now - seen_at
-            > 120
-        )
-    ]
-
-    for msg_id in expired_ids:
-        seen_message_ids.pop(
-            msg_id,
-            None
-        )
-
-
-def pop_pending_question():
-    with state_lock:
-        purge_state()
-
-        if not pending_questions:
-            return None
-
-        return (
-            pending_questions
-            .popleft()
-        )
-
-
-# =========================================================
-# HEALTH
-# =========================================================
+    for mid, ts in list(seen_message_ids.items()):
+        if now-ts > 120:
+            seen_message_ids.pop(mid, None)
 
 @app.route("/", methods=["GET"])
 def home():
-    return """
-<!doctype html>
-<html lang="vi">
-<head>
-<meta charset="utf-8">
-<meta name="zalo-platform-site-verification"
-      content="OiMc2EZKV28O_zyYtDbQAHRNrNRweGyWD34u" />
-<title>Trợ lý AI Công an xã Pơng Drang</title>
-</head>
-<body>
-<h3>Trợ lý AI Công an xã Pơng Drang</h3>
-<p>Competition Stable Mode: active</p>
-</body>
-</html>
-""", 200, {
-        "Content-Type":
-            "text/html; charset=utf-8"
-    }
+    return "CAX Pơng Drang Legal Verified V3", 200
 
-
-@app.route(
-    "/health",
-    methods=["GET"]
-)
+@app.route("/health", methods=["GET"])
 def health():
     return jsonify({
-        "status": "ok",
-        "mode":
-            "competition_stable_v2",
-        "groq":
-            bool(GROQ_API_KEY),
-        "kb_loaded":
-            bool(CHUNKS),
-        "kb_version":
-            VERSION.get("version"),
-        "kb_as_of":
-            VERSION.get("as_of"),
-        "chunks":
-            len(CHUNKS),
-        "sources":
-            len(SOURCES),
-        "model":
-            MODEL,
-        "web_search":
-            False,
-        "background_queue":
-            False,
-        "max_messages":
-            MAX_ZALO_MESSAGES,
-        "plain_text_only":
-            True,
+        "status":"ok",
+        "mode":"legal_verified_v3",
+        "kb_version":VERSION.get("version"),
+        "verified_at":VERSION.get("verified_at"),
+        "source_locked_legal":True,
+        "fail_closed":True,
+        "upcoming_excluded":bool(VERSION.get("upcoming_excluded")),
+        "chunks":len(CHUNKS),
+        "answerable_chunks":sum(1 for x in CHUNKS if x.get("answerable")),
+        "sources":len(SOURCES),
+        "groq":bool(GROQ_API_KEY),
+        "general_model":GENERAL_MODEL,
+        "web_search_runtime":False,
+        "max_messages":MAX_ZALO_MESSAGES
     }), 200
 
-
-@app.route(
-    "/kb/status",
-    methods=["GET"]
-)
-def kb_status():
-    return jsonify({
-        "loaded":
-            bool(CHUNKS),
-        "name":
-            VERSION.get("name"),
-        "version":
-            VERSION.get("version"),
-        "as_of":
-            VERSION.get("as_of"),
-        "next_review":
-            VERSION.get(
-                "next_mandatory_review"
-            ),
-        "chunks":
-            len(CHUNKS),
-        "sources":
-            len(SOURCES),
-    }), 200
-
-
-# =========================================================
-# ZALO WEBHOOK
-# =========================================================
-
-@app.route(
-    "/zalo/webhook",
-    methods=["GET", "POST"]
-)
-def zalo_webhook():
+@app.route("/zalo/webhook", methods=["GET","POST"])
+def webhook():
     if request.method == "GET":
         return "OK", 200
-
-    data = (
-        request.get_json(
-            silent=True
-        )
-        or {}
-    )
-
-    if (
-        data.get("event_name")
-        == "user_send_text"
-    ):
-        sender = (
-            data.get("sender")
-            or {}
-        )
-
-        message = (
-            data.get("message")
-            or {}
-        )
-
-        sender_id = str(
-            sender.get("id")
-            or ""
-        ).strip()
-
-        text = str(
-            message.get("text")
-            or ""
-        ).strip()
-
-        msg_id = str(
-            message.get("msg_id")
-            or ""
-        ).strip()
-
+    data = request.get_json(silent=True) or {}
+    if data.get("event_name") == "user_send_text":
+        sender = data.get("sender") or {}
+        message = data.get("message") or {}
+        sender_id = str(sender.get("id") or "").strip()
+        text = str(message.get("text") or "").strip()
+        msg_id = str(message.get("msg_id") or "").strip()
         if sender_id and text:
             with state_lock:
                 purge_state()
-
-                # Chặn webhook trùng.
-                if (
-                    msg_id
-                    and msg_id
-                    in seen_message_ids
-                ):
-                    return jsonify({
-                        "success": True,
-                        "duplicate": True
-                    }), 200
-
+                if msg_id and msg_id in seen_message_ids:
+                    return jsonify({"success":True,"duplicate":True}), 200
                 if msg_id:
-                    seen_message_ids[
-                        msg_id
-                    ] = time.time()
-
+                    seen_message_ids[msg_id] = time.time()
                 pending_questions.append({
-                    "sender_id":
-                        sender_id,
-                    "msg_id":
-                        msg_id,
-                    "text":
-                        text,
-                    "time":
-                        time.time(),
+                    "sender_id":sender_id, "text":text, "msg_id":msg_id, "time":time.time()
                 })
-
-                conversation_history.setdefault(
-                    sender_id,
-                    []
-                )
-
-                while (
-                    len(
-                        pending_questions
-                    )
-                    > 50
-                ):
+                conversation_history.setdefault(sender_id, [])
+                while len(pending_questions) > 50:
                     pending_questions.popleft()
+            print("QUESTION RECEIVED LEN:", len(text), flush=True)
+    return jsonify({"success":True}), 200
 
-            # Không log nội dung/PII.
-            print(
-                "QUESTION RECEIVED:",
-                "LENGTH:",
-                len(text),
-                "QUEUE:",
-                len(
-                    pending_questions
-                ),
-                flush=True
-            )
-
-    return jsonify({
-        "success": True
-    }), 200
-
-
-# =========================================================
-# DYNAMIC -> RAG -> GROQ
-# =========================================================
-
-@app.route(
-    "/zalo/ai",
-    methods=["GET", "POST"]
-)
+@app.route("/zalo/ai", methods=["GET","POST"])
 def zalo_ai():
-    item = (
-        pop_pending_question()
-    )
+    with state_lock:
+        purge_state()
+        item = pending_questions.popleft() if pending_questions else None
 
     if not item:
-        return chatbot_response(
-            "Anh/chị vui lòng nhập nội dung cần hỗ trợ."
-        )
+        return chatbot_response("Anh/chị vui lòng nhập nội dung cần hỗ trợ.")
 
-    sender_id = (
-        item["sender_id"]
-    )
-
-    question = (
-        item["text"]
-    )
-
-    with state_lock:
-        history = list(
-            conversation_history.get(
-                sender_id,
-                []
-            )
-        )
-
-    # Chuẩn bị sẵn RAG để nếu AI lỗi vẫn có câu trả lời từ KB.
-    domains = detect_domains(
-        question
-    )
-
-    legal_mode = (
-        is_legal_or_police_question(
-            question,
-            domains
-        )
-    )
-
-    fallback_chunks = (
-        retrieve_chunks(
-            question,
-            domains,
-            top_k=2
-        )
-        if legal_mode
-        else []
-    )
-
-    started = time.time()
+    sender_id = item["sender_id"]
+    question = item["text"]
+    domains = detect_domains(question)
+    legal = is_legal(question, domains)
 
     try:
-        answer, trace = ask_groq(
-            question,
-            history
-        )
-
-        elapsed = round(
-            time.time()
-            - started,
-            2
-        )
+        if legal:
+            ranked = retrieve_verified(question, domains)
+            answer, mode = ask_legal_locked(question, [], ranked)
+            print(
+                "LEGAL ANSWER MODE:", mode,
+                "DOMAINS:", ",".join(domains),
+                "TOP:", ranked[0][1].get("id") if ranked else "NONE",
+                "SCORE:", round(ranked[0][0],1) if ranked else 0,
+                flush=True
+            )
+        else:
+            with state_lock:
+                history = list(conversation_history.get(sender_id, []))
+            answer = ask_general(question, history)
+            mode = "general_model"
 
         with state_lock:
-            conversation_history.setdefault(
-                sender_id,
-                []
-            )
-
-            conversation_history[
-                sender_id
-            ].extend([
-                {
-                    "role": "user",
-                    "content": question
-                },
-                {
-                    "role": "assistant",
-                    "content": answer
-                },
+            conversation_history.setdefault(sender_id, [])
+            conversation_history[sender_id].extend([
+                {"role":"user","content":question},
+                {"role":"assistant","content":answer}
             ])
+            conversation_history[sender_id] = conversation_history[sender_id][-MAX_HISTORY_MESSAGES:]
 
-            conversation_history[
-                sender_id
-            ] = (
-                conversation_history[
-                    sender_id
-                ][
-                    -MAX_HISTORY_MESSAGES:
-                ]
-            )
+        return chatbot_response(answer)
 
-        print(
-            "AI SUCCESS:",
-            "SECONDS:",
-            elapsed,
-            "LEGAL:",
-            trace["legal_mode"],
-            "DOMAINS:",
-            ",".join(
-                trace["domains"]
-            ),
-            "CHUNKS:",
-            ",".join(
-                trace["chunks"]
-            ),
-            flush=True
-        )
+    except requests.exceptions.RequestException as e:
+        print("AI REQUEST ERROR:", type(e).__name__, flush=True)
+        if legal:
+            ranked = retrieve_verified(question, domains)
+            fixed = deterministic_answer(question, ranked)
+            if fixed:
+                return chatbot_response(fixed)
+            for score, ch in ranked:
+                if score >= 12 and ch.get("answerable"):
+                    return chatbot_response(ch.get("verified_answer",""))
+            return chatbot_response(SAFE_REFUSAL)
+        return chatbot_response("Trợ lý AI hiện chưa kết nối được dịch vụ xử lý. Anh/chị vui lòng thử lại.")
 
-        return chatbot_response(
-            answer
-        )
-
-    except (
-        requests.exceptions.Timeout,
-        requests.exceptions.HTTPError,
-        requests.exceptions.RequestException
-    ) as error:
-        print(
-            "AI FAST FALLBACK:",
-            type(error).__name__,
-            flush=True
-        )
-
-        return chatbot_response(
-            kb_fallback_answer(
-                fallback_chunks
-            )
-        )
-
-    except Exception as error:
-        print(
-            "AI FALLBACK:",
-            type(error).__name__,
-            flush=True
-        )
-
-        return chatbot_response(
-            kb_fallback_answer(
-                fallback_chunks
-            )
-        )
-
-
-# =========================================================
-# RUN
-# =========================================================
+    except Exception as e:
+        print("AI ERROR:", type(e).__name__, flush=True)
+        return chatbot_response(SAFE_REFUSAL if legal else "Trợ lý AI hiện chưa xử lý được yêu cầu này.")
 
 if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=10000
-    )
+    app.run(host="0.0.0.0", port=10000)
