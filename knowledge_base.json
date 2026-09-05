@@ -1,9 +1,9 @@
 {
   "version": {
     "name": "CAX Pơng Drang Hybrid Legal Flexible KB",
-    "version": "6.0.0",
+    "version": "7.0.0",
     "snapshot": "2026-09-05",
-    "mode": "router_fixed_full_blhs",
+    "mode": "conversational_legal_guard",
     "note": "BLHS sử dụng toàn văn PDF người dùng cung cấp làm nguồn ưu tiên; không dùng các tóm tắt BLHS thủ công của V4."
   },
   "unit": {
@@ -312,5 +312,12 @@
     "only_phone_number_to_show": "02623509777",
     "label": "Số điện thoại trực ban Công an xã Pơng Drang, tỉnh Đắk Lắk",
     "rule": "Chatbot không cung cấp số điện thoại liên hệ nào khác."
+  },
+  "conversation_policy": {
+    "natural_conversation": true,
+    "not_template_based": true,
+    "legal_details_must_be_source_grounded": true,
+    "assistant_may_explain_flexibly": true,
+    "only_contact_phone": "02623509777"
   }
 }
