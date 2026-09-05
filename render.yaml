@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: cax-pongdrang-ai
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python scripts/build_db.py
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 60
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ANSWER_MODEL
+        value: openai/gpt-oss-120b
+      - key: PLANNER_MODEL
+        value: openai/gpt-oss-20b
+      - key: CORE_REASONING_EFFORT
+        value: medium
+      - key: DYNAMIC_REASONING_EFFORT
+        value: low
