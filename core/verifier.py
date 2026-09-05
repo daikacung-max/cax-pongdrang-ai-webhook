@@ -13,6 +13,52 @@ def norm(text):
     return text.strip()
 
 
+def _numbers(text):
+    return set(re.findall(r"\b\d+(?:[.,]\d+)?%?\b", str(text or "")))
+
+
+def _has_exception_structure(text):
+    q = norm(text)
+    markers = [
+        "hoac duoi",
+        "nhung thuoc",
+        "tru truong hop",
+        "thuoc mot trong cac truong hop",
+        "cac truong hop sau day",
+        "ngoai tru",
+    ]
+    return any(marker in q for marker in markers)
+
+
+def _is_overbroad_negative(text):
+    q = norm(text)
+    markers = [
+        "khong thuoc pham vi",
+        "khong cau thanh",
+        "chac chan khong",
+        "khong bi xu ly hinh su",
+        "khong the bi xu ly hinh su",
+        "chi khi",
+        "chi tu",
+    ]
+    return any(marker in q for marker in markers)
+
+
+def _acknowledges_exception(text):
+    q = norm(text)
+    markers = [
+        "van co the",
+        "neu thuoc",
+        "neu khong thuoc",
+        "tru truong hop",
+        "ngoai le",
+        "chua the ket luan",
+        "con phu thuoc",
+        "tuy thuoc",
+    ]
+    return any(marker in q for marker in markers)
+
+
 def verify(draft, retrieved_units):
     by_id = {unit["id"]: unit for unit in retrieved_units}
     errors = []
@@ -42,6 +88,46 @@ def verify(draft, retrieved_units):
             )
             continue
 
+        evidence_quote = str(claim.get("evidence_quote") or "").strip()
+        if not evidence_quote:
+            errors.append(
+                f"Claim '{claim.get('claim','')}' không có evidence_quote nguyên văn."
+            )
+            continue
+
+        source_text = str(unit.get("text") or "")
+        if norm(evidence_quote) not in norm(source_text):
+            errors.append(
+                f"evidence_quote của claim không tồn tại nguyên văn trong source {unit_id}."
+            )
+            continue
+
+        # Nếu claim nêu con số/ngưỡng, con số đó phải xuất hiện trong chính đoạn chứng cứ.
+        claim_numbers = _numbers(claim.get("claim", ""))
+        evidence_numbers = _numbers(evidence_quote)
+        if claim_numbers and not claim_numbers.issubset(evidence_numbers):
+            missing = sorted(claim_numbers - evidence_numbers)
+            errors.append(
+                "Claim nêu số liệu/ngưỡng không có trong evidence_quote: "
+                + ", ".join(missing)
+            )
+            continue
+
+        # Hàng rào chống rút gọn sai quy tắc có ngoại lệ/nhánh thay thế.
+        # Ví dụ nguồn có cấu trúc '... hoặc dưới ngưỡng nhưng thuộc trường hợp ...'
+        # thì không được kết luận tuyệt đối chỉ dựa vào ngưỡng chính.
+        claim_text = str(claim.get("claim") or "")
+        if (
+            _is_overbroad_negative(claim_text)
+            and _has_exception_structure(source_text)
+            and not _acknowledges_exception(claim_text)
+        ):
+            errors.append(
+                "Claim kết luận loại trừ quá rộng trong khi nguồn có nhánh/ngoại lệ liên quan; "
+                "phải nêu điều kiện/ngoại lệ hoặc dùng cách diễn đạt 'chưa thể kết luận'."
+            )
+            continue
+
         verified_claims.append(claim)
 
     allowed_articles = {
@@ -59,6 +145,20 @@ def verify(draft, retrieved_units):
         errors.append(
             "Câu trả lời nêu Điều không có trong nguồn truy xuất: "
             + ", ".join(unsupported)
+        )
+
+    # Kiểm tra cả câu trả lời cuối: nếu đang kết luận tuyệt đối nhưng nguồn truy xuất
+    # có cấu trúc ngoại lệ và câu trả lời không hề nhắc điều kiện/ngoại lệ, từ chối.
+    answer_text = str(draft.get("answer") or "")
+    source_blob = "\n".join(str(x.get("text") or "") for x in retrieved_units)
+    if (
+        _is_overbroad_negative(answer_text)
+        and _has_exception_structure(source_blob)
+        and not _acknowledges_exception(answer_text)
+    ):
+        errors.append(
+            "Câu trả lời có kết luận loại trừ tuyệt đối nhưng nguồn có ngoại lệ/nhánh thay thế; "
+            "cần sửa lại để phản ánh đầy đủ quy định."
         )
 
     return {
