@@ -19,6 +19,12 @@ def _no_source_answer(intake):
             "Kho dữ liệu demo chưa có nguồn thủ tục cấp lại đã được kiểm chứng cho đúng trường hợp, "
             "nên tôi chưa thể khẳng định giấy tờ, thời hạn hoặc điểm tiếp nhận."
         )
+    if intake.get("procedure_code") == "vehicle_registration":
+        return (
+            "Tôi đã ghi nhận anh/chị cần sang tên hoặc cấp đổi giấy tờ xe. "
+            "Kho dữ liệu demo chưa có nguồn thủ tục đã được kiểm chứng cho đúng trường hợp này, "
+            "nên tôi chưa thể tự nêu hồ sơ, thời hạn hoặc điểm tiếp nhận."
+        )
     if intake.get("conversation_mode") == "intake_requested":
         question = intake.get("next_question")
         if question:

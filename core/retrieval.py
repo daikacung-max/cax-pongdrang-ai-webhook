@@ -56,6 +56,10 @@ def _detect_domain_in_text(text):
     # trong văn bản hình sự có thể làm FTS trả sai Điều luật.
     if any(x in q for x in ["can cuoc", "cccd", "can cuoc cong dan"]):
         return "identity_unverified", []
+    if any(x in q for x in ["sang ten", "cap doi"]) and any(
+        x in q for x in ["xe", "dang ky xe", "bien so"]
+    ):
+        return "vehicle_unverified", []
     if any(x in q for x in ["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe", "cap bien so", "mua xe moi"]):
         return "vehicle", ["VEHICLE_REGISTRATION_2026"]
     if any(x in q for x in ["xac nhan cu tru", "xac nhan thong tin cu tru", "cu tru"]):
@@ -154,7 +158,7 @@ def retrieve(plan, question):
 
     # Không có nguồn đúng phạm vi thì fail-closed. Danh sách rỗng trong SQLite
     # không phải filter, nên phải dừng rõ ràng tại đây.
-    if domain == "identity_unverified":
+    if domain in ("identity_unverified", "vehicle_unverified"):
         return []
 
     for pos, unit_id in enumerate(_priority_unit_ids(domain, question)):

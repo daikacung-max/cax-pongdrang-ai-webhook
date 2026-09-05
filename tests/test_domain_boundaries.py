@@ -15,6 +15,11 @@ class DomainBoundaryTests(unittest.TestCase):
         units = retrieve(plan(question, [], dynamic=True), question)
         self.assertEqual(units, [])
 
+    def test_vehicle_transfer_cannot_use_first_registration_source(self):
+        question = "Tôi muốn sang tên xe máy"
+        units = retrieve(plan(question, [], dynamic=True), question)
+        self.assertEqual(units, [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -179,7 +179,9 @@ def assess(question, history):
     return {
         "procedure_code": chosen["code"],
         "procedure_name": chosen["name"],
-        "source_ready": bool(chosen["source_ready"]),
+        "source_ready": bool(chosen["source_ready"]) and not (
+            chosen["code"] == "vehicle_registration" and any(x in text for x in ("sang ten", "cap doi"))
+        ),
         "conversation_mode": conversation_mode,
         "handoff_status": handoff_status,
         "handoff_queue": chosen["queue"],

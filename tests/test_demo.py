@@ -44,6 +44,12 @@ class DemoTests(unittest.TestCase):
         self.assertIn("chưa thể xác định tội danh", result["answer"])
         self.assertNotIn("Điều 174", result["answer"])
 
+    def test_vehicle_transfer_does_not_borrow_new_vehicle_procedure(self):
+        result = respond(str(uuid.uuid4()), "Tôi muốn sang tên xe máy.")
+        self.assertEqual(result["source_state"], "no_source")
+        self.assertIn("sang tên", result["answer"])
+        self.assertNotIn("ĐKX10", result["answer"])
+
     def test_demo_console_is_off_by_default(self):
         with app.test_client() as client:
             response = client.get("/demo")
