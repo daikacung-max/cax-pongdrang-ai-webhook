@@ -427,7 +427,6 @@ def ask_groq(question, history):
         {"role": "system", "content": system_prompt}
     ]
 
-    # Trí nhớ hội thoại ngắn để giữ tốc độ
     messages.extend(history[-MAX_HISTORY_MESSAGES:])
 
     messages.append({
@@ -435,34 +434,37 @@ def ask_groq(question, history):
         "content": question
     })
 
+    # Header cơ bản dùng cho GPT-OSS.
+    # Không gửi Groq-Model-Version cho model thường.
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json",
-        "Groq-Model-Version": "latest",
     }
 
     if web_required:
+        # Groq-Model-Version là header dành cho Compound system versioning.
+        headers["Groq-Model-Version"] = "latest"
+
         payload = {
             "model": WEB_MODEL,
             "messages": messages,
             "temperature": 0.15 if legal_mode else 0.35,
-            "max_completion_tokens": 320,
-            "citation_options": "enabled",
+            "max_completion_tokens": 300,
         }
 
+        # Khi là pháp luật, ưu tiên nguồn chính thức.
         if legal_mode:
             payload["search_settings"] = {
                 "include_domains": OFFICIAL_LEGAL_DOMAINS
             }
 
     else:
+        # Request tối giản, bám đúng mẫu Chat Completions của Groq.
         payload = {
             "model": FAST_MODEL,
             "messages": messages,
-            "temperature": 0.12 if legal_mode else 0.45,
-            "max_completion_tokens": 320,
-            "reasoning_effort": "low",
-            "citation_options": "enabled",
+            "temperature": 0.20 if legal_mode else 0.45,
+            "max_completion_tokens": 300,
         }
 
     response = requests.post(
@@ -472,7 +474,26 @@ def ask_groq(question, history):
         timeout=GROQ_TIMEOUT_SECONDS
     )
 
-    response.raise_for_status()
+    if response.status_code >= 400:
+        # Chỉ log mã lỗi và thông báo Groq, KHÔNG log API key/prompt.
+        try:
+            err = response.json()
+            err_message = (
+                err.get("error", {}).get("message")
+                if isinstance(err, dict)
+                else None
+            )
+        except Exception:
+            err_message = response.text[:300]
+
+        print(
+            "GROQ API ERROR:",
+            response.status_code,
+            str(err_message)[:300],
+            flush=True
+        )
+
+        response.raise_for_status()
 
     data = response.json()
 
@@ -486,7 +507,6 @@ def ask_groq(question, history):
     if not answer:
         raise RuntimeError("Groq không trả về nội dung")
 
-    # Cắt an toàn cho Zalo
     if len(answer) > MAX_ZALO_CHARS:
         answer = answer[:MAX_ZALO_CHARS - 20].rstrip() + "\n…"
 
