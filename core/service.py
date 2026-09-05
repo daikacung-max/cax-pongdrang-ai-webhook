@@ -9,6 +9,7 @@ from config import (
 from core import db
 from core.answerer import answer as generate_answer, answer_dynamic_text
 from core.history import conversation_key
+from core.intake import assess as assess_intake, prompt_hint as intake_prompt_hint
 from core.llm import LLMTimeout
 from core.planner import plan
 from core.providers import provider_name_for_model
@@ -98,6 +99,8 @@ class AICore:
 
         with timer.stage("history_ms"):
             history = db.get_history(user_id, limit=MAX_HISTORY_MESSAGES)
+        intake = assess_intake(question, history)
+        intake_hint = intake_prompt_hint(intake)
         with timer.stage("planner_ms"):
             search_plan = plan(
                 question,
@@ -125,6 +128,7 @@ class AICore:
                 "legal": True, "retrieved_unit_ids": [], "verified": False,
                 "repaired": False, "verification_errors": ["no_verified_source"],
                 "dynamic": bool(dynamic), "path": "legal_no_source_fail_closed",
+                "intake": intake,
                 **_model_meta(model_used),
             }
             self._save(user_id, question, final_answer, search_plan, meta)
@@ -146,6 +150,7 @@ class AICore:
                         legal_context=legal_context,
                         model=model_used,
                         safety_identifier=safety_identifier,
+                        intake_hint=intake_hint,
                     )
                 models_used.append(model_used)
                 with timer.stage("verify_ms"):
@@ -178,6 +183,7 @@ class AICore:
                 "verified": bool(verified), "repaired": False,
                 "verification_errors": verification_errors,
                 "dynamic": True, "path": "single_call_or_grounded_fallback",
+                "intake": intake,
                 **_model_meta(model_used),
             }
             self._save(user_id, question, final_answer, search_plan, meta)
@@ -194,7 +200,7 @@ class AICore:
         with timer.stage("llm_ms"):
             draft = generate_answer(
                 question, history, legal_context=legal_context, dynamic=False,
-                model=model_used, safety_identifier=safety_identifier,
+                model=model_used, safety_identifier=safety_identifier, intake_hint=intake_hint,
             )
         models_used.append(model_used)
         with timer.stage("verify_ms"):
@@ -209,7 +215,7 @@ class AICore:
                 draft = generate_answer(
                     question, history, legal_context=legal_context, dynamic=False,
                     repair_note=repair_note(verification), model=model_used,
-                    safety_identifier=safety_identifier,
+                    safety_identifier=safety_identifier, intake_hint=intake_hint,
                 )
             models_used.append(model_used)
             with timer.stage("verify_ms"):
@@ -224,7 +230,7 @@ class AICore:
                 draft = generate_answer(
                     question, history, legal_context=legal_context, dynamic=False,
                     repair_note=repair_note(verification), model=model_used,
-                    safety_identifier=safety_identifier,
+                    safety_identifier=safety_identifier, intake_hint=intake_hint,
                 )
             models_used.append(model_used)
             with timer.stage("verify_ms"):
@@ -246,6 +252,7 @@ class AICore:
             "verified": bool(verification["ok"]), "repaired": repaired,
             "verification_errors": verification.get("errors", []),
             "dynamic": False, "path": "structured_verified",
+            "intake": intake,
             **_model_meta(model_used), "models_used": models_used,
         }
         self._save(user_id, question, final_answer, search_plan, meta)

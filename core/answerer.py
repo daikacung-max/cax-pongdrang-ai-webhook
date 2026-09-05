@@ -73,7 +73,7 @@ LEGAL_SYSTEM = """
 """
 
 
-def build_messages(question, history, legal_context="", repair_note=None):
+def build_messages(question, history, legal_context="", repair_note=None, intake_hint=""):
     system = BASE_SYSTEM
     if legal_context:
         system += "\n" + LEGAL_SYSTEM
@@ -83,6 +83,8 @@ def build_messages(question, history, legal_context="", repair_note=None):
             "\nCÂU TRẢ LỜI TRƯỚC BỊ BỘ KIỂM CHỨNG TỪ CHỐI."
             "\nHãy sửa đúng các lỗi sau:\n" + repair_note
         )
+    if intake_hint:
+        system += "\nTIẾP NHẬN:\n" + intake_hint
 
     messages = [{"role": "system", "content": system}]
     for item in history[-8:]:
@@ -113,12 +115,13 @@ def _bounded_history(history, max_messages, max_chars):
 
 
 def answer(question, history, legal_context="", dynamic=False, repair_note=None,
-           model=None, safety_identifier=None):
+           model=None, safety_identifier=None, intake_hint=""):
     model = model or (DYNAMIC_ANSWER_MODEL if dynamic else ANSWER_MODEL)
     return chat_structured(
         model=model,
         messages=build_messages(
-            question, history, legal_context=legal_context, repair_note=repair_note
+            question, history, legal_context=legal_context, repair_note=repair_note,
+            intake_hint=intake_hint,
         ),
         schema_name="citizen_answer",
         schema=ANSWER_SCHEMA,
@@ -131,7 +134,7 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None,
 
 
 def answer_dynamic_text(question, history, legal_context="", model=None,
-                        safety_identifier=None):
+                        safety_identifier=None, intake_hint=""):
     """Một lượt gọi model real-time, prompt ngắn, dành riêng cho Zalo Dynamic."""
     system = f"""
 Bạn là Trợ lý AI của {UNIT_NAME}, không phải cán bộ thật. Đây là hội thoại chat bằng văn bản.
@@ -151,6 +154,8 @@ Nếu chưa đủ căn cứ, nói rõ phần nào còn thiếu, không đẩy ng
 """
     if legal_context:
         system += "\nSOURCE:\n" + legal_context
+    if intake_hint:
+        system += "\nTIẾP NHẬN:\n" + intake_hint
 
     messages = [{"role": "system", "content": system}]
     messages.extend(_bounded_history(
