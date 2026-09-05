@@ -59,6 +59,8 @@ SEARCH_VOCAB = [
      "đăng ký thường trú cư trú Công an cấp xã"),
     (["xac nhan cu tru", "xac nhan thong tin cu tru"],
      "xác nhận thông tin cư trú Công an cấp xã"),
+    (["dang ky xe", "dang ky xe mo to", "dang ky xe may", "xe gan may", "bien so xe", "cap bien so", "mua xe moi", "giay to dang ky xe"],
+     "Đăng ký lần đầu xe mô tô xe gắn máy Giấy khai đăng ký xe ĐKX10 giấy tờ chủ xe giấy tờ của xe cơ quan đăng ký xe biển số"),
 ]
 
 LEGAL_HINTS = [
@@ -66,7 +68,7 @@ LEGAL_HINTS = [
     "tam tru", "thuong tru", "cu tru", "dang ky xe", "can cuoc", "to giac",
     "thuong tich", "bi thuong", "bi danh", "dung dao", "hung khi",
     "bi lua", "trom", "ma tuy", "khoi to", "tham quyen", "truy cuu",
-    "thu tuc", "ho so", "vneid",
+    "thu tuc", "ho so", "vneid", "xe mo to", "xe may", "xe gan may", "bien so xe",
 ]
 
 
