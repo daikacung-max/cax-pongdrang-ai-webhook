@@ -95,7 +95,20 @@ def clean_plain_text(text):
     for mark in ("```", "**", "__", "`", "*"):
         text = text.replace(mark, "")
     text = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", text)
-    text = text.replace("Cục Công an xã Pơng Drang", "Công an xã Pơng Drang")
+
+    # Chuẩn hóa cách gọi đơn vị/cán bộ trước khi phát ra Zalo.
+    text = re.sub(
+        r"(?i)đồn\s+công\s+an\s+xã\s+pơng\s+drang(?:,?\s*tỉnh\s+đắk\s+lắk)?",
+        UNIT_NAME,
+        text,
+    )
+    text = re.sub(
+        r"(?i)cục\s+công\s+an\s+xã\s+pơng\s+drang(?:,?\s*tỉnh\s+đắk\s+lắk)?",
+        UNIT_NAME,
+        text,
+    )
+    text = re.sub(r"(?i)nhân\s+viên\s+công\s+an", "cán bộ Công an", text)
+
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
