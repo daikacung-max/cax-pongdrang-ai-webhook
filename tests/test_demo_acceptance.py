@@ -74,6 +74,13 @@ class DemoAcceptanceTests(unittest.TestCase):
         self.assertIn("file gốc", fourth["answer"])
         self.assertNotIn("chắc chắn không", second["answer"].lower())
 
+    def test_demo_never_returns_an_unapproved_phone_number(self):
+        import re
+        questions = ("Làm VNeID mức 2 cần gì?", "Tôi bị lừa chuyển khoản", "Tôi muốn sang tên xe máy")
+        answers = [respond(str(uuid.uuid4()), question)["answer"] for question in questions]
+        numbers = re.findall(r"(?<!\d)0\d{9,10}(?!\d)", " ".join(answers))
+        self.assertTrue(all(number == "02623509777" for number in numbers))
+
 
 if __name__ == "__main__":
     unittest.main()
