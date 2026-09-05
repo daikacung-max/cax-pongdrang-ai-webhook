@@ -57,12 +57,14 @@ Không dùng Markdown, không trình bày chuỗi suy luận nội bộ.
 
 
 LEGAL_SYSTEM = """
-Đối với câu hỏi pháp luật:
-- LEGAL_SOURCE_CONTEXT là nguồn pháp lý đã truy xuất.
-- Mọi số Điều, tên Điều/tội danh, ngưỡng, khung hình phạt, thời hạn, lệ phí, thẩm quyền hoặc kết luận loại trừ phải bám trực tiếp nguồn.
+Đối với câu hỏi pháp luật hoặc thủ tục hành chính:
+- LEGAL_SOURCE_CONTEXT là nguồn đã được kiểm chứng.
+- Mọi số Điều, tên Điều/tội danh, ngưỡng, khung hình phạt, thời hạn, lệ phí, thẩm quyền, thành phần hồ sơ hoặc kết luận loại trừ phải bám trực tiếp nguồn.
 - Với mỗi legal_claim, evidence_quote phải là đoạn nguyên văn ngắn chép trực tiếp từ đúng SOURCE_UNIT_ID.
 - Không được biến quy tắc có nhiều nhánh thành một điều kiện duy nhất. Nếu nguồn có 'hoặc', 'nhưng thuộc', 'trừ trường hợp' hay ngoại lệ liên quan thì phải phản ánh đầy đủ.
 - Không nói 'không cấu thành', 'không thuộc', 'chắc chắn không bị xử lý' nếu nguồn còn nhánh/ngoại lệ chưa được loại trừ.
+- Với thủ tục hành chính, tuyệt đối không tự sáng tác tên biểu mẫu, giấy tờ, bản sao, cơ quan/phòng nghiệp vụ hay loại kết quả nếu nguồn không nêu.
+- Nếu nguồn nói cơ quan nhà nước phải khai thác dữ liệu/VNeID và không yêu cầu nộp lại giấy tờ đã có dữ liệu thì phải phản ánh đúng nguyên tắc này.
 - Nếu dữ kiện mới làm thay đổi đánh giá pháp lý, nói rõ ý nghĩa của dữ kiện mới theo nguồn, nhưng không kết luận thay cơ quan có thẩm quyền.
 """
 
@@ -103,16 +105,17 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None)
 
 
 def answer_dynamic_text(question, history, legal_context=""):
-    """Một lượt gọi 20B, prompt ngắn, dành riêng cho giới hạn dưới 2 giây của Zalo Dynamic."""
+    """Một lượt gọi model real-time, prompt ngắn, dành riêng cho Zalo Dynamic."""
     system = f"""
-Bạn là Trợ lý AI của {UNIT_NAME}. Trả lời bằng tiếng Việt tự nhiên, ngắn gọn, thường 2-5 câu.
+Bạn là Trợ lý AI của {UNIT_NAME}. Trả lời tiếng Việt tự nhiên, ngắn gọn, thường 2-5 câu.
 Hiểu câu hỏi theo các lượt hội thoại gần nhất và trả lời phần thông tin mới, không kể lại từ đầu.
 Không kết luận một người có tội chỉ từ lời kể một phía.
 Tên đơn vị duy nhất: {UNIT_NAME}. Số liên hệ duy nhất: {HOTLINE}.
-Nếu có SOURCE bên dưới, mọi số Điều, tên tội, ngưỡng và kết luận pháp lý phải bám SOURCE.
+Nếu có SOURCE bên dưới, mọi chi tiết pháp luật và thủ tục hành chính phải bám SOURCE.
+Không tự thêm tên giấy tờ, bản sao CMND/CCCD, sổ hộ khẩu, giấy khai sinh, thư mời, biểu mẫu, phòng nghiệp vụ, lệ phí, thời hạn hoặc loại kết quả nếu SOURCE không nêu.
+Nếu SOURCE nêu nguyên tắc tái sử dụng dữ liệu/VNeID thì không được yêu cầu người dân nộp lại giấy tờ đã có dữ liệu.
 Đặc biệt không được kết luận chỉ dựa vào một ngưỡng nếu SOURCE còn nhánh 'hoặc', 'nhưng thuộc', ngoại lệ hay điều kiện thay thế.
-Nếu chưa đủ căn cứ, nói 'chưa thể kết luận' và giải thích điều gì cần làm rõ.
-Không dùng Markdown.
+Nếu chưa đủ căn cứ, nói 'chưa thể kết luận' hoặc nói rõ phần nào nguồn chưa đủ. Không dùng Markdown.
 """
     if legal_context:
         system += "\nSOURCE:\n" + legal_context
@@ -128,6 +131,6 @@ Không dùng Markdown.
         messages=messages,
         reasoning_effort=DYNAMIC_REASONING_EFFORT,
         timeout=DYNAMIC_TIMEOUT_SECONDS,
-        temperature=0.08 if legal_context else 0.35,
-        max_completion_tokens=260,
+        temperature=0.06 if legal_context else 0.30,
+        max_completion_tokens=220,
     )
