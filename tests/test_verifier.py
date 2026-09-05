@@ -92,6 +92,15 @@ class DynamicVerifierTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("article_134_knife_assumed_weapon", result["errors"])
 
+    def test_rejects_informal_second_person_in_dynamic_reply(self):
+        result = verify_dynamic_text(
+            "Bạn cần giữ lại file gốc của camera.",
+            [ARTICLE_134],
+            question="Tôi có camera ghi lại vụ việc.",
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("second_person_must_be_anh_chi", result["errors"])
+
 
 if __name__ == "__main__":
     unittest.main()

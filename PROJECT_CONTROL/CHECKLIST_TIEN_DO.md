@@ -9,7 +9,9 @@ Quy ước: `[x]` chỉ dùng khi có bằng chứng ghi ở cột ghi chú. `[ 
 - [x] Retrieval FTS5 và verifier fail-closed.
 - [x] Lịch sử HMAC + giới hạn số tin/ngày lưu.
 - [x] Log timing không chứa nội dung người dân.
-- [x] 52 kiểm tra tự động đạt tại thời điểm cập nhật, gồm ranh giới nguồn, bảo mật lịch sử, chính sách số điện thoại và adapter Zalo.
+- [x] 53 kiểm tra tự động đạt tại thời điểm cập nhật, gồm ranh giới nguồn, bảo mật lịch sử, chính sách số điện thoại, cách xưng hô và adapter Zalo.
+- [x] Đã đo Groq Dynamic bằng dữ liệu giả lập, không chứa dữ liệu cá nhân: 30 lượt nóng và 10 lượt trong process mới.
+- [ ] Dynamic đạt ngưỡng vận hành mặc định: fallback dưới 5% và p95 còn cách deadline Zalo ít nhất 300 ms.
 - [ ] OA thật đã kiểm thử hai chiều.
 
 ## B. Demo nghiệp vụ
@@ -55,3 +57,4 @@ Quy ước: `[x]` chỉ dùng khi có bằng chứng ghi ở cột ghi chú. `[ 
 | 2026-09-05 | Nhập thêm nguồn Bộ Công an cho căn cước dưới 14 tuổi và tố giác/tin báo | `core/verified_sources.py` | Các chủ đề còn thiếu nguồn chi tiết vẫn fail-closed | Chưa duyệt |
 | 2026-09-05 | Sửa lỗi mất căn cước bị kéo nhầm sang Điều 134; nhập nguồn cấp lại thẻ căn cước tại cấp tỉnh và mở rộng 30 kịch bản demo | Thủ tục 2.001194 của Cổng DVC Bộ Công an; 49/49 test đạt | Cấp mới/đổi căn cước, sang tên xe và các thủ tục còn lại vẫn chờ nguồn duyệt | Chưa duyệt |
 | 2026-09-05 | Tách nguồn cấp thẻ căn cước lần đầu từ đủ 14 tuổi tại cấp tỉnh | Thủ tục 2.000200 của Cổng DVC Bộ Công an; 50/50 test đạt | Đổi thẻ căn cước vẫn chờ nguồn riêng | Chưa duyệt |
+| 2026-09-05 | Kiểm tra Groq Dynamic bằng 40 câu hỏi giả lập và chuỗi 4 lượt Điều 134 | Groq/model hợp lệ; 53/53 test nội bộ đạt; 30 lượt nóng: p50 157 ms, p95 801 ms, max 1.450 ms; 10 lượt process mới (clock lõi sau khởi tạo): p50 1.211 ms, p95 1.272 ms | Fallback của model còn cao (nóng: 29/30; process mới: 7/10), nên chưa đủ điều kiện đặt làm đường trả lời mặc định; fallback nguồn vẫn an toàn | Chưa duyệt |

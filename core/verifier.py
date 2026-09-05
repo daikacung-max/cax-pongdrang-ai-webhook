@@ -214,6 +214,10 @@ def verify_dynamic_text(answer, retrieved_units, question=""):
         errors.append("unsupported_guilt_conclusion")
     if _premature_fraud_label(answer, question):
         errors.append("premature_fraud_offence_label")
+    # Giữ nhất quán cách xưng hô đã công bố của trợ lý. Nếu model lạc sang
+    # "bạn", nhánh Dynamic sẽ dùng câu fallback đã bám nguồn và xưng "anh/chị".
+    if re.search(r"(?i)\bbạn\s+(?:có|cần|đã|nên|muốn|hãy|vui lòng)\b", answer):
+        errors.append("second_person_must_be_anh_chi")
     answer_norm = norm(answer)
     if any(x in answer_norm for x in ["dao la hung khi nguy hiem", "dao chinh la hung khi nguy hiem"]):
         errors.append("knife_assumed_dangerous_weapon")
