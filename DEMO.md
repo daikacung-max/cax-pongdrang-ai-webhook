@@ -1,6 +1,6 @@
 # Chạy demo cục bộ
 
-Demo này chỉ dùng dữ liệu giả lập, không gọi Zalo OA, không gửi hồ sơ cho cán bộ và không gọi model/provider. Câu trả lời được tạo từ kho nguồn đã kiểm chứng và các fallback an toàn, vì vậy có thể chạy khi chưa trả phí hoặc chưa có API key.
+Demo này chỉ dùng dữ liệu giả lập, không gọi Zalo OA, không gửi hồ sơ cho cán bộ và không gọi model/provider. Câu trả lời được tạo từ kho nguồn đã kiểm chứng và các fallback an toàn, vì vậy có thể chạy khi chưa trả phí hoặc chưa có API key. Khi bật demo, server mặc định chỉ lắng nghe tại `127.0.0.1`, không mở ra mạng nội bộ hay Internet.
 
 Trong PowerShell tại thư mục dự án:
 

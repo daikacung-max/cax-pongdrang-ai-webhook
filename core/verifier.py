@@ -42,6 +42,16 @@ def _asserts_guilt(text):
     return any(re.search(pattern, q) for pattern in patterns)
 
 
+def _premature_fraud_label(answer, question):
+    """Không gán Điều 174/tên tội danh chỉ từ lời kể bị lừa chuyển khoản."""
+    q = norm(question)
+    a = norm(answer)
+    is_transfer_report = any(x in q for x in ["bi lua", "lua dao chuyen khoan", "chuyen khoan", "chuyen tien"])
+    names_fraud_offence = "dieu 174" in a or "toi lua dao chiem doat tai san" in a
+    has_caveat = any(x in a for x in ["chua the ket luan", "chua the xac dinh", "can xac minh", "con phu thuoc"])
+    return is_transfer_report and names_fraud_offence and not has_caveat
+
+
 def _has_residence_source(units):
     return any(str(x.get("document_id") or "").startswith(("RESIDENCE_", "TTHC_TEMP_RESIDENCE_")) for x in units)
 
@@ -202,6 +212,8 @@ def verify_dynamic_text(answer, retrieved_units, question=""):
         errors.append("overbroad_negative")
     if _asserts_guilt(answer):
         errors.append("unsupported_guilt_conclusion")
+    if _premature_fraud_label(answer, question):
+        errors.append("premature_fraud_offence_label")
     answer_norm = norm(answer)
     if any(x in answer_norm for x in ["dao la hung khi nguy hiem", "dao chinh la hung khi nguy hiem"]):
         errors.append("knife_assumed_dangerous_weapon")
@@ -298,6 +310,18 @@ def grounded_dynamic_fallback(question, retrieved_units):
         return (
             "Đoạn camera là chứng cứ cần bảo toàn. Anh/chị nên giữ nguyên file gốc, không chỉnh sửa, sao lưu thêm một bản và ghi lại thời gian, địa điểm, người biết sự việc; "
             "khi trình báo thì cung cấp bản sao theo hướng dẫn và giữ lại bản gốc để đối chiếu. Việc đánh giá trách nhiệm cụ thể vẫn phải dựa trên toàn bộ diễn biến, thương tích và kết quả xác minh."
+        )
+    if article == "134" and any(x in q for x in ["bi danh", "nguoi khac danh", "bi hanh hung"]):
+        return (
+            "Tôi đã ghi nhận anh/chị bị người khác đánh. Nếu có thương tích, anh/chị nên đi khám và giữ lại giấy tờ liên quan; "
+            "đồng thời lưu ảnh, video, tin nhắn hoặc thông tin người biết sự việc nếu có. "
+            "Anh/chị đã đi khám hoặc có kết quả thương tích chưa?"
+        )
+    if any(x in q for x in ["bi lua", "lua dao chuyen khoan", "chuyen tien", "chuyen khoan"]):
+        return (
+            "Tôi đã ghi nhận việc anh/chị nghi bị lừa qua chuyển khoản. Anh/chị nên giữ lại chứng từ giao dịch, tin nhắn, "
+            "ảnh chụp và thông tin tài khoản liên quan; tôi chưa thể xác định tội danh chỉ từ thông tin hiện có. "
+            "Anh/chị chuyển khoản vào thời điểm nào?"
         )
     if article and title:
         return f"Nội dung anh/chị hỏi có liên quan đến Điều {article} Bộ luật Hình sự, {title}. Cần đối chiếu đầy đủ điều kiện của điều luật với diễn biến thực tế trước khi kết luận."

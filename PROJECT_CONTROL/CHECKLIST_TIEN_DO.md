@@ -20,6 +20,7 @@ Quy ước: `[x]` chỉ dùng khi có bằng chứng ghi ở cột ghi chú. `[ 
 - [ ] Mỗi thủ tục có bộ câu trả lời mẫu tự nhiên, ngắn, bằng văn bản.
 - [x] Phân biệt tư vấn thông thường với yêu cầu tiếp nhận; không tạo hồ sơ chỉ vì người dân hỏi thông tin.
 - [ ] Có 30 kịch bản hội thoại và kết quả mong đợi.
+- [x] Có demo cục bộ tách production: chat văn bản, chỉ tư vấn/tiếp nhận theo yêu cầu, lịch sử tách theo phiên và không gửi dữ liệu ra ngoài.
 - [ ] Nhớ được dữ kiện qua nhiều lượt, không lặp lại từ đầu.
 - [ ] Khi thiếu dữ kiện chỉ hỏi câu quan trọng nhất.
 - [ ] Khi không có nguồn thì nói rõ giới hạn và chuyển người thật.

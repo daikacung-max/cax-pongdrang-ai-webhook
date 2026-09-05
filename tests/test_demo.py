@@ -32,13 +32,24 @@ class DemoTests(unittest.TestCase):
         self.assertIn("mất thẻ Căn cước", result["answer"])
         self.assertNotIn("Điều 134", result["answer"])
 
+    def test_assault_starts_with_evidence_and_one_followup(self):
+        result = respond(str(uuid.uuid4()), "Tôi bị người khác đánh.")
+        self.assertIn("đi khám", result["answer"])
+        self.assertIn("kết quả thương tích", result["answer"])
+        self.assertNotIn("Điều 134", result["answer"])
+
+    def test_fraud_transfer_does_not_assign_an_offence(self):
+        result = respond(str(uuid.uuid4()), "Tôi bị lừa chuyển khoản.")
+        self.assertIn("chứng từ giao dịch", result["answer"])
+        self.assertIn("chưa thể xác định tội danh", result["answer"])
+        self.assertNotIn("Điều 174", result["answer"])
+
     def test_demo_console_is_off_by_default(self):
         with app.test_client() as client:
             response = client.get("/demo")
         self.assertEqual(response.status_code, 404)
 
     def test_demo_console_rejects_invalid_session(self):
-        original = app.view_functions["demo_console"]
         # The route is intentionally disabled by default; test the session validator
         # through its public API only when temporarily enabled.
         import app as application
@@ -48,6 +59,26 @@ class DemoTests(unittest.TestCase):
             with app.test_client() as client:
                 response = client.post("/demo/api/chat", json={"session_id": "not-a-uuid", "message": "Xin chào"})
             self.assertEqual(response.status_code, 400)
+        finally:
+            application.ENABLE_DEMO_CONSOLE = old_enabled
+
+    def test_demo_history_is_isolated_between_sessions(self):
+        import app as application
+        old_enabled = application.ENABLE_DEMO_CONSOLE
+        application.ENABLE_DEMO_CONSOLE = True
+        session_a = str(uuid.uuid4())
+        session_b = str(uuid.uuid4())
+        try:
+            with app.test_client() as client:
+                created = client.post("/demo/api/chat", json={
+                    "session_id": session_a,
+                    "message": "Làm VNeID mức 2 cần gì?",
+                })
+                own = client.get("/demo/api/history?session_id=" + session_a)
+                other = client.get("/demo/api/history?session_id=" + session_b)
+            self.assertEqual(created.status_code, 200)
+            self.assertEqual(len(own.get_json()["messages"]), 2)
+            self.assertEqual(other.get_json()["messages"], [])
         finally:
             application.ENABLE_DEMO_CONSOLE = old_enabled
 

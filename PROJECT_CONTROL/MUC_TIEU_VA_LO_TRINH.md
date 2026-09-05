@@ -48,6 +48,8 @@ Mức tổng thể ước tính: **25% mục tiêu toàn hệ thống**.
 
 Tiêu chí qua: 30 kịch bản hội thoại không bịa điều luật, số liệu, giấy tờ hoặc thẩm quyền; chỉ trả lời văn bản; không lộ dữ liệu giữa hai người dùng.
 
+Trạng thái: đã có demo cục bộ dùng nguồn kiểm chứng và không gọi provider. Demo mới bao phủ một phần nhóm thủ tục; chưa thay thế việc kiểm thử Zalo OA thật hoặc nghiệm thu đủ 30 kịch bản.
+
 ### Giai đoạn 2 — Tiếp nhận và chuyển bộ phận
 
 Đầu ra: tạo hồ sơ vụ việc sau khi đủ dữ kiện; phân loại; định tuyến; mã hồ sơ; trạng thái tiếp nhận/đang xử lý/cần bổ sung/đã chuyển/đã đóng; thông báo lại cho người dân bằng tin nhắn.

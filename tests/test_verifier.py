@@ -42,6 +42,16 @@ class DynamicVerifierTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("unsupported_guilt_conclusion", result["errors"])
 
+    def test_rejects_premature_fraud_offence_label(self):
+        units = [{"id": "BLHS_2025:article:174", "article": "174", "text": "Nguồn giả lập"}]
+        result = verify_dynamic_text(
+            "Người đó phạm tội lừa đảo chiếm đoạt tài sản theo Điều 174.",
+            units,
+            question="Tôi bị lừa chuyển khoản.",
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("premature_fraud_offence_label", result["errors"])
+
     def test_rejects_automatic_knife_classification(self):
         result = verify_dynamic_text(
             "Con dao chính là hung khí nguy hiểm.", [ARTICLE_134], question="Người kia dùng dao."

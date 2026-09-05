@@ -49,3 +49,7 @@ HISTORY_POOL_MAX_SIZE = int(os.getenv("HISTORY_POOL_MAX_SIZE", "5"))
 # Bản demo chỉ chạy cục bộ, tách khỏi Zalo OA và production. Mặc định tắt để
 # không vô tình công khai lịch sử hội thoại demo trên web service.
 ENABLE_DEMO_CONSOLE = os.getenv("ENABLE_DEMO_CONSOLE", "false").lower() in ("1", "true", "yes", "on")
+LOCAL_BIND_HOST = os.getenv(
+    "LOCAL_BIND_HOST",
+    "127.0.0.1" if ENABLE_DEMO_CONSOLE else "0.0.0.0",
+)

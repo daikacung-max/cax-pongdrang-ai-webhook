@@ -3,6 +3,7 @@ from pathlib import Path
 import logging
 import time
 import re
+import os
 
 from config import (
     UNIT_NAME,
@@ -16,6 +17,7 @@ from config import (
     TARGET_ZALO_CHARS,
     MAX_ZALO_TOTAL_CHARS,
     ENABLE_DEMO_CONSOLE,
+    LOCAL_BIND_HOST,
 )
 from core import db
 from core.ingest import import_article_index
@@ -303,4 +305,4 @@ def debug_article(article):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host=LOCAL_BIND_HOST, port=int(os.getenv("PORT", "10000")))
