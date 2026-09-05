@@ -34,6 +34,24 @@ class DynamicServiceTests(unittest.TestCase):
         self.assertEqual(result["meta"]["path"], "full_core_grounded_fallback")
         self.assertNotIn("AI Core chưa xử lý", result["answer"])
 
+    def test_full_core_repair_error_returns_grounded_fallback(self):
+        user_id = "service-test-" + uuid.uuid4().hex
+        rejected_draft = {
+            "answer": "Bạn nên lưu giữ video camera nếu có.",
+            "legal_claims": [],
+            "needs_followup": False,
+            "followup_question": None,
+            "contact_recommended": False,
+        }
+        with patch(
+            "core.service.generate_answer",
+            side_effect=[rejected_draft, LLMError("repair rejected")],
+        ) as model:
+            result = core.chat(user_id, "Tôi bị người khác đánh.", dynamic=False)
+        self.assertEqual(model.call_count, 2)
+        self.assertEqual(result["_telemetry"]["fallback_reason"], "llm_error")
+        self.assertEqual(result["meta"]["path"], "full_core_grounded_fallback")
+
 
 if __name__ == "__main__":
     unittest.main()
