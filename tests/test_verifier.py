@@ -64,6 +64,24 @@ class DynamicVerifierTests(unittest.TestCase):
             x.startswith("unsupported_procedural_details:") for x in result["errors"]
         ))
 
+    def test_rejects_production_style_absolute_5_percent_conclusion(self):
+        result = verify_dynamic_text(
+            "Mức thương tích 5% nằm dưới 11%. Theo Điều 134, hành vi này không bị xử lý hình sự.",
+            [ARTICLE_134],
+            question="Kết quả thương tích là 5%.",
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("article_134_absolute_low_injury_conclusion", result["errors"])
+
+    def test_rejects_dao_as_weapon_without_verification(self):
+        result = verify_dynamic_text(
+            "Việc sử dụng dao làm vũ khí khiến hành vi thuộc điểm a Điều 134.",
+            [ARTICLE_134],
+            question="Người đó có dùng dao.",
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("article_134_knife_assumed_weapon", result["errors"])
+
 
 if __name__ == "__main__":
     unittest.main()

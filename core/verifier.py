@@ -87,9 +87,37 @@ def _unsupported_procedural_details(answer, source_blob, question=""):
         "phong canh sat", "phong quan ly hanh chinh", "van phong cong an xa",
         "dich vu buu chinh", "buu chinh cong ich", "hop dong thue nha",
         "giay khai sinh", "giay ket hon", "so ho khau", "so do", "so hong",
+        "don khieu nai", "ho so khieu nai", "yeu cau dieu tra",
     ]
     candidates.update(x for x in sensitive_phrases if x in answer_norm)
     return sorted(x for x in candidates if x not in allowed)
+
+
+def _article_134_dynamic_errors(answer, retrieved_units):
+    """Chốt cứng các kết luận Dynamic không được phép suy ra từ thương tích/dùng dao."""
+    if not any(str(x.get("article") or "") == "134" for x in retrieved_units):
+        return []
+    q = norm(answer)
+    errors = []
+    absolute_no_criminal = [
+        "khong bi xu ly hinh su", "khong phai chiu trach nhiem hinh su",
+        "khong cau thanh toi pham", "khong the bi truy cuu", "khong bi khoi to",
+    ]
+    has_low_injury = bool(re.search(r"\b(?:\d+(?:[.,]\d+)?%|duoi\s+11)\b", q))
+    if has_low_injury and any(x in q for x in absolute_no_criminal):
+        errors.append("article_134_absolute_low_injury_conclusion")
+
+    knife_as_weapon = any(x in q for x in [
+        "dao la vu khi", "dao lam vu khi", "su dung dao lam vu khi",
+        "dung dao lam vu khi", "dao thuoc diem a", "dung dao thuoc diem a",
+        "dao la hung khi nguy hiem", "dao chinh la hung khi nguy hiem",
+    ])
+    needs_verification = any(x in q for x in [
+        "can lam ro", "can xac minh", "co thuoc", "hay khong", "chua the ket luan",
+    ])
+    if knife_as_weapon and not needs_verification:
+        errors.append("article_134_knife_assumed_weapon")
+    return errors
 
 
 def verify(draft, retrieved_units):
@@ -169,6 +197,7 @@ def verify_dynamic_text(answer, retrieved_units, question=""):
     answer_norm = norm(answer)
     if any(x in answer_norm for x in ["dao la hung khi nguy hiem", "dao chinh la hung khi nguy hiem"]):
         errors.append("knife_assumed_dangerous_weapon")
+    errors.extend(_article_134_dynamic_errors(answer, retrieved_units))
     if _has_residence_source(retrieved_units):
         risky = _unsafe_residence_requirements(answer)
         if risky:
