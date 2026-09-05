@@ -95,6 +95,38 @@ def ensure_verified_sources():
     ])
 
     # ------------------------------------------------------------------
+    # 0.2) CẤP THẺ CĂN CƯỚC TỪ ĐỦ 14 TUỔI (CẤP TỈNH)
+    # ------------------------------------------------------------------
+    db.upsert_document({
+        "id": "CITIZEN_ID_OVER14_PROVINCIAL_2026",
+        "title": "Cấp thẻ Căn cước cho người từ đủ 14 tuổi trở lên tại cấp tỉnh",
+        "number": "Mã thủ tục 2.000200",
+        "issuer": "Bộ Công an",
+        "effective_from": None,
+        "source_path": "https://dichvucong.bocongan.gov.vn/public/link-to/chi-tiet-thu-tuc?ma-thu-tuc=26052",
+        "sha256": None,
+        "metadata": {"checked": "2026-09-05", "official": True},
+    })
+    db.replace_document_units("CITIZEN_ID_OVER14_PROVINCIAL_2026", [
+        {
+            "id": "CITIZEN_ID_OVER14_PROVINCIAL_2026:channels",
+            "unit_type": "procedure",
+            "title": "Cấp thẻ Căn cước từ đủ 14 tuổi: nơi và cách thực hiện",
+            "text": (
+                "Thủ tục cấp thẻ Căn cước cho người từ đủ 14 tuổi trở lên thực hiện tại cơ quan quản lý căn cước của Công an cấp tỉnh "
+                "hoặc Trung tâm phục vụ hành chính công cấp tỉnh, thành phố nếu đã triển khai. Công dân có thể thực hiện trực tiếp hoặc "
+                "qua Cổng dịch vụ công quốc gia, Cổng dịch vụ công Bộ Công an, ứng dụng định danh quốc gia để đăng ký thời gian, địa điểm."
+            ),
+        },
+        {
+            "id": "CITIZEN_ID_OVER14_PROVINCIAL_2026:time",
+            "unit_type": "procedure",
+            "title": "Thời hạn giải quyết cấp thẻ Căn cước từ đủ 14 tuổi",
+            "text": "Thời hạn giải quyết thủ tục cấp thẻ Căn cước cho người từ đủ 14 tuổi trở lên là 07 ngày làm việc; lệ phí và phí theo trang thủ tục là không.",
+        },
+    ])
+
+    # ------------------------------------------------------------------
     # 1) CƯ TRÚ HIỆN HÀNH TỪ 01/07/2026
     # ------------------------------------------------------------------
     db.upsert_document({

@@ -6,7 +6,8 @@ Ngày kiểm tra: 2026-09-05. Chỉ mục có trạng thái **Đang dùng** mớ
 |---|---|---|
 | Căn cước dưới 14 tuổi | Đang dùng | Cổng DVC Bộ Công an, thủ tục 1.014062 |
 | Cấp lại thẻ căn cước bị mất/hư hỏng | Đang dùng có giới hạn | Cổng DVC Bộ Công an, thủ tục 2.001194 tại cấp tỉnh |
-| Căn cước cấp mới/đổi người từ 14 tuổi | Chờ nguồn | Cần tách đúng thủ tục theo hình thức thực hiện |
+| Cấp thẻ căn cước lần đầu từ đủ 14 tuổi | Đang dùng có giới hạn | Cổng DVC Bộ Công an, thủ tục 2.000200 tại cấp tỉnh |
+| Đổi thẻ căn cước người từ 14 tuổi | Chờ nguồn | Cần tách đúng thủ tục theo hình thức thực hiện |
 | VNeID mức 1, mức 2 | Đang dùng | Nghị định 69/2024/NĐ-CP và nguồn Bộ Công an |
 | Đăng ký tạm trú | Đang dùng | Cổng DVC Bộ Công an và quy định cư trú hiện hành |
 | Đăng ký thường trú | Đang dùng | Cổng DVC Bộ Công an và quy định cư trú hiện hành |
@@ -21,4 +22,5 @@ Nguồn được thêm trong đợt này:
 
 - [Căn cước dưới 14 tuổi, thủ tục 1.014062](https://dichvucong.bocongan.gov.vn/public/link-to/chi-tiet-thu-tuc?ma-thu-tuc=122156)
 - [Cấp lại thẻ căn cước tại cấp tỉnh, thủ tục 2.001194](https://dichvucong.bocongan.gov.vn/bocongan/bothutuc/tthc?matt=26093)
+- [Cấp thẻ Căn cước từ đủ 14 tuổi tại cấp tỉnh, thủ tục 2.000200](https://dichvucong.bocongan.gov.vn/public/link-to/chi-tiet-thu-tuc?ma-thu-tuc=26052)
 - [Hướng dẫn tố giác, báo tin về tội phạm từ 01/03/2025](https://bocongan.gov.vn/bai-viet/huong-dan-to-giac-bao-tin-ve-toi-pham-kien-nghi-khoi-to-tu-ngay-0132025-d2-t43729)

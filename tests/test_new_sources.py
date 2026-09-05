@@ -33,7 +33,17 @@ class NewVerifiedSourcesTests(unittest.TestCase):
         answer = grounded_dynamic_fallback(question, units)
         self.assertIn("Công an cấp tỉnh", answer)
         self.assertIn("07 ngày làm việc", answer)
+        self.assertNotIn("đủ 14 tuổi chưa", answer)
         self.assertNotIn("Công an xã Pơng Drang trực tiếp cấp lại", answer)
+
+    def test_over14_new_identity_card_uses_only_provincial_source(self):
+        question = "Tôi cần cấp căn cước lần đầu, đã đủ 14 tuổi"
+        units = retrieve(plan(question, [], dynamic=True), question)
+        self.assertTrue(any(unit["document_id"] == "CITIZEN_ID_OVER14_PROVINCIAL_2026" for unit in units))
+        self.assertFalse(any(unit["document_id"] == "BLHS_2025" for unit in units))
+        answer = grounded_dynamic_fallback(question, units)
+        self.assertIn("Công an cấp tỉnh", answer)
+        self.assertIn("07 ngày làm việc", answer)
 
 
 if __name__ == "__main__":

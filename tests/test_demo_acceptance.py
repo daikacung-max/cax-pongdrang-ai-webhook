@@ -43,7 +43,7 @@ class DemoAcceptanceTests(unittest.TestCase):
             ("Tôi bị mất điện thoại", "advice_only", "not_requested", "chưa có nguồn"),
             ("Tôi bị mất giấy tờ", "advice_only", "not_requested", "chưa có nguồn"),
             ("Tôi muốn đổi căn cước", "advice_only", "not_requested", "chưa có nguồn"),
-            ("Tôi cần cấp căn cước lần đầu", "advice_only", "not_requested", "chưa có nguồn"),
+            ("Tôi cần cấp căn cước lần đầu", "advice_only", "not_requested", "đủ 14 tuổi chưa"),
             ("Tôi muốn nộp hồ sơ đăng ký xe máy mới", "intake_requested", "needs_information", "đăng ký lần đầu"),
             ("Tôi muốn trình báo bị đe dọa", "intake_requested", "needs_information", "Sự việc xảy ra khi nào"),
             ("Có được bảo mật người tố giác không?", "advice_only", "not_requested", "giữ bí mật"),

@@ -249,6 +249,22 @@ def grounded_dynamic_fallback(question, retrieved_units):
             "Khi bị mất thẻ, cơ quan tiếp nhận đối chiếu dữ liệu căn cước đã có để thực hiện thủ tục; anh/chị đang mất thẻ hay thẻ bị hư hỏng không sử dụng được?"
         )
 
+    if any(unit.get("document_id") == "CITIZEN_ID_OVER14_PROVINCIAL_2026" for unit in retrieved_units):
+        first_time = any(x in q for x in ["lan dau", "cap moi"])
+        states_over14 = any(x in q for x in ["tu du 14", "14 tuoi"])
+        opening = (
+            "Nếu người cần làm đã từ đủ 14 tuổi, thủ tục cấp thẻ Căn cước hiện được thực hiện tại cơ quan quản lý căn cước của Công an cấp tỉnh "
+            if first_time and not states_over14
+            else "Với người từ đủ 14 tuổi cần cấp thẻ Căn cước, thủ tục hiện được thực hiện tại cơ quan quản lý căn cước của Công an cấp tỉnh "
+        )
+        follow_up = " Anh/chị cho biết người cần làm đã đủ 14 tuổi chưa?" if first_time and not states_over14 else ""
+        return (
+            opening
+            + "hoặc Trung tâm phục vụ hành chính công cấp tỉnh nếu địa phương đã triển khai. Anh/chị có thể đến trực tiếp hoặc đăng ký thời gian, "
+            + "địa điểm qua Cổng Dịch vụ công quốc gia, Cổng Dịch vụ công Bộ Công an hoặc ứng dụng VNeID; thời hạn giải quyết là 07 ngày làm việc. "
+            + follow_up
+        )
+
     if _has_vneid_source(retrieved_units):
         if any(x in q for x in ["muc 2", "muc do 2", "muc 02", "muc do 02"]):
             return (

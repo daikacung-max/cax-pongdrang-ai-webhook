@@ -9,7 +9,7 @@ Quy ước: `[x]` chỉ dùng khi có bằng chứng ghi ở cột ghi chú. `[ 
 - [x] Retrieval FTS5 và verifier fail-closed.
 - [x] Lịch sử HMAC + giới hạn số tin/ngày lưu.
 - [x] Log timing không chứa nội dung người dân.
-- [x] 49 kiểm tra tự động đạt tại thời điểm cập nhật, gồm ranh giới nguồn, bảo mật lịch sử và adapter Zalo.
+- [x] 50 kiểm tra tự động đạt tại thời điểm cập nhật, gồm ranh giới nguồn, bảo mật lịch sử và adapter Zalo.
 - [ ] OA thật đã kiểm thử hai chiều.
 
 ## B. Demo nghiệp vụ
@@ -54,3 +54,4 @@ Quy ước: `[x]` chỉ dùng khi có bằng chứng ghi ở cột ghi chú. `[ 
 | 2026-09-05 | Thêm phân loại tiếp nhận an toàn cho 8 nhóm demo | `core/intake.py`, test intake | Chưa chuyển hồ sơ thật; chờ nguồn và quy trình nghiệp vụ duyệt | Chưa duyệt |
 | 2026-09-05 | Nhập thêm nguồn Bộ Công an cho căn cước dưới 14 tuổi và tố giác/tin báo | `core/verified_sources.py` | Các chủ đề còn thiếu nguồn chi tiết vẫn fail-closed | Chưa duyệt |
 | 2026-09-05 | Sửa lỗi mất căn cước bị kéo nhầm sang Điều 134; nhập nguồn cấp lại thẻ căn cước tại cấp tỉnh và mở rộng 30 kịch bản demo | Thủ tục 2.001194 của Cổng DVC Bộ Công an; 49/49 test đạt | Cấp mới/đổi căn cước, sang tên xe và các thủ tục còn lại vẫn chờ nguồn duyệt | Chưa duyệt |
+| 2026-09-05 | Tách nguồn cấp thẻ căn cước lần đầu từ đủ 14 tuổi tại cấp tỉnh | Thủ tục 2.000200 của Cổng DVC Bộ Công an; 50/50 test đạt | Đổi thẻ căn cước vẫn chờ nguồn riêng | Chưa duyệt |
