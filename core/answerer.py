@@ -4,6 +4,7 @@ from config import (
     ANSWER_MODEL,
     DYNAMIC_ANSWER_MODEL,
     CORE_REASONING_EFFORT,
+    GROQ_CORE_REASONING_EFFORT,
     DYNAMIC_REASONING_EFFORT,
     CORE_TIMEOUT_SECONDS,
     DYNAMIC_TIMEOUT_SECONDS,
@@ -116,6 +117,7 @@ def _bounded_history(history, max_messages, max_chars):
 def answer(question, history, legal_context="", dynamic=False, repair_note=None,
            model=None, safety_identifier=None, intake_hint=""):
     model = model or (DYNAMIC_ANSWER_MODEL if dynamic else ANSWER_MODEL)
+    is_groq_oss = str(model).startswith("openai/gpt-oss")
     return chat_structured(
         model=model,
         messages=build_messages(
@@ -124,10 +126,13 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None,
         ),
         schema_name="citizen_answer",
         schema=ANSWER_SCHEMA,
-        reasoning_effort=(DYNAMIC_REASONING_EFFORT if dynamic else CORE_REASONING_EFFORT),
+        reasoning_effort=(
+            DYNAMIC_REASONING_EFFORT if dynamic
+            else (GROQ_CORE_REASONING_EFFORT if is_groq_oss else CORE_REASONING_EFFORT)
+        ),
         timeout=(DYNAMIC_TIMEOUT_SECONDS if dynamic else CORE_TIMEOUT_SECONDS),
         temperature=0.08 if legal_context else 0.42,
-        max_completion_tokens=360 if dynamic else 1100,
+        max_completion_tokens=360 if dynamic else (1600 if is_groq_oss else 1100),
         safety_identifier=safety_identifier,
     )
 

@@ -29,6 +29,9 @@ RETRIEVAL_HISTORY_USER_TURNS = int(os.getenv("RETRIEVAL_HISTORY_USER_TURNS", "4"
 LEGAL_TOP_K = int(os.getenv("LEGAL_TOP_K", "8"))
 DYNAMIC_LEGAL_TOP_K = int(os.getenv("DYNAMIC_LEGAL_TOP_K", "2"))
 CORE_REASONING_EFFORT = os.getenv("CORE_REASONING_EFFORT", "medium")
+# GPT-OSS trên Groq tính token suy luận vào cùng ngân sách hoàn thành. Với câu
+# trả lời có nguồn dài, mức thấp dành phần ngân sách còn lại cho JSON trả lời.
+GROQ_CORE_REASONING_EFFORT = os.getenv("GROQ_CORE_REASONING_EFFORT", "low")
 DYNAMIC_REASONING_EFFORT = os.getenv("DYNAMIC_REASONING_EFFORT", "low")
 CORE_TIMEOUT_SECONDS = float(os.getenv("CORE_TIMEOUT_SECONDS", "12"))
 # Dynamic GET có thể phải đợi webhook tới khoảng 0.4-0.6s; dành khoảng 1.05s cho model.
