@@ -32,13 +32,30 @@ class AICore:
         if search_plan.get("is_legal"):
             legal_units = retrieve(search_plan, question)
             if dynamic:
-                # Dynamic cần tốc độ. Dùng nguồn xếp hạng cao nhất trước, không nhồi nhiều Điều.
-                legal_units = legal_units[:max(1, min(DYNAMIC_LEGAL_TOP_K, 1))]
+                legal_units = legal_units[:max(1, min(DYNAMIC_LEGAL_TOP_K, 2))]
             legal_context = format_context(legal_units)
 
+        # Nguyên tắc an toàn cốt lõi: câu hỏi pháp luật/TTHC mà chưa có nguồn phù hợp
+        # thì không cho model tự sáng tác chi tiết cụ thể.
+        if search_plan.get("is_legal") and not legal_units:
+            raw_answer = grounded_dynamic_fallback(question, [])
+            final_answer = finalize(raw_answer, contact_recommended=False)
+            meta = {
+                "legal": True,
+                "retrieved_unit_ids": [],
+                "verified": False,
+                "repaired": False,
+                "verification_errors": ["no_verified_source"],
+                "dynamic": bool(dynamic),
+                "path": "legal_no_source_fail_closed",
+            }
+            db.add_message(user_id, "user", question, meta={"legal_plan": search_plan})
+            db.add_message(user_id, "assistant", final_answer, meta=meta)
+            return {"answer": final_answer, "meta": meta}
+
         if dynamic:
-            # Zalo Dynamic: chỉ 1 lần gọi 20B dạng text. Nếu timeout hoặc verifier từ chối,
-            # trả fail-safe được dựng từ chính nguồn đã truy xuất, không trả lỗi chung chung.
+            # Zalo Dynamic: một lần gọi model real-time. Nếu timeout hoặc verifier từ chối,
+            # trả fail-safe dựng từ chính nguồn đã truy xuất.
             try:
                 raw_answer = answer_dynamic_text(
                     question,
