@@ -100,22 +100,24 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None)
         reasoning_effort=(DYNAMIC_REASONING_EFFORT if dynamic else CORE_REASONING_EFFORT),
         timeout=(DYNAMIC_TIMEOUT_SECONDS if dynamic else CORE_TIMEOUT_SECONDS),
         temperature=0.08 if legal_context else 0.42,
-        max_completion_tokens=420 if dynamic else 1100,
+        max_completion_tokens=360 if dynamic else 1100,
     )
 
 
 def answer_dynamic_text(question, history, legal_context=""):
     """Một lượt gọi model real-time, prompt ngắn, dành riêng cho Zalo Dynamic."""
     system = f"""
-Bạn là Trợ lý AI của {UNIT_NAME}. Trả lời tiếng Việt tự nhiên, ngắn gọn, thường 2-5 câu.
+Bạn là Trợ lý AI của {UNIT_NAME}. Trả lời tiếng Việt tự nhiên, ngắn gọn, thường 2-4 câu.
 Hiểu câu hỏi theo các lượt hội thoại gần nhất và trả lời phần thông tin mới, không kể lại từ đầu.
 Không kết luận một người có tội chỉ từ lời kể một phía.
 Tên đơn vị duy nhất: {UNIT_NAME}. Số liên hệ duy nhất: {HOTLINE}.
 Nếu có SOURCE bên dưới, mọi chi tiết pháp luật và thủ tục hành chính phải bám SOURCE.
-Không tự thêm tên giấy tờ, bản sao CMND/CCCD, sổ hộ khẩu, giấy khai sinh, thư mời, biểu mẫu, phòng nghiệp vụ, lệ phí, thời hạn hoặc loại kết quả nếu SOURCE không nêu.
+Không tự thêm tên giấy tờ, bản sao CMND/CCCD, sổ hộ khẩu, giấy khai sinh, giấy kết hôn, sổ đỏ/sổ hồng, hợp đồng thuê, dịch vụ bưu chính, biểu mẫu, phòng nghiệp vụ, lệ phí, thời hạn hoặc loại kết quả nếu SOURCE không nêu cho đúng trường hợp.
+Nếu SOURCE nói hồ sơ phụ thuộc loại chỗ ở thì phải hỏi loại chỗ ở trước khi liệt kê chi tiết.
 Nếu SOURCE nêu nguyên tắc tái sử dụng dữ liệu/VNeID thì không được yêu cầu người dân nộp lại giấy tờ đã có dữ liệu.
+Với VNeID, nếu người dân chưa nói mức độ 01 hay 02 thì giải thích ngắn sự khác nhau và hỏi họ cần mức nào, không trả lời 'chưa thể kết luận'.
 Đặc biệt không được kết luận chỉ dựa vào một ngưỡng nếu SOURCE còn nhánh 'hoặc', 'nhưng thuộc', ngoại lệ hay điều kiện thay thế.
-Nếu chưa đủ căn cứ, nói 'chưa thể kết luận' hoặc nói rõ phần nào nguồn chưa đủ. Không dùng Markdown.
+Nếu chưa đủ căn cứ, nói rõ phần nào còn thiếu, không đẩy người dân sang nguồn khác khi SOURCE hiện tại đã có câu trả lời. Không dùng Markdown.
 """
     if legal_context:
         system += "\nSOURCE:\n" + legal_context
@@ -131,6 +133,6 @@ Nếu chưa đủ căn cứ, nói 'chưa thể kết luận' hoặc nói rõ ph�
         messages=messages,
         reasoning_effort=DYNAMIC_REASONING_EFFORT,
         timeout=DYNAMIC_TIMEOUT_SECONDS,
-        temperature=0.06 if legal_context else 0.30,
-        max_completion_tokens=220,
+        temperature=0.05 if legal_context else 0.25,
+        max_completion_tokens=160,
     )
