@@ -5,6 +5,7 @@ import time
 import re
 import os
 import hmac
+import hashlib
 
 from config import (
     UNIT_NAME,
@@ -21,6 +22,10 @@ from config import (
     LOCAL_BIND_HOST,
     OFFICER_API_TOKEN,
     PRODUCTION_MODE,
+    ZALO_WEBHOOK_ENABLED,
+    ZALO_WEBHOOK_SIGNATURE_REQUIRED,
+    ZALO_APP_ID,
+    ZALO_OA_SECRET_KEY,
 )
 from core import cases, db
 from core.ingest import import_article_index
@@ -144,6 +149,34 @@ def _officer_authorized():
     return hmac.compare_digest(supplied, OFFICER_API_TOKEN)
 
 
+def _valid_zalo_webhook_signature(data, raw_body):
+    """Xác thực webhook OA theo X-ZEvent-Signature của Zalo.
+
+    Zalo ký SHA-256 của ``appId + data + timeStamp + OAsecretKey``. ``data``
+    phải là nguyên văn JSON body nhận được, do đó không serialize lại JSON trước
+    khi kiểm tra. Chế độ local/demo có thể tắt yêu cầu chữ ký; Render pilot và
+    production phải bật nó trước khi đăng ký webhook tại Zalo.
+    """
+    if not ZALO_WEBHOOK_SIGNATURE_REQUIRED:
+        return True
+    if not ZALO_APP_ID or not ZALO_OA_SECRET_KEY:
+        return False
+
+    app_id = str((data or {}).get("app_id") or "").strip()
+    timestamp = str((data or {}).get("timestamp") or "").strip()
+    supplied = str(request.headers.get("X-ZEvent-Signature") or "").strip()
+    if supplied.lower().startswith("mac="):
+        supplied = supplied[4:].strip()
+    if not app_id or not timestamp or not supplied:
+        return False
+    if not hmac.compare_digest(app_id, ZALO_APP_ID):
+        return False
+
+    signed_value = f"{app_id}{raw_body}{timestamp}{ZALO_OA_SECRET_KEY}".encode("utf-8")
+    expected = hashlib.sha256(signed_value).hexdigest()
+    return hmac.compare_digest(supplied.lower(), expected)
+
+
 @app.route("/", methods=["GET"])
 def home():
     return f"{UNIT_NAME} - AI CORE", 200
@@ -261,7 +294,14 @@ def officer_cases():
 def zalo_webhook():
     if request.method == "GET":
         return "OK", 200
+    if not ZALO_WEBHOOK_ENABLED:
+        return jsonify({"success": False, "error": "Zalo pilot is not enabled."}), 503
+    raw_body = request.get_data(cache=True, as_text=True)
     data = request.get_json(silent=True) or {}
+    if not _valid_zalo_webhook_signature(data, raw_body):
+        # Không log nội dung tin nhắn, Zalo ID, chữ ký hoặc secret.
+        app.logger.warning("Rejected Zalo webhook with invalid signature")
+        return jsonify({"success": False}), 401
     if data.get("event_name") == "user_send_text":
         sender = data.get("sender") or {}
         message = data.get("message") or {}
@@ -275,6 +315,8 @@ def zalo_webhook():
 
 @app.route("/zalo/ai", methods=["GET", "POST"])
 def zalo_dynamic():
+    if not ZALO_WEBHOOK_ENABLED:
+        return dynamic_response("Trợ lý AI đang ở chế độ pilot nội bộ, chưa nhận tin nhắn Zalo công khai.")
     request_started = time.perf_counter()
     trace_id = new_trace_id()
     uid = str(

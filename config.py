@@ -39,6 +39,15 @@ TARGET_ZALO_CHARS = int(os.getenv("TARGET_ZALO_CHARS", "650"))
 MAX_ZALO_TOTAL_CHARS = int(os.getenv("MAX_ZALO_TOTAL_CHARS", "2400"))
 PENDING_TTL_SECONDS = int(os.getenv("PENDING_TTL_SECONDS", "30"))
 
+# Zalo chỉ được phép đẩy sự kiện vào hàng đợi khi tích hợp đã được bật rõ ràng.
+# Khi chạy pilot chưa gắn OA, Render đặt biến này là false để endpoint không xử lý
+# yêu cầu giả mạo. Khi kết nối thật, bật cờ và bắt buộc xác minh X-ZEvent-Signature
+# theo công thức chính thức của Zalo OA OpenAPI.
+ZALO_WEBHOOK_ENABLED = os.getenv("ZALO_WEBHOOK_ENABLED", "true").lower() in ("1", "true", "yes", "on")
+ZALO_WEBHOOK_SIGNATURE_REQUIRED = os.getenv("ZALO_WEBHOOK_SIGNATURE_REQUIRED", "false").lower() in ("1", "true", "yes", "on")
+ZALO_APP_ID = os.getenv("ZALO_APP_ID", "").strip()
+ZALO_OA_SECRET_KEY = os.getenv("ZALO_OA_SECRET_KEY", "").strip()
+
 # Lịch sử hội thoại dùng Postgres khi DATABASE_URL được cấu hình; local/test vẫn
 # dùng SQLite. user_id luôn được HMAC trước khi ghi xuống storage.
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()

@@ -1,6 +1,8 @@
 import threading
 import time
 import unittest
+import hashlib
+from unittest.mock import patch
 
 from adapters.zalo import PendingZaloMessages
 from app import app, split_zalo_messages
@@ -46,6 +48,37 @@ class ZaloAdapterTests(unittest.TestCase):
         self.assertEqual(health.get_json()["status"], "ok")
         self.assertEqual(article.status_code, 200)
         self.assertTrue(article.get_json()["found"])
+
+    def test_signed_zalo_webhook_accepts_official_formula(self):
+        body = (
+            '{"app_id":"test-app","sender":{"id":"user-1"},'
+            '"event_name":"user_send_text","message":{"text":"Xin chào","msg_id":"m-1"},'
+            '"timestamp":"123"}'
+        )
+        signature = hashlib.sha256(f"test-app{body}123test-secret".encode("utf-8")).hexdigest()
+        with patch("app.ZALO_WEBHOOK_SIGNATURE_REQUIRED", True), \
+             patch("app.ZALO_APP_ID", "test-app"), \
+             patch("app.ZALO_OA_SECRET_KEY", "test-secret"):
+            with app.test_client() as client:
+                response = client.post(
+                    "/zalo/webhook",
+                    data=body,
+                    content_type="application/json",
+                    headers={"X-ZEvent-Signature": signature},
+                )
+        self.assertEqual(response.status_code, 200)
+
+    def test_signed_zalo_webhook_rejects_forged_request(self):
+        with patch("app.ZALO_WEBHOOK_SIGNATURE_REQUIRED", True), \
+             patch("app.ZALO_APP_ID", "test-app"), \
+             patch("app.ZALO_OA_SECRET_KEY", "test-secret"):
+            with app.test_client() as client:
+                response = client.post(
+                    "/zalo/webhook",
+                    json={"app_id": "test-app", "timestamp": "123"},
+                    headers={"X-ZEvent-Signature": "forged"},
+                )
+        self.assertEqual(response.status_code, 401)
 
 
 if __name__ == "__main__":
