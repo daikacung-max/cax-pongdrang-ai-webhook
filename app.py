@@ -434,48 +434,140 @@ def ask_groq(question, history):
         "content": question
     })
 
-    # Header cơ bản dùng cho GPT-OSS.
-    # Không gửi Groq-Model-Version cho model thường.
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json",
     }
 
-    if web_required:
-        # Groq-Model-Version là header dành cho Compound system versioning.
-        headers["Groq-Model-Version"] = "latest"
+    web_used = False
+    web_attempted = False
+    web_error = None
 
-        payload = {
+    # =====================================================
+    # 1) NẾU CẦN DỮ LIỆU MỚI: THỬ COMPOUND MINI TỐI GIẢN
+    # =====================================================
+    if web_required:
+        web_attempted = True
+
+        web_payload = {
             "model": WEB_MODEL,
             "messages": messages,
-            "temperature": 0.15 if legal_mode else 0.35,
-            "max_completion_tokens": 300,
         }
 
-        # Khi là pháp luật, ưu tiên nguồn chính thức.
-        if legal_mode:
-            payload["search_settings"] = {
-                "include_domains": OFFICIAL_LEGAL_DOMAINS
-            }
+        try:
+            web_response = requests.post(
+                GROQ_URL,
+                headers=headers,
+                json=web_payload,
+                timeout=1.65
+            )
 
-    else:
-        # Request tối giản, bám đúng mẫu Chat Completions của Groq.
-        payload = {
-            "model": FAST_MODEL,
-            "messages": messages,
-            "temperature": 0.20 if legal_mode else 0.45,
-            "max_completion_tokens": 300,
+            if web_response.status_code < 400:
+                web_data = web_response.json()
+
+                web_answer = (
+                    web_data.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
+                    .strip()
+                )
+
+                if web_answer:
+                    web_used = True
+
+                    if len(web_answer) > MAX_ZALO_CHARS:
+                        web_answer = (
+                            web_answer[:MAX_ZALO_CHARS - 20].rstrip()
+                            + "\n…"
+                        )
+
+                    return web_answer, {
+                        "domains": domains,
+                        "legal_mode": legal_mode,
+                        "web_required": True,
+                        "web_attempted": True,
+                        "web_used": True,
+                        "web_error": None,
+                        "chunks": [c.get("id") for c in chunks_found],
+                    }
+
+            try:
+                err = web_response.json()
+                web_error = (
+                    err.get("error", {}).get("message")
+                    if isinstance(err, dict)
+                    else None
+                )
+            except Exception:
+                web_error = web_response.text[:250]
+
+            print(
+                "WEB SEARCH FALLBACK:",
+                web_response.status_code,
+                str(web_error)[:250],
+                flush=True
+            )
+
+        except requests.exceptions.Timeout:
+            web_error = "timeout"
+            print(
+                "WEB SEARCH FALLBACK: TIMEOUT",
+                flush=True
+            )
+
+        except Exception as e:
+            web_error = type(e).__name__
+            print(
+                "WEB SEARCH FALLBACK:",
+                type(e).__name__,
+                flush=True
+            )
+
+    # =====================================================
+    # 2) FAST MODEL + KNOWLEDGE BASE
+    #    Luôn là đường dự phòng để Zalo không bị im/lỗi.
+    # =====================================================
+
+    fallback_note = ""
+
+    if web_required and not web_used:
+        fallback_note = f"""
+LƯU Ý QUAN TRỌNG:
+Hệ thống vừa không truy xuất được web thời gian thực.
+Chỉ được trả lời từ Knowledge Base hiện có và kiến thức chắc chắn.
+Knowledge Base có mốc kiểm tra: {VERSION.get("as_of", "không rõ")}.
+Nếu câu hỏi phụ thuộc quy định mới hơn mốc này hoặc cần xác nhận hiện hành,
+hãy nói rõ cần kiểm tra lại nguồn chính thức, KHÔNG tự suy đoán.
+"""
+
+    fast_messages = [
+        {
+            "role": "system",
+            "content": system_prompt + "\n\n" + fallback_note
         }
+    ]
+
+    fast_messages.extend(history[-MAX_HISTORY_MESSAGES:])
+    fast_messages.append({
+        "role": "user",
+        "content": question
+    })
+
+    fast_payload = {
+        "model": FAST_MODEL,
+        "messages": fast_messages,
+        "temperature": 0.18 if legal_mode else 0.45,
+        "max_completion_tokens": 300,
+    }
 
     response = requests.post(
         GROQ_URL,
         headers=headers,
-        json=payload,
-        timeout=GROQ_TIMEOUT_SECONDS
+        json=fast_payload,
+        timeout=1.55
     )
 
     if response.status_code >= 400:
-        # Chỉ log mã lỗi và thông báo Groq, KHÔNG log API key/prompt.
         try:
             err = response.json()
             err_message = (
@@ -514,6 +606,9 @@ def ask_groq(question, history):
         "domains": domains,
         "legal_mode": legal_mode,
         "web_required": web_required,
+        "web_attempted": web_attempted,
+        "web_used": False,
+        "web_error": web_error,
         "chunks": [c.get("id") for c in chunks_found],
     }
 
@@ -696,7 +791,8 @@ def zalo_ai():
         print(
             "AI ANSWER: SUCCESS",
             "LEGAL:", trace["legal_mode"],
-            "WEB:", trace["web_required"],
+            "WEB_REQUIRED:", trace["web_required"],
+            "WEB_USED:", trace.get("web_used", False),
             "DOMAINS:", ",".join(trace["domains"]),
             "CHUNKS:", ",".join(trace["chunks"]),
             flush=True
