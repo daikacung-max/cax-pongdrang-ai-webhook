@@ -1,9 +1,10 @@
 {
   "version": {
     "name": "CAX Pơng Drang Hybrid Legal Flexible KB",
-    "version": "4.0.0",
+    "version": "5.0.0",
     "snapshot": "2026-09-05",
-    "mode": "hybrid_verified_flexible"
+    "mode": "hybrid_full_source",
+    "note": "BLHS sử dụng toàn văn PDF người dùng cung cấp làm nguồn ưu tiên; không dùng các tóm tắt BLHS thủ công của V4."
   },
   "unit": {
     "name": "Công an xã Pơng Drang, tỉnh Đắk Lắk",
@@ -138,54 +139,6 @@
     }
   ],
   "exact_articles": {
-    "BLHS": {
-      "133": {
-        "title": "Tội đe dọa giết người",
-        "summary": "Điều 133 Bộ luật Hình sự quy định tội đe dọa giết người. Dấu hiệu cốt lõi là có hành vi đe dọa giết người và có căn cứ làm cho người bị đe dọa lo sợ rằng việc đe dọa sẽ được thực hiện.",
-        "source_id": "BLHS135"
-      },
-      "134": {
-        "title": "Tội cố ý gây thương tích hoặc gây tổn hại cho sức khỏe của người khác",
-        "summary": "Điều 134 Bộ luật Hình sự quy định tội cố ý gây thương tích hoặc gây tổn hại cho sức khỏe của người khác. Khoản 1 áp dụng khi tỷ lệ tổn thương cơ thể từ 11% đến 30%, hoặc dưới 11% nhưng thuộc một trong các tình tiết luật định như dùng vũ khí, vật liệu nổ, hung khí nguy hiểm hoặc thủ đoạn có khả năng gây nguy hại cho nhiều người; dùng a-xít hoặc hóa chất nguy hiểm; đối với một số nhóm nạn nhân đặc biệt; có tổ chức; lợi dụng chức vụ, quyền hạn; thuê hoặc được thuê gây thương tích; có tính chất côn đồ; hoặc đối với người đang thi hành công vụ hoặc vì lý do công vụ. Điều này còn quy định các khung tăng nặng theo tỷ lệ tổn thương, số người bị hại, hậu quả chết người và các tình tiết khác.",
-        "source_id": "BLHS135",
-        "warning": "Điều 134 không phải tội hành hạ hoặc 'bạo hành'. Tội hành hạ người khác nằm tại Điều 140 Bộ luật Hình sự."
-      },
-      "140": {
-        "title": "Tội hành hạ người khác",
-        "summary": "Điều 140 Bộ luật Hình sự quy định tội hành hạ người khác. Dấu hiệu cơ bản là đối xử tàn ác hoặc làm nhục người lệ thuộc mình, nếu không thuộc trường hợp quy định tại Điều 185 của Bộ luật Hình sự.",
-        "source_id": "BLHS135"
-      },
-      "173": {
-        "title": "Tội trộm cắp tài sản",
-        "summary": "Điều 173 Bộ luật Hình sự quy định tội trộm cắp tài sản. Khoản 1 có ngưỡng tài sản từ 2.000.000 đồng đến dưới 50.000.000 đồng; tài sản dưới 2.000.000 đồng vẫn có thể bị truy cứu nếu thuộc một trong các trường hợp luật định như đã bị xử phạt hành chính về hành vi chiếm đoạt mà còn vi phạm, có án về nhóm tội chiếm đoạt chưa được xóa án tích mà còn vi phạm, gây ảnh hưởng xấu đến ANTT, tài sản là phương tiện kiếm sống chính, hoặc là di vật, cổ vật.",
-        "source_id": "BLHS135"
-      },
-      "174": {
-        "title": "Tội lừa đảo chiếm đoạt tài sản",
-        "summary": "Điều 174 Bộ luật Hình sự quy định tội lừa đảo chiếm đoạt tài sản, với dấu hiệu đặc trưng là dùng thủ đoạn gian dối để chiếm đoạt tài sản. Việc xác định phải làm rõ thủ đoạn gian dối, thời điểm hình thành ý định chiếm đoạt, giá trị tài sản và các tình tiết luật định.",
-        "source_id": "BLHS135"
-      },
-      "175": {
-        "title": "Tội lạm dụng tín nhiệm chiếm đoạt tài sản",
-        "summary": "Điều 175 Bộ luật Hình sự quy định tội lạm dụng tín nhiệm chiếm đoạt tài sản. Việc chỉ có quan hệ vay, mượn, thuê hoặc hợp đồng rồi chậm trả chưa đủ để mặc nhiên kết luận phạm tội; phải làm rõ hành vi chiếm đoạt thuộc các trường hợp luật định và các điều kiện về giá trị tài sản hoặc trường hợp đặc biệt.",
-        "source_id": "BLHS135"
-      },
-      "178": {
-        "title": "Tội hủy hoại hoặc cố ý làm hư hỏng tài sản",
-        "summary": "Điều 178 Bộ luật Hình sự quy định tội hủy hoại hoặc cố ý làm hư hỏng tài sản của người khác. Cần làm rõ hành vi, giá trị thiệt hại và các tình tiết đặc biệt mà điều luật quy định trước khi kết luận.",
-        "source_id": "BLHS135"
-      },
-      "256a": {
-        "title": "Tội sử dụng trái phép chất ma túy",
-        "summary": "Điều 256a Bộ luật Hình sự không làm cho mọi trường hợp sử dụng trái phép chất ma túy mặc nhiên trở thành tội phạm. Điều luật áp dụng đối với người sử dụng thuộc các trạng thái quản lý, cai nghiện hoặc sau cai mà khoản 1 quy định; vì vậy phải kiểm tra tình trạng quản lý cụ thể.",
-        "source_id": "BLHS135"
-      },
-      "318": {
-        "title": "Tội gây rối trật tự công cộng",
-        "summary": "Điều 318 Bộ luật Hình sự quy định tội gây rối trật tự công cộng. Không phải mọi việc cãi nhau, tụ tập hoặc xô xát đều tự động cấu thành tội này; phải đánh giá hành vi, mức độ ảnh hưởng đến ANTT, tiền sử xử lý và các tình tiết cụ thể.",
-        "source_id": "BLHS135"
-      }
-    },
     "BLTTHS": {
       "145": {
         "title": "Trách nhiệm tiếp nhận và thẩm quyền giải quyết tố giác, tin báo về tội phạm, kiến nghị khởi tố",
@@ -332,5 +285,27 @@
     "Thông tư 116/2026/TT-BCA",
     "Thông tư 79/2024/TT-BCA và Thông tư 51/2025/TT-BCA",
     "Luật Căn cước 26/2023/QH15 và Thông tư 118/2026/TT-BCA"
-  ]
+  ],
+  "documents": [
+    {
+      "id": "DOC_BLHS_2025_FULL",
+      "title": "Bộ luật Hình sự năm 2025",
+      "type": "full_primary_legal_source",
+      "original_file": "source_files/Bộ luật Hình sự năm 2025.pdf",
+      "extracted_full_text": "source_text/Bộ luật Hình sự năm 2025 - toàn văn trích xuất.txt",
+      "article_index": "source_index/Bộ luật Hình sự năm 2025 - chỉ mục điều luật.json",
+      "sha256_original_pdf": "ce7f1dc86e2f40c102f26e5d6980519d51842f864070a979939e182125400155",
+      "article_count_indexed": 409,
+      "priority_for_domains": [
+        "hinh_su"
+      ],
+      "preserve_original": true,
+      "do_not_rewrite_source": true
+    }
+  ],
+  "legal_source_policy": {
+    "criminal_law_primary_source": "DOC_BLHS_2025_FULL",
+    "criminal_law_rule": "Mọi câu hỏi về Bộ luật Hình sự, số điều, tên tội, khung hình phạt, điều kiện định tội phải ưu tiên nội dung từ toàn văn DOC_BLHS_2025_FULL. Không dùng tóm tắt BLHS thủ công của phiên bản cũ để thay thế văn bản gốc.",
+    "general_questions": "AI vẫn trả lời linh hoạt; khi nêu chi tiết hình sự phải bám nguồn toàn văn."
+  }
 }

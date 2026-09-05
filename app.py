@@ -16,6 +16,18 @@ SOURCES = {x["id"]:x for x in KB.get("sources",[])}
 EXACT = KB.get("exact_articles",{})
 CARDS = KB.get("cards",[])
 
+BLHS_INDEX_FILE = BASE_DIR / "source_index" / "Bộ luật Hình sự năm 2025 - chỉ mục điều luật.json"
+try:
+    BLHS_INDEX = json.loads(BLHS_INDEX_FILE.read_text(encoding="utf-8"))
+    BLHS_ARTICLES = {
+        str(item.get("article")): item
+        for item in BLHS_INDEX.get("articles", [])
+        if item.get("article")
+    }
+except Exception:
+    BLHS_INDEX = {}
+    BLHS_ARTICLES = {}
+
 GROQ_API_KEY = "".join((os.getenv("GROQ_API_KEY") or "").split())
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = "openai/gpt-oss-20b"
@@ -109,8 +121,35 @@ def exact_article_answer(question):
     m = re.search(r"\bdieu\s+(\d+[a-z]?)\b", q)
     if not m:
         return None
+
     art = m.group(1)
     law = detect_law(question) or DEFAULT_ARTICLE_LAW.get(art)
+
+    # BLHS: LUÔN ưu tiên chỉ mục được trích trực tiếp từ PDF toàn văn.
+    if law == "BLHS" and art in BLHS_ARTICLES:
+        item = BLHS_ARTICLES[art]
+        title = clean(item.get("title", ""))
+        raw = clean(item.get("raw_text", ""))
+
+        if not raw:
+            return f"Điều {art} Bộ luật Hình sự: {title}."
+
+        # Khi người dân chỉ hỏi "Điều X là tội gì/quy định gì", trả đúng tên Điều trước.
+        short_query = any(x in q for x in [
+            "toi gi", "quy dinh gi", "la gi", "ten toi", "noi dung dieu"
+        ])
+
+        if short_query:
+            return (
+                f"Điều {art} Bộ luật Hình sự: {title}. "
+                f"Nội dung chi tiết được hệ thống tra trực tiếp từ toàn văn Bộ luật Hình sự năm 2025."
+            )
+
+        # Nếu hỏi cụ thể hơn thì model sẽ được cấp nguyên điều luật ở bước sau,
+        # không dùng summary thủ công.
+        return None
+
+    # Các luật khác vẫn dùng exact_articles còn lại trong KB.
     if not law:
         return None
     item = (EXACT.get(law) or {}).get(art)
@@ -130,6 +169,64 @@ def exact_article_answer(question):
     if item.get("warning"):
         parts.append(item["warning"])
     return clean(" ".join(parts))
+
+
+def blhs_context_for_question(question, top_k=3):
+    """
+    Truy xuất trực tiếp từ toàn văn các Điều BLHS.
+    Ưu tiên: số Điều nêu rõ -> tiêu đề -> độ trùng từ khóa trong văn bản.
+    """
+    q = norm(question)
+    qt = {w for w in q.split() if len(w) >= 2}
+    ranked = []
+
+    explicit = re.search(r"\bdieu\s+(\d+[a-z]?)\b", q)
+    explicit_art = explicit.group(1) if explicit else None
+
+    for art, item in BLHS_ARTICLES.items():
+        title = norm(item.get("title", ""))
+        raw = norm(item.get("raw_text", ""))
+        score = 0.0
+
+        if explicit_art == art:
+            score += 1000.0
+
+        title_tokens = set(title.split())
+        raw_tokens = set(raw.split())
+
+        score += len(qt & title_tokens) * 8.0
+        score += len(qt & raw_tokens) * 0.35
+
+        # Một số từ trọng tâm phổ biến
+        if "thuong tich" in q and "thuong tich" in title:
+            score += 40
+        if "trom" in q and "trom cap tai san" in title:
+            score += 40
+        if "lua dao" in q and "lua dao chiem doat tai san" in title:
+            score += 40
+        if "lam dung tin nhiem" in q and "lam dung tin nhiem chiem doat tai san" in title:
+            score += 40
+        if "gây rối" in question.lower() and "gây rối trật tự công cộng" in item.get("title","").lower():
+            score += 40
+        if "ma túy" in question.lower() and "ma túy" in item.get("title","").lower():
+            score += 15
+
+        if score > 0:
+            ranked.append((score, item))
+
+    ranked.sort(key=lambda x: x[0], reverse=True)
+
+    blocks = []
+    for score, item in ranked[:top_k]:
+        raw = item.get("raw_text", "")
+        # Giữ đủ rộng để model đọc điều luật, nhưng không đẩy toàn bộ 277 trang vào một request.
+        if len(raw) > 9000:
+            raw = raw[:9000]
+        blocks.append(
+            f"[BLHS Điều {item.get('article')}: {item.get('title','')}]\n{raw}"
+        )
+
+    return "\n\n".join(blocks)
 
 def card_score(question, card):
     q = norm(question)
@@ -217,6 +314,24 @@ def call_groq(question, history, legal=False, context=""):
     system = GENERAL_SYSTEM
     if legal:
         system += "\n" + LEGAL_RULES
+
+        # Nếu câu hỏi thuộc hình sự hoặc có nhắc Điều BLHS, nạp trực tiếp toàn văn điều luật liên quan.
+        qn = norm(question)
+        criminal_hint = any(x in qn for x in [
+            "bo luat hinh su", "blhs", "toi pham", "hinh su", "thuong tich",
+            "trom", "lua dao", "lam dung tin nhiem", "gây rối", "ma tuy"
+        ]) or bool(re.search(r"\bdieu\s+(\d+[a-z]?)\b", qn))
+
+        if criminal_hint:
+            blhs_context = blhs_context_for_question(question, top_k=3)
+            if blhs_context:
+                system += (
+                    "\nBLHS_FULLTEXT_CONTEXT - TRÍCH TRỰC TIẾP TỪ PDF NGƯỜI DÙNG CUNG CẤP:"
+                    "\n" + blhs_context +
+                    "\nQUY TẮC: với nội dung hình sự, ưu tiên tuyệt đối BLHS_FULLTEXT_CONTEXT; "
+                    "không được thay tên Điều, tội danh, ngưỡng, khung hình phạt bằng trí nhớ riêng."
+                )
+
         if context:
             system += "\nVERIFIED_CONTEXT:\n" + context
         else:
@@ -260,12 +375,14 @@ def home():
 def health():
     return jsonify({
         "status":"ok",
-        "mode":"hybrid_legal_flexible_v4",
+        "mode":"hybrid_full_blhs_v5",
         "kb_version":VERSION.get("version"),
         "snapshot":VERSION.get("snapshot"),
         "unit":UNIT,
         "hotline":HOTLINE,
         "exact_article_router":True,
+        "blhs_fulltext_loaded":bool(BLHS_ARTICLES),
+        "blhs_article_count":len(BLHS_ARTICLES),
         "flexible_general_ai":True,
         "hybrid_legal_ai":True,
         "plain_text_only":True,
