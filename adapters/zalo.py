@@ -9,11 +9,13 @@ class PendingZaloMessages:
     """
     Hàng đợi tương thích Zalo Chatbot Dynamic.
 
-    Log thực tế cho thấy GET /zalo/ai đôi khi đến trước POST /zalo/webhook khoảng 40-120ms.
-    pop() chờ tối đa 0.28 giây để webhook kịp đưa câu hỏi vào hàng đợi, tránh trả nhầm
-    'Anh/chị vui lòng nhập câu hỏi cần hỗ trợ'.
+    Log thực tế cho thấy GET /zalo/ai có thể đến TRƯỚC POST /zalo/webhook.
+    Vì timestamp của Render là lúc request hoàn tất, khoảng chênh nhìn thấy 100-150ms
+    có thể tương ứng gần 400ms tính từ lúc GET bắt đầu. Do đó pop() chờ tối đa 0.65s
+    để webhook kịp đưa câu hỏi vào hàng đợi.
 
-    Nếu Dynamic không truyền user_id thì vẫn phải fallback FIFO. Đây chỉ phù hợp demo/tải thấp.
+    Nếu Dynamic không truyền user_id thì vẫn fallback FIFO. Kiến trúc này phù hợp
+    demo/tải thấp; AI Core /api/chat vẫn dùng user_id riêng chính xác.
     """
 
     def __init__(self):
@@ -61,7 +63,7 @@ class PendingZaloMessages:
             return None
         return self._queue.popleft()
 
-    def pop(self, user_id=None, wait_seconds=0.28):
+    def pop(self, user_id=None, wait_seconds=0.65):
         deadline = time.monotonic() + max(0.0, float(wait_seconds or 0))
         with self._condition:
             while True:
