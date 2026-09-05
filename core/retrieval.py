@@ -26,11 +26,7 @@ def _fts_query(text):
     words = [w for w in words if len(w) >= 2][:12]
     if not words:
         return ""
-    escaped = []
-    for word in words:
-        word = word.replace('"', '""')
-        escaped.append(f'"{word}"')
-    return " OR ".join(escaped)
+    return " OR ".join(f'"{w.replace(chr(34), chr(34)*2)}"' for w in words)
 
 
 def detect_document_from_hint(law_hint):
@@ -41,33 +37,46 @@ def detect_document_from_hint(law_hint):
     return None
 
 
-def _domain_document_ids(question, queries):
-    """Khoanh vùng nguồn theo lĩnh vực trước khi FTS để tránh BLHS lẫn vào TTHC và ngược lại."""
+def _domain(question, queries):
     q = _norm(str(question or "") + " " + " ".join(str(x or "") for x in (queries or [])))
 
-    vehicle_terms = [
-        "dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe",
-        "cap bien so", "giay to dang ky xe", "mua xe moi", "dkx10",
-    ]
-    if any(x in q for x in vehicle_terms):
-        return ["VEHICLE_REGISTRATION_2026"]
+    # Cư trú được ưu tiên trước VNeID nếu câu hỏi đang nói rõ tạm trú/thường trú.
+    if any(x in q for x in ["thuong tru", "dang ky thuong tru", "ho khau thuong tru", "nhap khau"]):
+        return "permanent_residence", ["RESIDENCE_GUIDANCE_2026", "RESIDENCE_PERMANENT_2026"]
+    if any(x in q for x in ["tam tru", "dang ky tam tru"]):
+        return "temporary_residence", ["RESIDENCE_GUIDANCE_2026", "TTHC_TEMP_RESIDENCE_2026"]
+    if any(x in q for x in ["xac nhan cu tru", "xac nhan thong tin cu tru", "cu tru"]):
+        return "residence", ["RESIDENCE_GUIDANCE_2026", "RESIDENCE_PERMANENT_2026", "TTHC_TEMP_RESIDENCE_2026"]
+    if any(x in q for x in ["vneid", "dinh danh dien tu", "tai khoan dinh danh", "muc do 1", "muc do 01", "muc do 2", "muc do 02"]):
+        return "vneid", ["VNEID_2026", "VNEID_SIM_GUIDANCE_2026"]
+    if any(x in q for x in ["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe", "cap bien so", "mua xe moi"]):
+        return "vehicle", ["VEHICLE_REGISTRATION_2026"]
+    if any(x in q for x in ["toi pham", "bo luat hinh su", "blhs", "bi danh", "danh nguoi", "thuong tich", "dung dao", "hung khi", "trom", "lua dao", "lam dung tin nhiem", "gay roi", "huy hoai", "de doa giet"]):
+        return "criminal", ["BLHS_2025"]
+    return None, None
 
-    residence_terms = [
-        "tam tru", "thuong tru", "cu tru", "xac nhan cu tru",
-        "xac nhan thong tin cu tru", "vneid cu tru",
-    ]
-    if any(x in q for x in residence_terms):
-        return ["RESIDENCE_GUIDANCE_2026", "TTHC_TEMP_RESIDENCE_2026"]
 
-    criminal_terms = [
-        "toi pham", "bo luat hinh su", "blhs", "bi danh", "danh nguoi",
-        "thuong tich", "dung dao", "hung khi", "trom", "lua dao",
-        "lam dung tin nhiem", "gay roi", "huy hoai", "de doa giet",
-    ]
-    if any(x in q for x in criminal_terms):
-        return ["BLHS_2025"]
-
-    return None
+def _priority_unit_ids(domain, question):
+    q = _norm(question)
+    if domain == "permanent_residence":
+        return [
+            "RESIDENCE_PERMANENT_2026:core",
+            "RESIDENCE_PERMANENT_2026:documents_by_case",
+            "RESIDENCE_GUIDANCE_2026:data_reuse",
+        ]
+    if domain == "temporary_residence":
+        return ["TTHC_TEMP_RESIDENCE_2026:core", "TTHC_TEMP_RESIDENCE_2026:documents_policy"]
+    if domain == "vneid":
+        if any(x in q for x in ["muc do 2", "muc do 02", "muc 2"]):
+            return ["VNEID_2026:level2", "VNEID_2026:overview", "VNEID_SIM_GUIDANCE_2026:sim"]
+        if any(x in q for x in ["muc do 1", "muc do 01", "muc 1"]):
+            return ["VNEID_2026:level1", "VNEID_2026:overview"]
+        if "sim" in q or "so dien thoai" in q:
+            return ["VNEID_SIM_GUIDANCE_2026:sim", "VNEID_2026:level2"]
+        return ["VNEID_2026:overview", "VNEID_2026:level2", "VNEID_2026:level1"]
+    if domain == "vehicle":
+        return ["VEHICLE_REGISTRATION_2026:first_registration_documents", "VEHICLE_REGISTRATION_2026:authority"]
+    return []
 
 
 def _candidate_score(unit, query, query_index):
@@ -78,58 +87,56 @@ def _candidate_score(unit, query, query_index):
     title_tokens = set(title.split())
     score = max(0, 12 - query_index * 2)
     if q and q == title:
-        score += 400.0
+        score += 400
     elif q and q in title:
-        score += 120.0
-    score += len(q_tokens & title_tokens) * 16.0
-    for token in list(q_tokens)[:8]:
-        if token in text:
-            score += 1.0
-    rank = unit.get("_rank")
-    if isinstance(rank, (int, float)):
-        score += min(8.0, max(-8.0, -float(rank)))
+        score += 120
+    score += len(q_tokens & title_tokens) * 16
+    score += sum(1 for token in list(q_tokens)[:8] if token in text)
     return score
 
 
 def retrieve(plan, question):
     candidates = {}
 
+    # Điều luật nêu rõ.
     for ref in plan.get("explicit_references", []):
         article = str(ref.get("article") or "").strip()
         doc_id = detect_document_from_hint(ref.get("law_hint"))
-        candidate_docs = [doc_id] if doc_id else ["BLHS_2025"]
-        for candidate in candidate_docs:
+        for candidate in ([doc_id] if doc_id else ["BLHS_2025"]):
             if not candidate:
                 continue
             for unit in db.get_article(candidate, article):
                 entry = dict(unit)
                 entry["_why"] = "explicit_article"
-                entry["_score"] = 10000.0
+                entry["_score"] = 10000
                 candidates[entry["id"]] = entry
 
     queries = list(plan.get("search_queries") or []) or [question]
     if question not in queries:
         queries.append(question)
+    domain, document_filter = _domain(question, queries)
 
-    document_filter = _domain_document_ids(question, queries)
+    # Các đơn vị nguồn cốt lõi của đúng lĩnh vực được nạp trước để Dynamic không chọn nhầm nguồn.
+    for pos, unit_id in enumerate(_priority_unit_ids(domain, question)):
+        unit = db.get_unit(unit_id)
+        if unit:
+            entry = dict(unit)
+            entry["_why"] = "domain_priority"
+            entry["_score"] = 9000 - pos
+            candidates[entry["id"]] = entry
 
     for query_index, query in enumerate(queries[:4]):
         fts = _fts_query(query)
         if not fts:
             continue
-        found = db.search_fts(
-            fts,
-            limit=max(LEGAL_TOP_K * 2, 12),
-            document_ids=document_filter,
-        )
-        # LIKE fallback hiện không hỗ trợ filter theo document, vì vậy chỉ dùng khi không cần khoanh vùng.
+        found = db.search_fts(fts, limit=max(LEGAL_TOP_K * 2, 12), document_ids=document_filter)
         if not found and document_filter is None:
             found = db.search_like(query, limit=max(LEGAL_TOP_K * 2, 12))
         for unit in found:
             entry = dict(unit)
             score = _candidate_score(entry, query, query_index)
-            existing = candidates.get(entry["id"])
-            if existing is None or score > existing.get("_score", -1):
+            old = candidates.get(entry["id"])
+            if old is None or score > old.get("_score", -1):
                 entry["_why"] = f"search:{query}"
                 entry["_score"] = score
                 candidates[entry["id"]] = entry
@@ -141,13 +148,10 @@ def retrieve(plan, question):
 def format_context(units):
     blocks = []
     for unit in units:
-        source = (
-            f"{unit.get('document_title','')}"
-            + (f" ({unit.get('document_number')})" if unit.get("document_number") else "")
-        ).strip()
+        source = f"{unit.get('document_title','')}" + (f" ({unit.get('document_number')})" if unit.get("document_number") else "")
         blocks.append(
             "SOURCE_UNIT_ID: " + unit["id"] + "\n"
-            "SOURCE: " + source + "\n"
+            "SOURCE: " + source.strip() + "\n"
             "ARTICLE: " + str(unit.get("article") or "") + "\n"
             "TITLE: " + str(unit.get("title") or "") + "\n"
             "TEXT:\n" + str(unit.get("text") or "")
