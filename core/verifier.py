@@ -46,6 +46,30 @@ def _acknowledges_exception(text):
     return any(marker in q for marker in markers)
 
 
+def _has_residence_source(retrieved_units):
+    return any(
+        str(x.get("document_id") or "").startswith(("RESIDENCE_", "TTHC_TEMP_RESIDENCE_"))
+        for x in retrieved_units
+    )
+
+
+def _unsafe_residence_requirements(answer):
+    """Các cụm từng bị model tự bịa thành thành phần hồ sơ/đầu mối giải quyết."""
+    q = norm(answer)
+    risky = [
+        "so ho khau",
+        "ban sao cmnd",
+        "ban sao cccd",
+        "giay khai sinh",
+        "thu moi",
+        "giay phep su dung nha",
+        "giay chung minh quan he",
+        "phong dang ky dan cu",
+        "cap giay tam tru",
+    ]
+    return [x for x in risky if x in q]
+
+
 def verify(draft, retrieved_units):
     by_id = {unit["id"]: unit for unit in retrieved_units}
     errors = []
@@ -95,9 +119,7 @@ def verify(draft, retrieved_units):
             and _has_exception_structure(source_text)
             and not _acknowledges_exception(claim_text)
         ):
-            errors.append(
-                "Claim kết luận loại trừ quá rộng trong khi nguồn có nhánh/ngoại lệ liên quan."
-            )
+            errors.append("Claim kết luận loại trừ quá rộng trong khi nguồn có nhánh/ngoại lệ liên quan.")
             continue
 
         verified_claims.append(claim)
@@ -119,9 +141,12 @@ def verify(draft, retrieved_units):
         and _has_exception_structure(source_blob)
         and not _acknowledges_exception(answer_text)
     ):
-        errors.append(
-            "Câu trả lời có kết luận loại trừ tuyệt đối nhưng nguồn có ngoại lệ/nhánh thay thế."
-        )
+        errors.append("Câu trả lời có kết luận loại trừ tuyệt đối nhưng nguồn có ngoại lệ/nhánh thay thế.")
+
+    if _has_residence_source(retrieved_units):
+        risky = _unsafe_residence_requirements(answer_text)
+        if risky:
+            errors.append("Câu trả lời tự thêm thành phần/đầu mối cư trú không được nguồn hiện hành hỗ trợ: " + ", ".join(risky))
 
     return {
         "ok": not errors,
@@ -132,7 +157,7 @@ def verify(draft, retrieved_units):
 
 
 def verify_dynamic_text(answer, retrieved_units):
-    """Verifier nhẹ cho Zalo Dynamic, không cần model gọi lần hai."""
+    """Verifier nhẹ cho Zalo Dynamic, không cần gọi model lần hai."""
     answer = str(answer or "")
     allowed_articles = {
         str(unit.get("article")) for unit in retrieved_units if unit.get("article")
@@ -151,22 +176,36 @@ def verify_dynamic_text(answer, retrieved_units):
     ):
         errors.append("overbroad_negative")
 
+    if _has_residence_source(retrieved_units):
+        risky = _unsafe_residence_requirements(answer)
+        if risky:
+            errors.append("unsupported_residence_requirements:" + ",".join(risky))
+
     return {"ok": not errors, "errors": errors}
 
 
 def grounded_dynamic_fallback(question, retrieved_units):
-    """Fail-safe có nguồn, chỉ dùng khi model Dynamic timeout hoặc bị verifier từ chối."""
+    """Fail-safe có nguồn, dùng khi model Dynamic timeout hoặc bị verifier từ chối."""
     if not retrieved_units:
         return (
-            "Tôi chưa có đủ nguồn phù hợp để khẳng định chi tiết pháp lý của tình huống này. "
-            "Anh/chị có thể mô tả thêm diễn biến và tài liệu đang có để tôi tra chính xác hơn."
+            "Kho dữ liệu hiện chưa có nguồn đã kiểm chứng đủ gần để tôi khẳng định chi tiết pháp lý của nội dung này. "
+            "Tôi sẽ không tự đoán giấy tờ, điều luật, mức phạt hoặc thẩm quyền khi chưa có nguồn phù hợp."
+        )
+
+    q = norm(question)
+
+    # Fallback cư trú hiện hành: dựng hoàn toàn từ snapshot chính thức đã nạp.
+    if _has_residence_source(retrieved_units) and "tam tru" in q:
+        return (
+            "Hiện nay thủ tục đăng ký tạm trú được thực hiện tại Công an cấp xã hoặc trực tuyến; thời hạn giải quyết là 03 ngày làm việc. "
+            "Theo quy định cư trú áp dụng từ 01/07/2026, khi nộp trực tiếp, công dân cung cấp thông tin cơ bản và thông tin về điều kiện đăng ký; "
+            "cán bộ tiếp nhận chủ động khai thác dữ liệu để tạo lập hồ sơ. Những thông tin, giấy tờ đã có trong cơ sở dữ liệu hoặc VNeID không được yêu cầu nộp lại; "
+            "nếu chưa khai thác được dữ liệu thì có thể cần xuất trình giấy tờ gốc để đối chiếu khi thực sự cần thiết."
         )
 
     top = retrieved_units[0]
     article = str(top.get("article") or "").strip()
     title = str(top.get("title") or "").strip()
-    source_text = str(top.get("text") or "")
-    q = norm(question)
 
     if article == "134":
         if ("5%" in q or "%" in q or "duoi 11" in q or "dao" in q or "hung khi" in q):
@@ -189,8 +228,8 @@ def grounded_dynamic_fallback(question, retrieved_units):
         )
 
     return (
-        "Nguồn pháp luật đã được tìm thấy nhưng chưa đủ để đưa ra kết luận cụ thể từ dữ kiện hiện có. "
-        "Anh/chị có thể cung cấp thêm thông tin để tôi phân tích sát hơn."
+        "Nguồn đã được tìm thấy nhưng dữ kiện hiện có chưa đủ để kết luận chi tiết. "
+        "Tôi sẽ chỉ sử dụng thông tin có trong nguồn đã kiểm chứng và có thể phân tích tiếp khi anh/chị bổ sung tình huống cụ thể."
     )
 
 
