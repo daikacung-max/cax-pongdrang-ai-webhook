@@ -8,9 +8,10 @@ GROQ_API_KEY = "".join((os.getenv("GROQ_API_KEY") or "").split())
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1/chat/completions")
 
 # AI Core đầy đủ dùng 120B. Zalo Dynamic bị giới hạn thời gian phản hồi rất ngắn,
-# nên dùng model real-time nhanh, nhưng câu trả lời pháp luật vẫn phải qua retrieval + verifier.
+# nên dùng GPT-OSS 20B cho nhánh real-time; câu trả lời pháp luật vẫn đi qua
+# retrieval + verifier/fallback dựa trên nguồn.
 ANSWER_MODEL = os.getenv("ANSWER_MODEL", "openai/gpt-oss-120b")
-DYNAMIC_ANSWER_MODEL = os.getenv("DYNAMIC_ANSWER_MODEL", "llama-3.1-8b-instant")
+DYNAMIC_ANSWER_MODEL = os.getenv("DYNAMIC_ANSWER_MODEL", "openai/gpt-oss-20b")
 PLANNER_MODEL = os.getenv("PLANNER_MODEL", "openai/gpt-oss-20b")
 
 DB_PATH = Path(os.getenv("LEGAL_DB_PATH", str(BASE_DIR / "data" / "legal.db")))
