@@ -2,6 +2,7 @@ from config import (
     UNIT_NAME,
     HOTLINE,
     ANSWER_MODEL,
+    DYNAMIC_ANSWER_MODEL,
     CORE_REASONING_EFFORT,
     DYNAMIC_REASONING_EFFORT,
     CORE_TIMEOUT_SECONDS,
@@ -31,7 +32,7 @@ ANSWER_SCHEMA = {
                 ],
                 "additionalProperties": False,
             },
-            "maxItems": 10,
+            "maxItems": 6,
         },
         "needs_followup": {"type": "boolean"},
         "followup_question": {"type": ["string", "null"]},
@@ -103,8 +104,9 @@ def build_messages(question, history, legal_context="", repair_note=None):
 
 
 def answer(question, history, legal_context="", dynamic=False, repair_note=None):
+    model = DYNAMIC_ANSWER_MODEL if dynamic else ANSWER_MODEL
     return chat_structured(
-        model=ANSWER_MODEL,
+        model=model,
         messages=build_messages(
             question, history, legal_context=legal_context, repair_note=repair_note
         ),
@@ -113,5 +115,5 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None)
         reasoning_effort=(DYNAMIC_REASONING_EFFORT if dynamic else CORE_REASONING_EFFORT),
         timeout=(DYNAMIC_TIMEOUT_SECONDS if dynamic else CORE_TIMEOUT_SECONDS),
         temperature=0.08 if legal_context else 0.42,
-        max_completion_tokens=620 if dynamic else 1100,
+        max_completion_tokens=420 if dynamic else 1100,
     )
