@@ -49,10 +49,14 @@ def _detect_domain_in_text(text):
         return "temporary_residence", ["RESIDENCE_GUIDANCE_2026", "TTHC_TEMP_RESIDENCE_2026"]
     if any(x in q for x in ["vneid", "dinh danh dien tu", "tai khoan dinh danh", "muc do 1", "muc do 01", "muc do 2", "muc do 02"]):
         return "vneid", ["VNEID_2026", "VNEID_SIM_GUIDANCE_2026"]
+    if "can cuoc" in q and any(x in q for x in ["duoi 14", "tre em", "con toi", "be nha toi"]):
+        return "identity_under14", ["CITIZEN_ID_UNDER14_2026"]
     if any(x in q for x in ["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe", "cap bien so", "mua xe moi"]):
         return "vehicle", ["VEHICLE_REGISTRATION_2026"]
     if any(x in q for x in ["xac nhan cu tru", "xac nhan thong tin cu tru", "cu tru"]):
         return "residence", ["RESIDENCE_GUIDANCE_2026", "RESIDENCE_PERMANENT_2026", "TTHC_TEMP_RESIDENCE_2026"]
+    if any(x in q for x in ["to giac", "tin bao toi pham", "trinh bao toi pham"]):
+        return "crime_report", ["CRIME_REPORT_GUIDANCE_2025"]
     if any(x in q for x in ["toi pham", "bo luat hinh su", "blhs", "bi danh", "danh nguoi", "nguoi khac danh", "thuong tich", "dung dao", "hung khi", "trom", "lua dao", "bi lua chuyen khoan", "lam dung tin nhiem", "gay roi", "huy hoai", "de doa giet"]):
         return "criminal", ["BLHS_2025"]
     return None, None
@@ -90,6 +94,18 @@ def _priority_unit_ids(domain, question):
         if "sim" in q or "so dien thoai" in q:
             return ["VNEID_SIM_GUIDANCE_2026:sim", "VNEID_2026:level2"]
         return ["VNEID_2026:overview", "VNEID_2026:level2", "VNEID_2026:level1"]
+    if domain == "identity_under14":
+        return [
+            "CITIZEN_ID_UNDER14_2026:scope",
+            "CITIZEN_ID_UNDER14_2026:data_and_representative",
+            "CITIZEN_ID_UNDER14_2026:time",
+        ]
+    if domain == "crime_report":
+        return [
+            "CRIME_REPORT_GUIDANCE_2025:channels",
+            "CRIME_REPORT_GUIDANCE_2025:rights",
+            "CRIME_REPORT_GUIDANCE_2025:local_intake",
+        ]
     if domain == "vehicle":
         return ["VEHICLE_REGISTRATION_2026:first_registration_documents", "VEHICLE_REGISTRATION_2026:authority"]
     return []

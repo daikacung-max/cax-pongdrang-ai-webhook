@@ -54,6 +54,14 @@ def _has_vehicle_source(units):
     return any(str(x.get("document_id") or "") == "VEHICLE_REGISTRATION_2026" for x in units)
 
 
+def _has_crime_report_source(units):
+    return any(str(x.get("document_id") or "") == "CRIME_REPORT_GUIDANCE_2025" for x in units)
+
+
+def _has_identity_under14_source(units):
+    return any(str(x.get("document_id") or "") == "CITIZEN_ID_UNDER14_2026" for x in units)
+
+
 def _unsafe_residence_requirements(answer):
     q = norm(answer)
     risky = [
@@ -272,6 +280,20 @@ def grounded_dynamic_fallback(question, retrieved_units):
         if "dao" in q or "hung khi" in q:
             text += " Việc dùng dao là dữ kiện quan trọng; cần làm rõ đặc điểm con dao, cách sử dụng và việc có thuộc trường hợp vũ khí hoặc hung khí nguy hiểm hay không."
         return text + " Việc xử lý cụ thể còn phụ thuộc kết quả xác minh và chứng cứ liên quan."
+
+    if _has_identity_under14_source(retrieved_units):
+        return (
+            "Thủ tục này áp dụng cho người dưới 14 tuổi và thực hiện tại Công an xã. "
+            "Nếu làm trực tiếp, người đại diện hợp pháp đưa người dưới 14 tuổi đến địa điểm làm thủ tục. "
+            "Anh/chị cho biết người cần làm căn cước hiện dưới 06 tuổi hay từ đủ 06 đến dưới 14 tuổi để tôi hướng dẫn đúng cách thực hiện."
+        )
+
+    if _has_crime_report_source(retrieved_units):
+        return (
+            "Anh/chị có thể tố giác hoặc báo tin trực tiếp, bằng văn bản, qua điện thoại trực ban, qua VNeID hoặc các kênh được hướng dẫn. "
+            "Công an cấp xã là một trong các đơn vị tiếp nhận; nếu có nguy cơ bị đe dọa, anh/chị có quyền đề nghị giữ bí mật việc tố giác và bảo vệ theo quy định. "
+            f"Anh/chị có thể liên hệ trực ban {UNIT_NAME} qua số {HOTLINE} để được hướng dẫn tiếp nhận."
+        )
     if article == "134" and any(x in q for x in ["camera", "video", "clip", "ghi hinh"]):
         return (
             "Đoạn camera là chứng cứ cần bảo toàn. Anh/chị nên giữ nguyên file gốc, không chỉnh sửa, sao lưu thêm một bản và ghi lại thời gian, địa điểm, người biết sự việc; "

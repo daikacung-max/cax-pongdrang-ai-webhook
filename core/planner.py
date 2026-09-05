@@ -80,6 +80,10 @@ SEARCH_VOCAB = [
      "Cấp tài khoản định danh điện tử VNeID mức độ 01 mức độ 02 Công an xã căn cước số điện thoại chính chủ"),
     (["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe", "mua xe moi"],
      "Đăng ký lần đầu xe mô tô xe gắn máy Giấy khai đăng ký xe ĐKX10 giấy tờ chủ xe giấy tờ của xe"),
+    (["tre em", "duoi 14", "con toi", "be nha toi"],
+     "Cấp thẻ căn cước cho người dưới 14 tuổi thực hiện tại Công an cấp xã"),
+    (["to giac", "tin bao toi pham", "trinh bao toi pham"],
+     "Hướng dẫn tố giác báo tin về tội phạm Công an cấp xã"),
 ]
 
 LEGAL_HINTS = [

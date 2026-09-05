@@ -7,6 +7,50 @@ from core import db
 
 def ensure_verified_sources():
     # ------------------------------------------------------------------
+    # 0) CĂN CƯỚC CHO NGƯỜI DƯỚI 14 TUỔI (CẤP XÃ)
+    # ------------------------------------------------------------------
+    db.upsert_document({
+        "id": "CITIZEN_ID_UNDER14_2026",
+        "title": "Cấp thẻ căn cước cho người dưới 14 tuổi tại Công an cấp xã",
+        "number": "Mã thủ tục 1.014062",
+        "issuer": "Bộ Công an",
+        "effective_from": None,
+        "source_path": "https://dichvucong.bocongan.gov.vn/public/link-to/chi-tiet-thu-tuc?ma-thu-tuc=122156",
+        "sha256": None,
+        "metadata": {"checked": "2026-09-05", "official": True},
+    })
+    db.replace_document_units("CITIZEN_ID_UNDER14_2026", [
+        {
+            "id": "CITIZEN_ID_UNDER14_2026:scope",
+            "unit_type": "procedure",
+            "title": "Cấp thẻ căn cước cho người dưới 14 tuổi tại cấp xã",
+            "text": (
+                "Thủ tục cấp thẻ căn cước cho người dưới 14 tuổi được thực hiện tại Công an xã. "
+                "Người đại diện hợp pháp có thể thực hiện trực tiếp; khi trực tiếp, đưa người dưới 14 tuổi đến địa điểm làm thủ tục. "
+                "Đối với người dưới 06 tuổi, người đại diện hợp pháp có thể thực hiện qua Cổng dịch vụ công hoặc ứng dụng định danh quốc gia; "
+                "hồ sơ được chuyển đến Công an cấp xã trong cả nước không phụ thuộc nơi cư trú để xem xét, giải quyết theo thông báo của Bộ Công an."
+            ),
+        },
+        {
+            "id": "CITIZEN_ID_UNDER14_2026:data_and_representative",
+            "unit_type": "procedure",
+            "title": "Thông tin dân cư và người đại diện trong thủ tục căn cước dưới 14 tuổi",
+            "text": (
+                "Cán bộ thu nhận tìm kiếm thông tin trong Cơ sở dữ liệu quốc gia về dân cư để lập hồ sơ. "
+                "Nếu thông tin chưa có hoặc có thay đổi thì thực hiện thu thập, cập nhật hoặc điều chỉnh thông tin trước khi làm thủ tục cấp thẻ căn cước. "
+                "Người đại diện hợp pháp cần có giấy tờ, tài liệu có giá trị pháp lý chứng minh tư cách đại diện; "
+                "Phiếu thu nhận thông tin căn cước được tạo từ dữ liệu để kiểm tra, ký xác nhận."
+            ),
+        },
+        {
+            "id": "CITIZEN_ID_UNDER14_2026:time",
+            "unit_type": "procedure",
+            "title": "Thời hạn giải quyết thủ tục căn cước dưới 14 tuổi tại cấp xã",
+            "text": "Thời hạn giải quyết thủ tục là 07 ngày làm việc; kết quả thực hiện là thẻ căn cước.",
+        },
+    ])
+
+    # ------------------------------------------------------------------
     # 1) CƯ TRÚ HIỆN HÀNH TỪ 01/07/2026
     # ------------------------------------------------------------------
     db.upsert_document({
@@ -272,5 +316,47 @@ def ensure_verified_sources():
                 "Chủ xe kê khai Giấy khai đăng ký xe theo quy định. Cán bộ đăng ký xe kiểm tra giấy tờ của chủ xe, giấy tờ của xe, đối chiếu dữ liệu và kiểm tra thực tế xe theo quy định. "
                 "Khi hồ sơ và xe hợp lệ thì cấp biển số theo quy định. Thời hạn cấp chứng nhận đăng ký xe không quá 02 ngày làm việc kể từ ngày nhận đủ hồ sơ hợp lệ."
             ),
+        },
+    ])
+
+    # ------------------------------------------------------------------
+    # 4) TỐ GIÁC, TIN BÁO VỀ TỘI PHẠM
+    # ------------------------------------------------------------------
+    db.upsert_document({
+        "id": "CRIME_REPORT_GUIDANCE_2025",
+        "title": "Hướng dẫn tố giác, báo tin về tội phạm, kiến nghị khởi tố",
+        "number": "Hướng dẫn Bộ Công an từ 01/03/2025",
+        "issuer": "Bộ Công an",
+        "effective_from": "2025-03-01",
+        "source_path": "https://bocongan.gov.vn/bai-viet/huong-dan-to-giac-bao-tin-ve-toi-pham-kien-nghi-khoi-to-tu-ngay-0132025-d2-t43729",
+        "sha256": None,
+        "metadata": {"checked": "2026-09-05", "official": True},
+    })
+    db.replace_document_units("CRIME_REPORT_GUIDANCE_2025", [
+        {
+            "id": "CRIME_REPORT_GUIDANCE_2025:channels",
+            "unit_type": "procedure",
+            "title": "Cách tố giác, báo tin về tội phạm",
+            "text": (
+                "Tổ chức, cá nhân có thể tố giác, báo tin về tội phạm trực tiếp, bằng văn bản, qua điện thoại trực ban của cơ quan có thẩm quyền, "
+                "qua phương tiện thông tin đại chúng, hòm thư điện tử, báo nói, báo hình, ứng dụng VNeID, hoặc bằng đơn, thư gửi qua đường bưu điện, giao liên. "
+                "Cơ quan điều tra của Công an nhân dân tổ chức trực ban hình sự 24/24 giờ để tiếp nhận đầy đủ tố giác, tin báo về tội phạm, kiến nghị khởi tố."
+            ),
+        },
+        {
+            "id": "CRIME_REPORT_GUIDANCE_2025:rights",
+            "unit_type": "guidance",
+            "title": "Quyền của người tố giác, báo tin về tội phạm",
+            "text": (
+                "Người tố giác, báo tin có quyền yêu cầu cơ quan có thẩm quyền giữ bí mật việc tố giác, báo tin và bảo vệ tính mạng, sức khỏe, "
+                "danh dự, nhân phẩm, uy tín, tài sản, quyền và lợi ích hợp pháp của mình và người thân thích khi bị đe dọa. "
+                "Người tố giác, báo tin được thông báo kết quả giải quyết và có trách nhiệm trình bày trung thực những tình tiết mình biết khi cơ quan có thẩm quyền yêu cầu."
+            ),
+        },
+        {
+            "id": "CRIME_REPORT_GUIDANCE_2025:local_intake",
+            "unit_type": "guidance",
+            "title": "Công an cấp xã trong việc tiếp nhận tố giác, tin báo",
+            "text": "Công an xã, phường, thị trấn, Đồn Công an nằm trong danh sách đơn vị tiếp nhận tố giác, tin báo về tội phạm theo hướng dẫn của Bộ Công an.",
         },
     ])

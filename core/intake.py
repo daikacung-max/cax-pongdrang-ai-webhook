@@ -19,6 +19,16 @@ def _norm(text):
 # cán bộ; không được tự tư vấn chi tiết thủ tục khi kho nguồn chưa được duyệt.
 PROCEDURES = (
     {
+        "code": "identity_card_under14",
+        "name": "Cấp thẻ căn cước cho người dưới 14 tuổi",
+        "queue": "ADMIN_IDENTITY",
+        "source_ready": True,
+        "keywords": ("can cuoc", "cccd", "duoi 14", "tre em", "con toi", "be nha toi"),
+        "fields": (
+            ("age_group", "người cần làm căn cước hiện dưới 06 tuổi hay từ đủ 06 đến dưới 14 tuổi", ("duoi 6", "6 tuoi", "duoi 14", "13 tuoi", "12 tuoi", "11 tuoi", "10 tuoi", "9 tuoi", "8 tuoi", "7 tuoi")),
+        ),
+    },
+    {
         "code": "identity_card",
         "name": "Căn cước: cấp, đổi, cấp lại hoặc điều chỉnh thông tin",
         "queue": "ADMIN_IDENTITY",
@@ -63,7 +73,7 @@ PROCEDURES = (
         "code": "crime_report",
         "name": "Tố giác, tin báo về tội phạm",
         "queue": "CRIME_INTAKE",
-        "source_ready": False,
+        "source_ready": True,
         "keywords": ("to giac", "tin bao toi pham", "trinh bao toi pham", "bi de doa", "bi trom"),
         "fields": (
             ("incident_type", "sự việc chính anh/chị muốn trình báo là gì", ("lua dao", "danh", "de doa", "trom", "mat")),
@@ -74,7 +84,7 @@ PROCEDURES = (
         "code": "fraud_transfer",
         "name": "Lừa đảo chuyển khoản",
         "queue": "CRIME_INTAKE",
-        "source_ready": True,
+        "source_ready": False,
         "keywords": ("lua dao chuyen khoan", "bi lua", "chuyen tien", "chuyen khoan", "bi scam"),
         "fields": (
             ("transaction_time", "anh/chị chuyển khoản vào thời điểm nào", ("hom nay", "hom qua", "ngay", "luc", "gio")),

@@ -14,7 +14,7 @@ Quy ước: `[x]` chỉ dùng khi có bằng chứng ghi ở cột ghi chú. `[ 
 
 ## B. Demo nghiệp vụ
 
-- [x] Có danh mục khởi tạo 8 nhóm tiếp nhận cho demo; còn chờ cán bộ duyệt nội dung và mở rộng 10–15 thủ tục.
+- [x] Có danh mục khởi tạo 9 nhóm tiếp nhận cho demo; còn chờ cán bộ duyệt nội dung và mở rộng 10–15 thủ tục.
 - [ ] Mỗi thủ tục có nguồn chính thức, ngày hiệu lực và người duyệt.
 - [ ] Mỗi thủ tục có bộ câu hỏi tối thiểu và điều kiện đủ dữ kiện.
 - [ ] Mỗi thủ tục có bộ câu trả lời mẫu tự nhiên, ngắn, bằng văn bản.
@@ -50,3 +50,4 @@ Quy ước: `[x]` chỉ dùng khi có bằng chứng ghi ở cột ghi chú. `[ 
 |---|---|---|---|---|
 | 2026-09-05 | Tạo hồ sơ mục tiêu, checklist và kế hoạch bảo mật | Commit/tài liệu trong `PROJECT_CONTROL/` | Chưa có bộ thủ tục và luồng chuyển cán bộ | Chưa duyệt |
 | 2026-09-05 | Thêm phân loại tiếp nhận an toàn cho 8 nhóm demo | `core/intake.py`, test intake | Chưa chuyển hồ sơ thật; chờ nguồn và quy trình nghiệp vụ duyệt | Chưa duyệt |
+| 2026-09-05 | Nhập thêm nguồn Bộ Công an cho căn cước dưới 14 tuổi và tố giác/tin báo | `core/verified_sources.py` | Các chủ đề còn thiếu nguồn chi tiết vẫn fail-closed | Chưa duyệt |
