@@ -126,6 +126,12 @@ def ensure_verified_sources():
         },
     ])
 
+    db.upsert_document({"id":"CITIZEN_ID_RENEWAL_PROVINCIAL_2026","title":"Cấp đổi thẻ căn cước tại cấp tỉnh","number":"Mã thủ tục 2.001195","issuer":"Bộ Công an","effective_from":None,"source_path":"https://dichvucong.bocongan.gov.vn/bocongan/bothutuc/tthc?matt=26094","sha256":None,"metadata":{"checked":"2026-09-05","official":True}})
+    db.replace_document_units("CITIZEN_ID_RENEWAL_PROVINCIAL_2026", [
+        {"id":"CITIZEN_ID_RENEWAL_PROVINCIAL_2026:core","unit_type":"procedure","title":"Cấp đổi thẻ căn cước: nơi và cách thực hiện","text":"Thủ tục cấp đổi thẻ căn cước thực hiện tại cơ quan quản lý căn cước của Công an cấp tỉnh. Công dân có thể đến trực tiếp hoặc dùng Cổng dịch vụ công quốc gia, Cổng dịch vụ công Bộ Công an, ứng dụng định danh quốc gia để đăng ký thời gian, địa điểm."},
+        {"id":"CITIZEN_ID_RENEWAL_PROVINCIAL_2026:time","unit_type":"procedure","title":"Thời hạn cấp đổi thẻ căn cước","text":"Thời hạn giải quyết cấp đổi thẻ căn cước là 07 ngày làm việc. Khi thực hiện trực tiếp, cơ quan tiếp nhận thu thẻ căn cước cũ nếu có và cấp giấy hẹn theo quy định."},
+    ])
+
     # ------------------------------------------------------------------
     # 1) CƯ TRÚ HIỆN HÀNH TỪ 01/07/2026
     # ------------------------------------------------------------------

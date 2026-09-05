@@ -62,6 +62,8 @@ def _detect_domain_in_text(text):
         and not any(x in q for x in ["mat", "cap lai", "hu hong", "doi"])
     ):
         return "identity_over14_new", ["CITIZEN_ID_OVER14_PROVINCIAL_2026"]
+    if any(x in q for x in ["doi can cuoc", "doi cccd", "cap doi can cuoc", "cap doi cccd"]):
+        return "identity_renewal", ["CITIZEN_ID_RENEWAL_PROVINCIAL_2026"]
     # Chỉ có nguồn đã duyệt cho căn cước dưới 14 tuổi. Với các tình huống căn
     # cước khác (ví dụ mất thẻ), tuyệt đối không tìm toàn kho vì từ "căn cứ"
     # trong văn bản hình sự có thể làm FTS trả sai Điều luật.
@@ -137,6 +139,8 @@ def _priority_unit_ids(domain, question):
             "CITIZEN_ID_OVER14_PROVINCIAL_2026:channels",
             "CITIZEN_ID_OVER14_PROVINCIAL_2026:time",
         ]
+    if domain == "identity_renewal":
+        return ["CITIZEN_ID_RENEWAL_PROVINCIAL_2026:core", "CITIZEN_ID_RENEWAL_PROVINCIAL_2026:time"]
     if domain == "crime_report":
         return [
             "CRIME_REPORT_GUIDANCE_2025:channels",

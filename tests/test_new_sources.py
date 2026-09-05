@@ -45,6 +45,14 @@ class NewVerifiedSourcesTests(unittest.TestCase):
         self.assertIn("Công an cấp tỉnh", answer)
         self.assertIn("07 ngày làm việc", answer)
 
+    def test_identity_renewal_uses_its_own_provincial_source(self):
+        question = "Tôi cần đổi căn cước"
+        units = retrieve(plan(question, [], dynamic=True), question)
+        self.assertTrue(all(unit["document_id"] == "CITIZEN_ID_RENEWAL_PROVINCIAL_2026" for unit in units))
+        answer = grounded_dynamic_fallback(question, units)
+        self.assertIn("Công an cấp tỉnh", answer)
+        self.assertIn("07 ngày làm việc", answer)
+
 
 if __name__ == "__main__":
     unittest.main()
