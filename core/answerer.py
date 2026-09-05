@@ -34,7 +34,6 @@ ANSWER_SCHEMA = {
                 ],
                 "additionalProperties": False,
             },
-            "maxItems": 6,
         },
         "needs_followup": {"type": "boolean"},
         "followup_question": {"type": ["string", "null"]},
