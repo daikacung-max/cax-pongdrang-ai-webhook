@@ -23,7 +23,9 @@ PROCEDURES = (
         "name": "Cấp thẻ căn cước cho người dưới 14 tuổi",
         "queue": "ADMIN_IDENTITY",
         "source_ready": True,
-        "keywords": ("can cuoc", "cccd", "duoi 14", "tre em", "con toi", "be nha toi"),
+        # Không đưa "căn cước"/"CCCD" vào đây: chúng quá rộng và sẽ lấn các
+        # tình huống như mất thẻ, cấp lại hoặc đổi thẻ của người lớn.
+        "keywords": ("duoi 14", "tre em", "con toi", "be nha toi"),
         "fields": (
             ("age_group", "người cần làm căn cước hiện dưới 06 tuổi hay từ đủ 06 đến dưới 14 tuổi", ("duoi 6", "6 tuoi", "duoi 14", "13 tuoi", "12 tuoi", "11 tuoi", "10 tuoi", "9 tuoi", "8 tuoi", "7 tuoi")),
         ),

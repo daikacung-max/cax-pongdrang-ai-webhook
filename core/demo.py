@@ -13,6 +13,12 @@ def _no_source_answer(intake):
             "Anh/chị cần tôi hỗ trợ nội dung nào: căn cước, VNeID, cư trú, đăng ký xe, "
             "trình báo hoặc tố giác?"
         )
+    if intake.get("procedure_code") == "lost_document":
+        return (
+            "Tôi đã ghi nhận anh/chị bị mất thẻ Căn cước hoặc giấy tờ. "
+            "Kho dữ liệu demo chưa có nguồn thủ tục cấp lại đã được kiểm chứng cho đúng trường hợp, "
+            "nên tôi chưa thể khẳng định giấy tờ, thời hạn hoặc điểm tiếp nhận."
+        )
     if intake.get("conversation_mode") == "intake_requested":
         question = intake.get("next_question")
         if question:

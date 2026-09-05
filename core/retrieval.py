@@ -51,6 +51,11 @@ def _detect_domain_in_text(text):
         return "vneid", ["VNEID_2026", "VNEID_SIM_GUIDANCE_2026"]
     if "can cuoc" in q and any(x in q for x in ["duoi 14", "tre em", "con toi", "be nha toi"]):
         return "identity_under14", ["CITIZEN_ID_UNDER14_2026"]
+    # Chỉ có nguồn đã duyệt cho căn cước dưới 14 tuổi. Với các tình huống căn
+    # cước khác (ví dụ mất thẻ), tuyệt đối không tìm toàn kho vì từ "căn cứ"
+    # trong văn bản hình sự có thể làm FTS trả sai Điều luật.
+    if any(x in q for x in ["can cuoc", "cccd", "can cuoc cong dan"]):
+        return "identity_unverified", []
     if any(x in q for x in ["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe", "cap bien so", "mua xe moi"]):
         return "vehicle", ["VEHICLE_REGISTRATION_2026"]
     if any(x in q for x in ["xac nhan cu tru", "xac nhan thong tin cu tru", "cu tru"]):
@@ -146,6 +151,11 @@ def retrieve(plan, question):
     if question not in queries:
         queries.append(question)
     domain, document_filter = _domain(question, queries)
+
+    # Không có nguồn đúng phạm vi thì fail-closed. Danh sách rỗng trong SQLite
+    # không phải filter, nên phải dừng rõ ràng tại đây.
+    if domain == "identity_unverified":
+        return []
 
     for pos, unit_id in enumerate(_priority_unit_ids(domain, question)):
         unit = db.get_unit(unit_id)

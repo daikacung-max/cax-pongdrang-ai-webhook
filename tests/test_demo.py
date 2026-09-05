@@ -25,6 +25,13 @@ class DemoTests(unittest.TestCase):
         self.assertEqual(result["handoff_status"], "needs_information")
         self.assertIn("chỗ ở", result["answer"])
 
+    def test_lost_identity_card_never_retrieves_criminal_law(self):
+        result = respond(str(uuid.uuid4()), "Tôi bị mất căn cước")
+        self.assertEqual(result["mode"], "advice_only")
+        self.assertEqual(result["source_state"], "no_source")
+        self.assertIn("mất thẻ Căn cước", result["answer"])
+        self.assertNotIn("Điều 134", result["answer"])
+
     def test_demo_console_is_off_by_default(self):
         with app.test_client() as client:
             response = client.get("/demo")
