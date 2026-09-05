@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from config import DB_PATH
-from core import history
+from core import cases, history
 
 
 def utc_now():
@@ -82,6 +82,7 @@ def init_schema():
         """)
         con.execute("CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id, id DESC)")
     history.init_schema()
+    cases.init_schema()
 
 
 def upsert_document(doc):

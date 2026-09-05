@@ -4,6 +4,7 @@ import logging
 import time
 import re
 import os
+import hmac
 
 from config import (
     UNIT_NAME,
@@ -18,8 +19,10 @@ from config import (
     MAX_ZALO_TOTAL_CHARS,
     ENABLE_DEMO_CONSOLE,
     LOCAL_BIND_HOST,
+    OFFICER_API_TOKEN,
+    PRODUCTION_MODE,
 )
-from core import db
+from core import cases, db
 from core.ingest import import_article_index
 from core.verified_sources import ensure_verified_sources
 from core.service import core
@@ -131,6 +134,16 @@ def _valid_demo_session(value):
     return bool(re.fullmatch(r"[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}", str(value or "").lower()))
 
 
+def _officer_authorized():
+    """Cổng nội bộ không hoạt động nếu chưa cấu hình bí mật cán bộ."""
+    if not OFFICER_API_TOKEN:
+        return False
+    supplied = str(request.headers.get("Authorization") or "")
+    if supplied.lower().startswith("bearer "):
+        supplied = supplied[7:].strip()
+    return hmac.compare_digest(supplied, OFFICER_API_TOKEN)
+
+
 @app.route("/", methods=["GET"])
 def home():
     return f"{UNIT_NAME} - AI CORE", 200
@@ -162,6 +175,8 @@ def health():
         "history_backend": s.get("history_backend"),
         "dynamic_mode": "single_call_grounded_verified",
         "demo_console_enabled": _demo_enabled(),
+        "production_mode": PRODUCTION_MODE,
+        "officer_intake_ready": bool(OFFICER_API_TOKEN),
     }), 200
 
 
@@ -223,6 +238,23 @@ def api_chat():
             "error": type(exc).__name__,
             "message": "AI Core chưa xử lý được yêu cầu này.",
         }), 500
+
+
+@app.route("/internal/officer/cases", methods=["GET"])
+def officer_cases():
+    """Danh sách hồ sơ đã được người dân yêu cầu tiếp nhận.
+
+    Endpoint này chỉ dành cho mạng/cổng cán bộ phía sau xác thực. Nó không trả
+    Zalo ID; nội dung hội thoại không nằm trong bảng hồ sơ.
+    """
+    if not OFFICER_API_TOKEN:
+        return jsonify({"error": "Cổng cán bộ chưa được cấu hình."}), 503
+    if not _officer_authorized():
+        return jsonify({"error": "Không được phép."}), 401
+    return jsonify({"cases": cases.list_cases(
+        queue_code=request.args.get("queue"),
+        limit=request.args.get("limit", 50),
+    )}), 200
 
 
 @app.route("/zalo/webhook", methods=["GET", "POST"])

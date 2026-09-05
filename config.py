@@ -4,6 +4,7 @@ import os
 BASE_DIR = Path(__file__).resolve().parent
 UNIT_NAME = os.getenv("UNIT_NAME", "Công an xã Pơng Drang, tỉnh Đắk Lắk")
 HOTLINE = os.getenv("HOTLINE", "02623509777")
+PRODUCTION_MODE = os.getenv("PRODUCTION_MODE", "false").lower() in ("1", "true", "yes", "on")
 GROQ_API_KEY = "".join((os.getenv("GROQ_API_KEY") or "").split())
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1/chat/completions")
 OPENAI_API_KEY = "".join((os.getenv("OPENAI_API_KEY") or "").split())
@@ -45,6 +46,10 @@ HISTORY_HMAC_SECRET = os.getenv("HISTORY_HMAC_SECRET", "").strip()
 HISTORY_RETENTION_DAYS = int(os.getenv("HISTORY_RETENTION_DAYS", "30"))
 HISTORY_MAX_MESSAGES = int(os.getenv("HISTORY_MAX_MESSAGES", "20"))
 HISTORY_POOL_MAX_SIZE = int(os.getenv("HISTORY_POOL_MAX_SIZE", "5"))
+
+# Cổng cán bộ là API nội bộ. Token chỉ dùng tạm thời sau reverse proxy/SSO;
+# không trả về cho người dân và không được đưa vào mã nguồn hay log.
+OFFICER_API_TOKEN = os.getenv("OFFICER_API_TOKEN", "").strip()
 
 # Bản demo chỉ chạy cục bộ, tách khỏi Zalo OA và production. Mặc định tắt để
 # không vô tình công khai lịch sử hội thoại demo trên web service.

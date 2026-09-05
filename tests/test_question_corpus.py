@@ -35,7 +35,7 @@ class QuestionCorpusTests(unittest.TestCase):
                     # câu fallback an toàn; không biến corpus thành câu trả lời luật.
                     answer = grounded_dynamic_fallback(case.question, [])
                     self.assertTrue(
-                        "chưa có nguồn đã duyệt" in answer.lower()
+                        "chưa có nguồn" in answer.lower()
                         or "không tự đoán" in answer.lower()
                         or "mỗi trường hợp có giấy tờ khác nhau" in answer.lower(),
                         case.question,

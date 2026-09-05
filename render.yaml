@@ -18,6 +18,12 @@ services:
           property: connectionString
       - key: HISTORY_HMAC_SECRET
         generateValue: true
+      - key: OFFICER_API_TOKEN
+        sync: false
+      - key: PRODUCTION_MODE
+        value: "true"
+      - key: ENABLE_DEMO_CONSOLE
+        value: "false"
       - key: ANSWER_MODEL
         value: openai/gpt-oss-120b
       - key: FULL_CORE_CANDIDATE_MODEL

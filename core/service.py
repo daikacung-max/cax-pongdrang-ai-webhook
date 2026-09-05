@@ -7,6 +7,7 @@ from config import (
     MAX_HISTORY_MESSAGES,
 )
 from core import db
+from core import cases
 from core.answerer import answer as generate_answer, answer_dynamic_text
 from core.history import conversation_key
 from core.intake import assess as assess_intake, prompt_hint as intake_prompt_hint
@@ -124,11 +125,13 @@ class AICore:
             fallback_reason = "no_source"
             with timer.stage("finalize_ms"):
                 final_answer = finalize(grounded_dynamic_fallback(fallback_question, []))
+            final_answer, handoff = self._record_ready_intake(user_id, intake, final_answer)
             meta = {
                 "legal": True, "retrieved_unit_ids": [], "verified": False,
                 "repaired": False, "verification_errors": ["no_verified_source"],
                 "dynamic": bool(dynamic), "path": "legal_no_source_fail_closed",
                 "intake": intake,
+                "handoff": handoff,
                 **_model_meta(model_used),
             }
             self._save(user_id, question, final_answer, search_plan, meta)
@@ -137,7 +140,7 @@ class AICore:
                 model_used=model_used,
                 retrieved_unit_count=0,
             )
-            return {"answer": final_answer, "meta": meta, "_telemetry": telemetry}
+            return {"answer": final_answer, "meta": meta, "handoff": handoff, "_telemetry": telemetry}
 
         if dynamic:
             verified = False
@@ -177,6 +180,7 @@ class AICore:
 
             with timer.stage("finalize_ms"):
                 final_answer = finalize(raw_answer)
+            final_answer, handoff = self._record_ready_intake(user_id, intake, final_answer)
             meta = {
                 "legal": bool(search_plan.get("is_legal")),
                 "retrieved_unit_ids": [x["id"] for x in legal_units],
@@ -184,6 +188,7 @@ class AICore:
                 "verification_errors": verification_errors,
                 "dynamic": True, "path": "single_call_or_grounded_fallback",
                 "intake": intake,
+                "handoff": handoff,
                 **_model_meta(model_used),
             }
             self._save(user_id, question, final_answer, search_plan, meta)
@@ -192,7 +197,7 @@ class AICore:
                 model_used=model_used,
                 retrieved_unit_count=len(legal_units),
             )
-            return {"answer": final_answer, "meta": meta, "_telemetry": telemetry}
+            return {"answer": final_answer, "meta": meta, "handoff": handoff, "_telemetry": telemetry}
 
         if ENABLE_MODEL_ESCALATION and search_plan.get("complexity") == "complex":
             model_used = ESCALATION_MODEL
@@ -246,6 +251,7 @@ class AICore:
 
         with timer.stage("finalize_ms"):
             final_answer = finalize(raw_answer, contact_recommended=contact_recommended)
+        final_answer, handoff = self._record_ready_intake(user_id, intake, final_answer)
         meta = {
             "legal": bool(search_plan.get("is_legal")),
             "retrieved_unit_ids": [x["id"] for x in legal_units],
@@ -253,6 +259,7 @@ class AICore:
             "verification_errors": verification.get("errors", []),
             "dynamic": False, "path": "structured_verified",
             "intake": intake,
+            "handoff": handoff,
             **_model_meta(model_used), "models_used": models_used,
         }
         self._save(user_id, question, final_answer, search_plan, meta)
@@ -261,7 +268,18 @@ class AICore:
             model_used=model_used,
             retrieved_unit_count=len(legal_units),
         )
-        return {"answer": final_answer, "meta": meta, "_telemetry": telemetry}
+        return {"answer": final_answer, "meta": meta, "handoff": handoff, "_telemetry": telemetry}
+
+    @staticmethod
+    def _record_ready_intake(user_id, intake, answer_text):
+        """Ghi hồ sơ sau khi người dân yêu cầu tiếp nhận và đã đủ dữ kiện."""
+        handoff = cases.create_or_get_open(user_id, intake)
+        if handoff and handoff.get("created"):
+            answer_text = (
+                f"{answer_text} Yêu cầu của anh/chị đã được ghi nhận với mã "
+                f"{handoff['case_id']} để bộ phận chuyên môn tiếp nhận."
+            )
+        return answer_text, handoff
 
     @staticmethod
     def _save(user_id, question, final_answer, search_plan, meta):
