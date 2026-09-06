@@ -27,6 +27,7 @@ VBEE_APP_ID = os.getenv("VBEE_APP_ID", "").strip()
 VBEE_ACCESS_TOKEN = os.getenv("VBEE_ACCESS_TOKEN", "").strip()
 VBEE_VOICE_CODE = os.getenv("VBEE_VOICE_CODE", "").strip()
 VBEE_TTS_API_TOKEN = os.getenv("VBEE_TTS_API_TOKEN", "").strip()
+VBEE_CALLBACK_SECRET = os.getenv("VBEE_CALLBACK_SECRET", "").strip()
 VBEE_AUDIO_TYPE = os.getenv("VBEE_AUDIO_TYPE", "mp3").strip().lower() or "mp3"
 VBEE_SPEED_RATE = float(os.getenv("VBEE_SPEED_RATE", "0.95"))
 VBEE_BITRATE = int(os.getenv("VBEE_BITRATE", "128"))
@@ -44,6 +45,10 @@ class VbeeError(RuntimeError):
 
 def configured() -> bool:
     return bool(VBEE_APP_ID and VBEE_ACCESS_TOKEN and VBEE_VOICE_CODE)
+
+
+def callback_secured() -> bool:
+    return bool(VBEE_CALLBACK_SECRET)
 
 
 def _auth_headers() -> dict[str, str]:
@@ -81,7 +86,7 @@ def _safe_speed(value: Any) -> float:
         speed = float(value)
     except (TypeError, ValueError):
         speed = VBEE_SPEED_RATE
-    # Keep within a conservative range suitable for Vietnamese speech.
+    # Conservative range that remains natural for Vietnamese speech.
     return min(1.9, max(0.5, speed))
 
 
@@ -179,6 +184,7 @@ def health():
         "status": "ok",
         "provider": "vbee",
         "configured": configured(),
+        "callback_secured": callback_secured(),
         "voice_configured": bool(VBEE_VOICE_CODE),
         "audio_type": VBEE_AUDIO_TYPE,
         "speed_rate": VBEE_SPEED_RATE,
@@ -192,13 +198,19 @@ def create_audio():
         return jsonify({"error": "Không được phép."}), 401
     if not configured():
         return jsonify({"error": "Vbee chưa được cấu hình đầy đủ."}), 503
+    if not callback_secured():
+        return jsonify({"error": "Callback Vbee chưa được bảo vệ."}), 503
 
     data = request.get_json(silent=True) or {}
     text = _clean_text(data.get("text"))
     if not text:
         return jsonify({"error": "text là bắt buộc."}), 400
 
-    callback_url = url_for("vbee.callback", _external=True)
+    callback_url = url_for(
+        "vbee.callback",
+        key=VBEE_CALLBACK_SECRET,
+        _external=True,
+    )
     try:
         result = submit_tts(
             text,
@@ -236,11 +248,14 @@ def audio_status(request_id: str):
 
 @blueprint.post("/vbee/callback")
 def callback():
-    """Receive asynchronous Vbee result without exposing private credentials."""
+    """Receive asynchronous Vbee output through an unguessable callback URL."""
+    supplied_key = str(request.args.get("key") or "").strip()
+    if not VBEE_CALLBACK_SECRET or not hmac.compare_digest(supplied_key, VBEE_CALLBACK_SECRET):
+        return jsonify({"success": False}), 401
+
     data = request.get_json(silent=True) or {}
     app_id = str(data.get("app_id") or "").strip()
     request_id = str(data.get("request_id") or "").strip()
-
     if not VBEE_APP_ID or not app_id or not hmac.compare_digest(app_id, VBEE_APP_ID):
         return jsonify({"success": False}), 401
     if not request_id:
