@@ -303,6 +303,15 @@ def grounded_dynamic_fallback(question, retrieved_units):
 
     q = norm(question)
 
+    if any(unit.get("document_id") == "NOISE_KARAOKE_282_2025" for unit in retrieved_units):
+        return (
+            "Việc hát karaoke gây ảnh hưởng không nên được hiểu là chỉ sau một mốc giờ cố định mới cần xử lý. "
+            "Nghị định 282/2025/NĐ-CP có hiệu lực từ 15/12/2025 quy định riêng các hành vi về bảo đảm sự yên tĩnh chung; "
+            "còn hành vi tiếng ồn chưa được Nghị định này quy định thì áp dụng quy định về xử phạt trong lĩnh vực bảo vệ môi trường và văn bản liên quan. "
+            "Vì vậy cần xác minh nơi xảy ra, mức độ ảnh hưởng và diễn biến thực tế trước khi xác định căn cứ xử lý. "
+            "Anh/chị nên ghi lại thời điểm, video hoặc âm thanh nếu có và phản ánh trực tiếp khi sự việc đang diễn ra; hiện việc này xảy ra ở khu dân cư hay tại nơi công cộng?"
+        )
+
     if any(unit.get("document_id") == "CITIZEN_ID_REISSUE_PROVINCIAL_2026" for unit in retrieved_units):
         return (
             "Trường hợp mất thẻ Căn cước, thủ tục cấp lại hiện được thực hiện tại cơ quan quản lý căn cước của Công an cấp tỉnh. "

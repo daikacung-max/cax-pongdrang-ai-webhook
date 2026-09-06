@@ -91,9 +91,9 @@ class DemoTests(unittest.TestCase):
 
     def test_karaoke_noise_is_not_misread_as_a_business_procedure(self):
         result = respond(str(uuid.uuid4()), "Hàng xóm hát karaoke ồn ào quá")
-        self.assertEqual(result["source_state"], "no_source")
-        self.assertIn("tiếng ồn sinh hoạt", result["answer"])
-        self.assertIn("thời điểm nào", result["answer"])
+        self.assertEqual(result["source_state"], "grounded")
+        self.assertIn("Nghị định 282/2025/NĐ-CP", result["answer"])
+        self.assertIn("xác minh", result["answer"])
         self.assertNotIn("ngành nghề", result["answer"])
 
     def test_demo_console_is_off_by_default(self):

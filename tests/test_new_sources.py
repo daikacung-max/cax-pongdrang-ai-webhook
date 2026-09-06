@@ -7,6 +7,15 @@ from core.verifier import grounded_dynamic_fallback
 
 
 class NewVerifiedSourcesTests(unittest.TestCase):
+
+    def test_karaoke_noise_uses_article_9_source_without_a_fixed_hour_rule(self):
+        plan = {"is_legal": True, "search_queries": ["Hàng xóm hát karaoke ồn ào thì xử lý sao?"]}
+        units = retrieve(plan, "Hàng xóm hát karaoke ồn ào thì xử lý sao?")
+        self.assertTrue(units)
+        self.assertTrue(all(unit["document_id"] == "NOISE_KARAOKE_282_2025" for unit in units))
+        response = grounded_dynamic_fallback("Hàng xóm hát karaoke ồn ào thì xử lý sao?", units)
+        self.assertIn("không nên được hiểu là chỉ sau một mốc giờ", response)
+        self.assertIn("xác minh", response)
     @classmethod
     def setUpClass(cls):
         ensure_legal_db()

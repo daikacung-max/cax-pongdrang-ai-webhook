@@ -460,3 +460,77 @@ def ensure_verified_sources():
 
     db.upsert_document({"id":"FRAUD_TRANSFER_GUIDANCE_2026","title":"Khuyến cáo xử lý khi nghi bị lừa đảo chuyển khoản","number":"Khuyến cáo Bộ Công an 2026","issuer":"Bộ Công an","effective_from":None,"source_path":"https://bocongan.gov.vn/bai-viet/tp-can-tho-canh-giac-voi-cac-chieu-tro-lua-dao-mua-tuu-truong-1785748998","sha256":None,"metadata":{"checked":"2026-09-05","official":True}})
     db.replace_document_units("FRAUD_TRANSFER_GUIDANCE_2026", [{"id":"FRAUD_TRANSFER_GUIDANCE_2026:response","unit_type":"guidance","title":"Xử lý an toàn khi nghi bị lừa đảo chuyển khoản","text":"Khi nghi bị lừa đảo, người dân nhanh chóng liên hệ ngân hàng để đề nghị hỗ trợ tạm dừng hoặc phong tỏa giao dịch nếu có; lưu giữ tin nhắn, số điện thoại, tài khoản ngân hàng, mã QR, đường dẫn và thông tin liên quan; trình báo cơ quan Công an nơi gần nhất để được hướng dẫn, tiếp nhận, xác minh và xử lý theo quy định."}])
+
+    # ------------------------------------------------------------------
+    # 5) TIẾNG ỒN, KARAOKE VÀ BẢO ĐẢM SỰ YÊN TĨNH CHUNG
+    # ------------------------------------------------------------------
+    # Tài liệu tổng hợp do đơn vị cung cấp được ghi nhận bằng dấu vân tay để
+    # đối chiếu phiên bản. Một tài liệu tổng hợp không tự động được phép mở
+    # rộng phạm vi tư vấn: từng văn bản/điều khoản chỉ được kích hoạt sau khi
+    # đối chiếu hiệu lực và nguồn gốc chính thức.
+    db.upsert_document({
+        "id": "USER_LEGAL_COMPENDIUM_2026",
+        "title": "Tài liệu pháp luật tổng hợp tất cả các quy định liên quan",
+        "number": "Tài liệu do đơn vị cung cấp",
+        "issuer": "Nguồn nội bộ, chờ đối chiếu từng văn bản",
+        "effective_from": None,
+        "source_path": "user-provided://legal-compendium/sha256/3b3658684dd9f88fcc54ffa09928b863890a923b38411a2ea07bc31315751d15",
+        "sha256": "3b3658684dd9f88fcc54ffa09928b863890a923b38411a2ea07bc31315751d15",
+        "metadata": {
+            "catalogued": "2026-09-06",
+            "page_count": 2322,
+            "activation_policy": "per-document official verification required",
+        },
+    })
+
+    # Chỉ lưu đúng nội dung Điều 9. Không suy diễn Điều này thành một mức phạt
+    # chung áp dụng tự động cho mọi trường hợp hát karaoke tại nhà.
+    db.upsert_document({
+        "id": "NOISE_KARAOKE_282_2025",
+        "title": "Vi phạm quy định về bảo đảm sự yên tĩnh chung",
+        "number": "Nghị định 282/2025/NĐ-CP, Điều 9",
+        "issuer": "Chính phủ",
+        "effective_from": "2025-12-15",
+        "source_path": "https://vanban.chinhphu.vn/?classid=1&docid=215770&pageid=27160&typegroupid=4",
+        "sha256": None,
+        "metadata": {"checked": "2026-09-06", "official": True},
+    })
+    db.replace_document_units("NOISE_KARAOKE_282_2025", [
+        {
+            "id": "NOISE_KARAOKE_282_2025:quiet_places",
+            "unit_type": "article",
+            "article": "9",
+            "clause": "1",
+            "title": "Giữ yên tĩnh tại nơi có quy định phải giữ yên tĩnh chung",
+            "text": (
+                "Nghị định 282/2025/NĐ-CP có hiệu lực từ ngày 15/12/2025. Điều 9 khoản 1 quy định phạt cảnh cáo "
+                "hoặc phạt tiền từ 500.000 đồng đến 1.000.000 đồng đối với hành vi không thực hiện các quy định về giữ yên tĩnh "
+                "của cơ sở khám bệnh, chữa bệnh, nhà điều dưỡng, trường học hoặc ở những nơi khác có quy định phải giữ yên tĩnh chung."
+            ),
+        },
+        {
+            "id": "NOISE_KARAOKE_282_2025:public_propaganda",
+            "unit_type": "article",
+            "article": "9",
+            "clause": "2",
+            "title": "Dùng phương tiện để cổ động ở nơi công cộng không được phép",
+            "text": (
+                "Điều 9 khoản 2 Nghị định 282/2025/NĐ-CP phạt tiền từ 1.000.000 đồng đến 2.000.000 đồng "
+                "đối với hành vi dùng loa phóng thanh, chiêng, trống, còi, kèn hoặc các phương tiện khác để cổ động ở nơi công cộng "
+                "mà không được phép của cơ quan có thẩm quyền. Hành vi này có thể bị tịch thu tang vật, phương tiện vi phạm hành chính theo khoản 4 Điều 9."
+            ),
+        },
+        {
+            "id": "NOISE_KARAOKE_282_2025:other_noise",
+            "unit_type": "article",
+            "article": "9",
+            "clause": "3",
+            "title": "Hành vi tiếng ồn chưa được quy định tại Nghị định 282",
+            "text": (
+                "Điều 9 khoản 3 Nghị định 282/2025/NĐ-CP quy định các hành vi vi phạm hành chính về tiếng ồn "
+                "chưa được quy định tại Nghị định này được xử lý, xử phạt theo Nghị định của Chính phủ về xử phạt vi phạm hành chính "
+                "trong lĩnh vực bảo vệ môi trường và các văn bản quy phạm pháp luật có liên quan. Vì vậy, với karaoke tại nhà hoặc khu dân cư, "
+                "cần xác minh địa điểm, mức độ, diễn biến và căn cứ áp dụng; không tự động kết luận mức phạt chỉ từ một phản ánh."
+            ),
+        },
+    ])

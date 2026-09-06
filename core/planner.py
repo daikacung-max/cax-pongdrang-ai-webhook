@@ -85,6 +85,8 @@ SEARCH_VOCAB = [
      "Cấp thẻ căn cước cho người dưới 14 tuổi thực hiện tại Công an cấp xã"),
     (["to giac", "tin bao toi pham", "trinh bao toi pham"],
      "Hướng dẫn tố giác báo tin về tội phạm Công an cấp xã"),
+    (["karaoke", "hat karaoke", "loa keo", "tieng on", "on ao", "on nhieu"],
+     "Nghị định 282/2025/NĐ-CP Điều 9 tiếng ồn karaoke bảo đảm sự yên tĩnh chung"),
 ]
 
 LEGAL_HINTS = [
@@ -94,7 +96,7 @@ LEGAL_HINTS = [
     "dinh danh dien tu", "tai khoan dinh danh", "xe mo to", "xe may", "xe gan may", "bien so xe", "ho khau", "nhap khau",
     # Các cụm dưới đây vẫn đi vào cổng fail-closed nếu chưa có nguồn được duyệt;
     # chúng không cho phép model tự trả lời chi tiết bằng kiến thức nền.
-    "ho chieu", "xuat nhap canh", "thi thuc", "ly lich tu phap", "khieu nai", "to cao", "don thu", "khoi kien", "toa an", "thi hanh an", "trieu tap", "dieu tra", "luat su", "dat dai", "tranh chap dat", "nha o", "thue nha", "ly hon", "thua ke", "hop dong", "vay tien", "no tien", "lao dong", "bao hiem xa hoi", "bhxh", "thue", "hoa don", "khai sinh", "khai tu", "ket hon", "ho tich", "tai khoan bi hack", "mat zalo", "mat facebook", "o nhiem", "tieng on", "xay dung", "phong chay", "chua chay", "pccc", "co bac", "bao luc gia dinh", "xam hai tre em", "mat nguoi", "that lac nguoi", "vu khi", "cong cu ho tro", "phao", "phat giao thong", "phat nguoi", "giay phep lai xe",
+    "ho chieu", "xuat nhap canh", "thi thuc", "ly lich tu phap", "khieu nai", "to cao", "don thu", "khoi kien", "toa an", "thi hanh an", "trieu tap", "dieu tra", "luat su", "dat dai", "tranh chap dat", "nha o", "thue nha", "ly hon", "thua ke", "hop dong", "vay tien", "no tien", "lao dong", "bao hiem xa hoi", "bhxh", "thue", "hoa don", "khai sinh", "khai tu", "ket hon", "ho tich", "tai khoan bi hack", "mat zalo", "mat facebook", "o nhiem", "tieng on", "karaoke", "loa keo", "xay dung", "phong chay", "chua chay", "pccc", "co bac", "bao luc gia dinh", "xam hai tre em", "mat nguoi", "that lac nguoi", "vu khi", "cong cu ho tro", "phao", "phat giao thong", "phat nguoi", "giay phep lai xe",
 ]
 
 
