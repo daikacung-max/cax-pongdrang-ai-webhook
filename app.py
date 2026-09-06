@@ -178,6 +178,36 @@ def _valid_zalo_webhook_signature(data, raw_body):
     return hmac.compare_digest(supplied.lower(), expected)
 
 
+def _zalo_dynamic_uid():
+    """Read only a user identifier from common Dynamic-action envelopes.
+
+    Dynamic must never consume an unscoped pending message: that could pair one
+    person's question with another person's reply.  We deliberately do not
+    accept message text here; the signed webhook remains the sole message
+    source.
+    """
+    data = request.get_json(silent=True) or {}
+    sender = data.get("sender") or {}
+    user = data.get("user") or {}
+    nested = data.get("data") or {}
+    candidates = (
+        request.args.get("uid"),
+        request.args.get("user_id"),
+        request.headers.get("X-Zalo-User-ID"),
+        data.get("uid"),
+        data.get("user_id"),
+        sender.get("id"),
+        user.get("id"),
+        nested.get("uid"),
+        nested.get("user_id"),
+    )
+    for value in candidates:
+        value = str(value or "").strip()
+        if value:
+            return value
+    return ""
+
+
 @app.route("/", methods=["GET"])
 def home():
     return f"{UNIT_NAME} - AI CORE", 200
@@ -335,13 +365,21 @@ def zalo_dynamic():
         return dynamic_response("Trợ lý AI đang ở chế độ pilot nội bộ, chưa nhận tin nhắn Zalo công khai.")
     request_started = time.perf_counter()
     trace_id = new_trace_id()
-    uid = str(
-        request.args.get("uid")
-        or request.headers.get("X-Zalo-User-ID")
-        or ""
-    ).strip()
+    uid = _zalo_dynamic_uid()
+    if not uid:
+        log_zalo_latency(app.logger, {
+            "trace_id": trace_id,
+            "pending_wait_ms": 0.0,
+            "total_ms": round((time.perf_counter() - request_started) * 1000, 2),
+            "fallback_reason": "pending_missing",
+            "model_used": DYNAMIC_ANSWER_MODEL,
+            "retrieved_unit_count": 0,
+        })
+        return dynamic_response(
+            "Phiên trò chuyện chưa được liên kết. Anh/chị vui lòng gửi lại tin nhắn qua OA."
+        )
     pending_started = time.perf_counter()
-    item = pending.pop(user_id=uid or None)
+    item = pending.pop(user_id=uid)
     pending_wait_ms = round((time.perf_counter() - pending_started) * 1000, 2)
     if not item:
         log_zalo_latency(app.logger, {

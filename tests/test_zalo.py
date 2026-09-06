@@ -55,6 +55,23 @@ class ZaloAdapterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(body["content"]["messages"][0]["type"], "text")
 
+    def test_dynamic_without_uid_never_consumes_another_users_pending_message(self):
+        with patch("app.ZALO_WEBHOOK_ENABLED", True), patch("app.pending.pop") as pop:
+            with app.test_client() as client:
+                response = client.get("/zalo/ai")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("chưa được liên kết", response.get_json()["content"]["messages"][0]["text"])
+        pop.assert_not_called()
+
+    def test_dynamic_accepts_uid_from_zalo_sender_envelope(self):
+        with patch("app.ZALO_WEBHOOK_ENABLED", True), patch("app.pending.pop", return_value=None) as pop:
+            with app.test_client() as client:
+                response = client.post("/zalo/ai", json={"sender": {"id": "user-1"}})
+
+        self.assertEqual(response.status_code, 200)
+        pop.assert_called_once_with(user_id="user-1")
+
     def test_health_and_article_134(self):
         with app.test_client() as client:
             health = client.get("/health")
