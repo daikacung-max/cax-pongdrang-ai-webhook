@@ -34,7 +34,20 @@ class DynamicServiceTests(unittest.TestCase):
             result = core.chat(user_id, "Tôi bị mất căn cước, cần làm gì?", dynamic=False)
         self.assertEqual(result["_telemetry"]["fallback_reason"], "llm_error")
         self.assertEqual(result["meta"]["path"], "full_core_grounded_fallback")
+        self.assertEqual(
+            result["meta"]["verification_errors"],
+            ["full_core_fallback:provider_error"],
+        )
         self.assertNotIn("AI Core chưa xử lý", result["answer"])
+
+    def test_full_core_provider_status_is_sanitized(self):
+        user_id = "service-test-" + uuid.uuid4().hex
+        with patch("core.service.generate_answer", side_effect=LLMError("groq HTTP 400: private body")):
+            result = core.chat(user_id, "Tôi bị mất căn cước, cần làm gì?", dynamic=False)
+        self.assertEqual(
+            result["meta"]["verification_errors"],
+            ["full_core_fallback:provider_http_400"],
+        )
 
     def test_full_core_repair_error_returns_grounded_fallback(self):
         user_id = "service-test-" + uuid.uuid4().hex

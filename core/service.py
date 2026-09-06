@@ -82,6 +82,22 @@ def _model_meta(model):
     return {"model": model, "provider": provider_name_for_model(model)}
 
 
+def _safe_provider_error_code(exc):
+    """Mã lỗi công khai, không đưa nội dung provider/đề bài vào API hay lịch sử."""
+    if isinstance(exc, LLMTimeout):
+        return "provider_timeout"
+
+    message = str(exc or "").lower()
+    for status in (400, 401, 403, 404, 408, 409, 413, 422, 429, 500, 502, 503, 504):
+        if f"http {status}" in message:
+            return f"provider_http_{status}"
+    if "không đọc được text output" in message:
+        return "empty_or_invalid_text_output"
+    if "không đọc được structured output" in message:
+        return "empty_or_invalid_structured_output"
+    return "provider_error"
+
+
 class AICore:
     """Conversation -> Plan -> Retrieve -> Answer -> Verify -> Repair -> Finalize"""
 
@@ -318,7 +334,7 @@ class AICore:
             "legal": bool(search_plan.get("is_legal")),
             "retrieved_unit_ids": [x["id"] for x in legal_units],
             "verified": False, "repaired": False,
-            "verification_errors": [f"full_core_fallback:{type(exc).__name__}"],
+            "verification_errors": [f"full_core_fallback:{_safe_provider_error_code(exc)}"],
             "dynamic": False, "path": "full_core_grounded_fallback",
             "intake": intake,
             "handoff": handoff,
