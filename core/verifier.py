@@ -214,6 +214,13 @@ def verify(draft, retrieved_units, question=""):
         if risky:
             errors.append("Giấy tờ/cách gọi đăng ký xe không được nguồn hỗ trợ: " + ", ".join(risky))
 
+    # Khi provider dùng text mode, pháp luật vẫn phải được kiểm chứng trực tiếp
+    # trên câu trả lời, không chỉ dựa vào danh sách legal_claims có cấu trúc.
+    direct_answer_check = verify_dynamic_text(answer_text, retrieved_units, question=question)
+    for error in direct_answer_check["errors"]:
+        if error not in errors:
+            errors.append(error)
+
     return {"ok": not errors, "errors": errors, "verified_claims": verified_claims, "allowed_articles": sorted(allowed_articles)}
 
 

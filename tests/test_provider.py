@@ -39,6 +39,14 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(provider.payload["safety_identifier"], "h1_test")
         self.assertNotIn("temperature", provider.payload)
 
+    def test_full_groq_answer_uses_text_mode(self):
+        with patch("core.answerer.chat_text", return_value="Anh/chị nên giữ lại video camera.") as text_call:
+            from core.answerer import answer
+            result = answer("Tôi có camera", [], legal_context="SOURCE", model="openai/gpt-oss-20b")
+        self.assertEqual(result["answer"], "Anh/chị nên giữ lại video camera.")
+        self.assertEqual(result["legal_claims"], [])
+        text_call.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

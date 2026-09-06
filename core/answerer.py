@@ -118,6 +118,27 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None,
            model=None, safety_identifier=None, intake_hint=""):
     model = model or (DYNAMIC_ANSWER_MODEL if dynamic else ANSWER_MODEL)
     is_groq_oss = str(model).startswith("openai/gpt-oss")
+    # Groq GPT-OSS xử lý text chat ổn định hơn JSON schema khi ngữ cảnh gồm
+    # nhiều đoạn nguồn. Verifier vẫn kiểm tra toàn bộ câu trả lời trước khi gửi.
+    if is_groq_oss and not dynamic:
+        return {
+            "answer": chat_text(
+                model=model,
+                messages=build_messages(
+                    question, history, legal_context=legal_context, repair_note=repair_note,
+                    intake_hint=intake_hint,
+                ),
+                reasoning_effort=GROQ_CORE_REASONING_EFFORT,
+                timeout=CORE_TIMEOUT_SECONDS,
+                temperature=0.05 if legal_context else 0.25,
+                max_completion_tokens=480,
+                safety_identifier=safety_identifier,
+            ),
+            "legal_claims": [],
+            "needs_followup": False,
+            "followup_question": None,
+            "contact_recommended": False,
+        }
     return chat_structured(
         model=model,
         messages=build_messages(
