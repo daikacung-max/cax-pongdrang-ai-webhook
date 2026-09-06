@@ -308,7 +308,10 @@ def zalo_webhook():
     if request.method == "GET":
         return "OK", 200
     if not ZALO_WEBHOOK_ENABLED:
-        return jsonify({"success": False, "error": "Zalo pilot is not enabled."}), 503
+        # Zalo validates webhook URLs with a POST request and accepts only 200.
+        # Until the signed live integration is enabled, acknowledge configuration
+        # without reading, storing, or queuing the supplied event.
+        return jsonify({"success": True, "status": "webhook_configuration_pending"}), 200
     raw_body = request.get_data(cache=True, as_text=True)
     data = request.get_json(silent=True) or {}
     if not _valid_zalo_webhook_signature(data, raw_body):

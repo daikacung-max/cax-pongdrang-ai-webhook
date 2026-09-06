@@ -10,6 +10,20 @@ from core.llm import LLMError
 
 
 class ZaloAdapterTests(unittest.TestCase):
+    def test_disabled_webhook_acknowledges_configuration_without_processing(self):
+        payload = {
+            "event_name": "user_send_text",
+            "sender": {"id": "user-1"},
+            "message": {"text": "Xin chào"},
+        }
+        with patch("app.ZALO_WEBHOOK_ENABLED", False), patch("app.pending.push") as push:
+            with app.test_client() as client:
+                response = client.post("/zalo/webhook", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["status"], "webhook_configuration_pending")
+        push.assert_not_called()
+
     def test_pending_wait_handles_get_before_webhook(self):
         queue = PendingZaloMessages()
 
