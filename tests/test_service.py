@@ -52,7 +52,7 @@ class DynamicServiceTests(unittest.TestCase):
     def test_full_core_repair_error_returns_grounded_fallback(self):
         user_id = "service-test-" + uuid.uuid4().hex
         rejected_draft = {
-            "answer": "Bạn nên lưu giữ video camera nếu có.",
+            "answer": "Người kia chắc chắn phạm Điều 148.",
             "legal_claims": [],
             "needs_followup": False,
             "followup_question": None,

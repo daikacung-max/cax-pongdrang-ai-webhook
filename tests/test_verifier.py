@@ -1,6 +1,6 @@
 import unittest
 
-from core.verifier import verify, verify_dynamic_text
+from core.verifier import normalize_citizen_address, verify, verify_dynamic_text
 
 
 ARTICLE_134 = {
@@ -28,6 +28,24 @@ class DynamicVerifierTests(unittest.TestCase):
         )
         self.assertFalse(result["ok"])
         self.assertTrue(any("unsupported_numbers" in x for x in result["errors"]))
+
+    def test_allows_instruction_step_numbers_but_not_legal_numbers(self):
+        allowed = verify_dynamic_text(
+            "Bước 1: mở ứng dụng. 2. Chọn nội dung cần thực hiện.",
+            [ARTICLE_134], question="Tôi bị thương 5%."
+        )
+        rejected = verify_dynamic_text(
+            "Bước 1: mở ứng dụng. Thời hạn là 45 ngày.",
+            [ARTICLE_134], question="Tôi bị thương 5%."
+        )
+        self.assertTrue(allowed["ok"], allowed["errors"])
+        self.assertIn("unsupported_numbers:45", rejected["errors"])
+
+    def test_normalizes_citizen_address_before_service_verification(self):
+        self.assertEqual(
+            normalize_citizen_address("Bạn cần giữ lại video."),
+            "anh/chị cần giữ lại video.",
+        )
 
     def test_allows_question_number_and_source_exception(self):
         result = verify_dynamic_text(

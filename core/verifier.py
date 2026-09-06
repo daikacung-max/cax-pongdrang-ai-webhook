@@ -18,6 +18,19 @@ def _numbers(text):
     return set(re.findall(r"\b\d+(?:[.,]\d+)?%?\b", str(text or "")))
 
 
+def normalize_citizen_address(text):
+    """Chuẩn hoá đại từ trước khi kiểm chứng; không sửa nội dung pháp lý."""
+    return re.sub(r"(?i)\bbạn\b", "anh/chị", str(text or ""))
+
+
+def _instruction_step_numbers(text):
+    """Số thứ tự trình bày không phải số liệu pháp lý hay thủ tục."""
+    text = str(text or "")
+    indexed_lines = re.findall(r"(?:^|[\n.;:])\s*(\d+)\s*[.)]\s+", text)
+    named_steps = re.findall(r"(?i)\b(?:bước|mục|phần)\s+(\d+)\b", text)
+    return set(indexed_lines + named_steps)
+
+
 def _has_exception_structure(text):
     q = norm(text)
     return any(x in q for x in ["hoac duoi", "nhung thuoc", "tru truong hop", "thuoc mot trong cac truong hop", "ngoai tru"])
@@ -234,7 +247,11 @@ def verify_dynamic_text(answer, retrieved_units, question=""):
         errors.append("unsupported_articles:" + ",".join(unsupported))
     source_blob = "\n".join(str(x.get("text") or "") for x in retrieved_units)
     allowed_numbers = _numbers(source_blob) | _numbers(question) | _numbers(HOTLINE)
-    unsupported_numbers = sorted(_numbers(answer) - allowed_numbers)
+    # Chỉ chặn số liệu có ý nghĩa pháp lý/thủ tục. Các chỉ mục kiểu "Bước 1"
+    # hoặc "2. ..." là cấu trúc hội thoại, không phải một khẳng định số liệu.
+    unsupported_numbers = sorted(
+        (_numbers(answer) - _instruction_step_numbers(answer)) - allowed_numbers
+    )
     if unsupported_numbers:
         errors.append("unsupported_numbers:" + ",".join(unsupported_numbers))
     if _is_overbroad_negative(answer) and _has_exception_structure(source_blob) and not _acknowledges_exception(answer):

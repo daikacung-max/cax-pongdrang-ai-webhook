@@ -24,6 +24,7 @@ from core.verifier import (
     repair_note,
     verify,
     verify_dynamic_text,
+    normalize_citizen_address,
 )
 
 
@@ -172,6 +173,7 @@ class AICore:
                         safety_identifier=safety_identifier,
                         intake_hint=intake_hint,
                     )
+                raw_answer = normalize_citizen_address(raw_answer)
                 models_used.append(model_used)
                 with timer.stage("verify_ms"):
                     check = verify_dynamic_text(raw_answer, legal_units, question=question)
@@ -225,6 +227,7 @@ class AICore:
                     question, history, legal_context=legal_context, dynamic=False,
                     model=model_used, safety_identifier=safety_identifier, intake_hint=intake_hint,
                 )
+            draft["answer"] = normalize_citizen_address(draft.get("answer"))
         except (LLMTimeout, LLMError) as exc:
             return self._full_core_llm_fallback(
                 exc, timer, user_id, question, intake, fallback_question, legal_units,
@@ -244,6 +247,7 @@ class AICore:
                         repair_note=repair_note(verification), model=model_used,
                         safety_identifier=safety_identifier, intake_hint=intake_hint,
                     )
+                draft["answer"] = normalize_citizen_address(draft.get("answer"))
             except (LLMTimeout, LLMError) as exc:
                 return self._full_core_llm_fallback(
                     exc, timer, user_id, question, intake, fallback_question, legal_units,
@@ -265,6 +269,7 @@ class AICore:
                         repair_note=repair_note(verification), model=model_used,
                         safety_identifier=safety_identifier, intake_hint=intake_hint,
                     )
+                draft["answer"] = normalize_citizen_address(draft.get("answer"))
             except (LLMTimeout, LLMError) as exc:
                 return self._full_core_llm_fallback(
                     exc, timer, user_id, question, intake, fallback_question, legal_units,
