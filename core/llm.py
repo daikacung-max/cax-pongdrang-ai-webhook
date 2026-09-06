@@ -46,7 +46,6 @@ def chat_structured(model, messages, schema_name, schema, reasoning_effort="low"
         payload["temperature"] = temperature
     if str(model).startswith("openai/gpt-oss"):
         payload["reasoning_effort"] = reasoning_effort
-        payload["reasoning_format"] = "hidden"
 
     response = _post(model, payload, timeout, safety_identifier=safety_identifier)
     try:
@@ -71,7 +70,6 @@ def chat_text(model, messages, reasoning_effort="low", timeout=1.6,
         payload["temperature"] = temperature
     if str(model).startswith("openai/gpt-oss"):
         payload["reasoning_effort"] = reasoning_effort
-        payload["reasoning_format"] = "hidden"
 
     response = _post(model, payload, timeout, safety_identifier=safety_identifier)
     try:

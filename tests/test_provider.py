@@ -39,6 +39,13 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(provider.payload["safety_identifier"], "h1_test")
         self.assertNotIn("temperature", provider.payload)
 
+    def test_gpt_oss_payload_omits_optional_reasoning_format(self):
+        provider = FakeProvider()
+        with patch("core.llm.provider_for_model", return_value=provider):
+            llm.chat_text("openai/gpt-oss-20b", [{"role": "user", "content": "Chào"}])
+        self.assertEqual(provider.payload["reasoning_effort"], "low")
+        self.assertNotIn("reasoning_format", provider.payload)
+
     def test_full_groq_answer_uses_text_mode(self):
         with patch("core.answerer.chat_text", return_value="Anh/chị nên giữ lại video camera.") as text_call:
             from core.answerer import answer
