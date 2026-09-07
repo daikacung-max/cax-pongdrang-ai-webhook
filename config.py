@@ -50,6 +50,9 @@ ZALO_WEBHOOK_ENABLED = os.getenv("ZALO_WEBHOOK_ENABLED", "true").lower() in ("1"
 ZALO_WEBHOOK_SIGNATURE_REQUIRED = os.getenv("ZALO_WEBHOOK_SIGNATURE_REQUIRED", "false").lower() in ("1", "true", "yes", "on")
 ZALO_APP_ID = os.getenv("ZALO_APP_ID", "").strip()
 ZALO_OA_SECRET_KEY = os.getenv("ZALO_OA_SECRET_KEY", "").strip()
+# OA access token is stored only as a Render secret; direct replies remain off by default.
+ZALO_OA_ACCESS_TOKEN = os.getenv("ZALO_OA_ACCESS_TOKEN", "").strip()
+ZALO_DIRECT_REPLY_ENABLED = os.getenv("ZALO_DIRECT_REPLY_ENABLED", "false").lower() in ("1", "true", "yes", "on")
 
 # Lịch sử hội thoại dùng Postgres khi DATABASE_URL được cấu hình; local/test vẫn
 # dùng SQLite. user_id luôn được HMAC trước khi ghi xuống storage.
