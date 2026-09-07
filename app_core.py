@@ -26,6 +26,8 @@ from config import (
     ZALO_WEBHOOK_SIGNATURE_REQUIRED,
     ZALO_APP_ID,
     ZALO_OA_SECRET_KEY,
+    ZALO_OA_ACCESS_TOKEN,
+    ZALO_DIRECT_REPLY_ENABLED,
 )
 from core import cases, db
 from core.ingest import import_article_index
@@ -37,10 +39,12 @@ from core.providers import provider_name_for_model
 from core.telemetry import log_zalo_latency, new_trace_id
 from core.verifier import grounded_dynamic_fallback
 from adapters.zalo import pending
+from adapters.zalo_oa_api import ZaloOAClient, ZaloOAReplyError
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 BASE_DIR = Path(__file__).resolve().parent
+zalo_oa_client = ZaloOAClient(ZALO_OA_ACCESS_TOKEN)
 
 
 def ensure_legal_db():
@@ -130,6 +134,21 @@ def dynamic_response(text):
             ]
         }
     }), 200
+
+
+def _log_zalo_webhook(status, event_name):
+    """Chỉ ghi trạng thái kỹ thuật, tuyệt đối không ghi tin nhắn hoặc định danh."""
+    app.logger.info("zalo_webhook status=%s event=%s", status, event_name)
+
+
+def _direct_zalo_reply(user_id, text, trace_id):
+    """Trả lời trực tiếp qua OA API sau khi webhook đã xác thực."""
+    if not ZALO_DIRECT_REPLY_ENABLED:
+        return False
+    result = core.chat(user_id, text, dynamic=True, trace_id=trace_id)
+    result.pop("_telemetry", None)
+    zalo_oa_client.send_text(user_id, result["answer"])
+    return True
 
 
 def _demo_enabled():
@@ -338,24 +357,43 @@ def zalo_webhook():
     if request.method == "GET":
         return "OK", 200
     if not ZALO_WEBHOOK_ENABLED:
-        # Zalo validates webhook URLs with a POST request and accepts only 200.
-        # Until the signed live integration is enabled, acknowledge configuration
-        # without reading, storing, or queuing the supplied event.
         return jsonify({"success": True, "status": "webhook_configuration_pending"}), 200
+
     raw_body = request.get_data(cache=True, as_text=True)
     data = request.get_json(silent=True) or {}
+    event_name = str(data.get("event_name") or "").strip()
     if not _valid_zalo_webhook_signature(data, raw_body):
-        # Không log nội dung tin nhắn, Zalo ID, chữ ký hoặc secret.
-        app.logger.warning("Rejected Zalo webhook with invalid signature")
+        _log_zalo_webhook("rejected_signature", event_name)
         return jsonify({"success": False}), 401
-    if data.get("event_name") == "user_send_text":
-        sender = data.get("sender") or {}
-        message = data.get("message") or {}
-        user_id = str(sender.get("id") or "").strip()
-        text = str(message.get("text") or "").strip()
-        msg_id = str(message.get("msg_id") or "").strip()
-        if user_id and text:
-            pending.push(user_id, text, msg_id=msg_id)
+    if event_name != "user_send_text":
+        _log_zalo_webhook("ignored_event", event_name)
+        return jsonify({"success": True}), 200
+
+    sender = data.get("sender") or {}
+    message = data.get("message") or {}
+    user_id = str(sender.get("id") or "").strip()
+    text = str(message.get("text") or "").strip()
+    msg_id = str(message.get("msg_id") or "").strip()
+    if not user_id or not text:
+        _log_zalo_webhook("ignored_empty", event_name)
+        return jsonify({"success": True}), 200
+
+    accepted = pending.push(user_id, text, msg_id=msg_id)
+    if not accepted:
+        _log_zalo_webhook("duplicate", event_name)
+        return jsonify({"success": True}), 200
+
+    _log_zalo_webhook("accepted", event_name)
+    if ZALO_DIRECT_REPLY_ENABLED:
+        try:
+            _direct_zalo_reply(user_id, text, new_trace_id())
+            _log_zalo_webhook("reply_sent", event_name)
+        except (ZaloOAReplyError, LLMError, LLMTimeout):
+            app.logger.error("Zalo OA direct reply failed")
+            _log_zalo_webhook("reply_failed", event_name)
+        except Exception:
+            app.logger.exception("Zalo OA direct reply unexpected failure")
+            _log_zalo_webhook("reply_failed", event_name)
     return jsonify({"success": True}), 200
 
 
