@@ -43,12 +43,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Verify production health, legal anchor, live provider, and Zalo security
+      - name: Verify production health, provider, and Zalo boundary
         shell: bash
         run: |
           python - <<'PY'
           import json
           import time
+          import urllib.error
           import urllib.request
           import uuid
 
@@ -87,16 +88,47 @@ jobs:
                   assert health.get("core_answer_provider") == expected_provider, f"core provider={health.get('core_answer_provider')}"
                   assert health.get("dynamic_answer_provider") == expected_provider, f"dynamic provider={health.get('dynamic_answer_provider')}"
 
-                  # Production webhook is fail-closed: if enabled it must have
-                  # configured signing credentials and enforce verification.
+                  # Production webhook is fail-closed: credentials exist and
+                  # signature verification is mandatory.
                   if readiness.get("zalo_webhook_enabled"):
                       assert readiness.get("zalo_signature_ready") is True, "Zalo signature credentials missing"
                       assert readiness.get("zalo_signature_required") is True, "Zalo signature check disabled"
                   if readiness.get("zalo_direct_reply_enabled"):
                       assert readiness.get("zalo_direct_reply_ready") is True, "Zalo OA token missing"
 
-                  # Neutral prompt checks provider liveness/output plumbing,
-                  # independent from special greeting-verifier behavior.
+                  # Prove the public webhook actually rejects a forged request.
+                  forged_body = json.dumps({
+                      "app_id": "synthetic-app",
+                      "timestamp": "1",
+                      "event_name": "user_send_text",
+                  }).encode("utf-8")
+                  forged_req = urllib.request.Request(
+                      base + "/zalo/webhook",
+                      data=forged_body,
+                      headers={
+                          "Content-Type": "application/json",
+                          "X-ZEvent-Signature": "forged",
+                      },
+                      method="POST",
+                  )
+                  forged_status = None
+                  try:
+                      urllib.request.urlopen(forged_req, timeout=8)
+                      raise AssertionError("forged Zalo webhook was accepted")
+                  except urllib.error.HTTPError as exc:
+                      forged_status = exc.code
+                      assert exc.code == 401, f"forged webhook status={exc.code}"
+
+                  # Prove Dynamic remains user-scoped and returns the expected
+                  # Zalo chatbot contract when that random user has no pending message.
+                  empty_uid = "synthetic-empty-" + uuid.uuid4().hex
+                  with urllib.request.urlopen(base + "/zalo/ai?uid=" + empty_uid, timeout=8) as r:
+                      dynamic = json.load(r)
+                  assert dynamic.get("version") == "chatbot", "Dynamic version"
+                  messages = ((dynamic.get("content") or {}).get("messages") or [])
+                  assert messages and messages[0].get("type") == "text", "Dynamic text contract"
+
+                  # Neutral prompt checks Full Core provider liveness/output plumbing.
                   payload = json.dumps({
                       "user_id": "synthetic-smoke-" + uuid.uuid4().hex,
                       "message": "Trợ lý có thể hỗ trợ tôi những nội dung gì?"
@@ -140,6 +172,8 @@ jobs:
                       "zalo_webhook_enabled": readiness.get("zalo_webhook_enabled"),
                       "zalo_signature_required": readiness.get("zalo_signature_required"),
                       "zalo_signature_ready": readiness.get("zalo_signature_ready"),
+                      "zalo_forged_webhook_status": forged_status,
+                      "zalo_dynamic_contract": "chatbot_text",
                       "zalo_direct_reply_enabled": readiness.get("zalo_direct_reply_enabled"),
                       "zalo_direct_reply_ready": readiness.get("zalo_direct_reply_ready"),
                       "article_134_title": article.get("title"),
