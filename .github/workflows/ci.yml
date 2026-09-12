@@ -3,6 +3,7 @@ name: AI Core CI
 on:
   push:
     branches:
+      - main
       - ai-core-hardening
   pull_request:
     branches:
