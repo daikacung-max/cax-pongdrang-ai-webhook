@@ -2,14 +2,14 @@ from collections import deque
 from threading import Condition, Lock
 import time
 
-from config import PENDING_TTL_SECONDS
+from config import PENDING_TTL_SECONDS, ZALO_DIRECT_REPLY_ENABLED
 
 
 class PendingZaloMessages:
     """
     Hàng đợi tương thích Zalo Chatbot Dynamic, đồng thời giữ bộ nhớ chống lặp
-    webhook theo msg_id. Direct Reply chỉ cần claim msg_id mà không để lại một
-    pending message có thể bị /zalo/ai xử lý lại lần thứ hai.
+    webhook theo msg_id. Khi Direct Reply hoạt động, push() chỉ claim msg_id và
+    không xếp nội dung vào pending queue để tránh phản hồi trùng lần hai.
     """
 
     def __init__(self):
@@ -45,6 +45,8 @@ class PendingZaloMessages:
             self._purge_locked()
             if not self._claim_locked(msg_id):
                 return False
+            if ZALO_DIRECT_REPLY_ENABLED:
+                return True
             self._queue.append({
                 "user_id": str(user_id),
                 "text": str(text),
