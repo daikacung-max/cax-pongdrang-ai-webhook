@@ -43,28 +43,60 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Wait for healthy production and verify legal anchor
+      - name: Wait for production and verify health, legal anchor, and Full Core provider
         shell: bash
         run: |
           python - <<'PY'
           import json
           import time
           import urllib.request
+          import uuid
 
           base = "https://cax-pongdrang-ai.onrender.com"
           last_error = None
-          for _ in range(18):
+          for _ in range(24):
               try:
                   with urllib.request.urlopen(base + "/health", timeout=8) as r:
                       health = json.load(r)
                   with urllib.request.urlopen(base + "/debug/article/134", timeout=8) as r:
                       article = json.load(r)
+
                   assert health.get("status") == "ok"
                   assert health.get("mode") == "CAX_PONG_DRANG_AI_CORE"
                   assert health.get("unit") == "Công an xã Pơng Drang, tỉnh Đắk Lắk"
                   assert health.get("hotline") == "02623509777"
+                  assert health.get("production_mode") is True
+                  assert health.get("core_answer_model") == "openai/gpt-oss-120b"
+                  assert health.get("dynamic_answer_model") == "openai/gpt-oss-20b"
+                  assert health.get("core_answer_provider") == "groq"
+                  assert health.get("dynamic_answer_provider") == "groq"
                   assert article.get("found") is True
                   assert str(article.get("article")) == "134"
+
+                  payload = json.dumps({
+                      "user_id": "synthetic-smoke-" + uuid.uuid4().hex,
+                      "message": "Xin chào"
+                  }, ensure_ascii=False).encode("utf-8")
+                  req = urllib.request.Request(
+                      base + "/api/chat",
+                      data=payload,
+                      headers={"Content-Type": "application/json"},
+                      method="POST",
+                  )
+                  with urllib.request.urlopen(req, timeout=20) as r:
+                      chat = json.load(r)
+
+                  answer = str(chat.get("answer") or "").strip()
+                  meta = chat.get("meta") or {}
+                  assert answer
+                  assert meta.get("model") == "openai/gpt-oss-120b"
+                  assert meta.get("provider") == "groq"
+                  assert meta.get("path") not in {
+                      "api_boundary_grounded_fallback",
+                      "full_core_grounded_fallback",
+                      "legal_no_source_fail_closed",
+                  }
+
                   safe = {
                       "status": health.get("status"),
                       "mode": health.get("mode"),
@@ -76,6 +108,8 @@ jobs:
                       "dynamic_answer_provider": health.get("dynamic_answer_provider"),
                       "production_mode": health.get("production_mode"),
                       "article_134_title": article.get("title"),
+                      "full_core_live_path": meta.get("path"),
+                      "full_core_verified": meta.get("verified"),
                   }
                   print(json.dumps(safe, ensure_ascii=False, indent=2))
                   with open("production-smoke.json", "w", encoding="utf-8") as f:
