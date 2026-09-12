@@ -86,10 +86,14 @@ class CurrentKnowledgeTests(unittest.TestCase):
             "explicit_references": [],
         }, "Tôi đăng ký xe máy mới ở đâu?")
         ids = [x["id"] for x in units]
-        self.assertIn("VEHICLE_CURRENT_2026:authority", ids)
+        self.assertIn("VEHICLE_CURRENT_2026:first_domestic_online", ids)
         self.assertIn("VEHICLE_CURRENT_2026:legal_chain", ids)
         blob = " ".join(x.get("text", "") for x in units)
+        lower_blob = blob.lower()
         self.assertIn("37/2026/TT-BCA", blob)
+        self.assertIn("cấp tỉnh", lower_blob)
+        self.assertIn("cấp xã", lower_blob)
+        self.assertNotIn("công an cấp huyện", lower_blob)
 
     def test_procedural_huyen_hallucination_is_rejected(self):
         ensure_current_knowledge()
