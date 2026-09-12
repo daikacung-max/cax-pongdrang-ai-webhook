@@ -43,7 +43,7 @@ LEGAL_TOP_K = int(os.getenv("LEGAL_TOP_K", "8"))
 DYNAMIC_LEGAL_TOP_K = int(os.getenv("DYNAMIC_LEGAL_TOP_K", "2"))
 CORE_REASONING_EFFORT = os.getenv("CORE_REASONING_EFFORT", "medium")
 # GPT-OSS trên Groq tính token suy luận vào cùng ngân sách hoàn thành. Với câu
-# trả lời có nguồn dài, mức thấp dành phần ngân sách còn lại cho JSON trả lời.
+# trả lời có nguồn dài, mức thấp dành phần ngân sách còn lại cho câu trả lời cuối.
 GROQ_CORE_REASONING_EFFORT = os.getenv("GROQ_CORE_REASONING_EFFORT", "low")
 DYNAMIC_REASONING_EFFORT = os.getenv(
     "DYNAMIC_REASONING_EFFORT",
@@ -59,11 +59,13 @@ MAX_ZALO_TOTAL_CHARS = int(os.getenv("MAX_ZALO_TOTAL_CHARS", "2400"))
 PENDING_TTL_SECONDS = int(os.getenv("PENDING_TTL_SECONDS", "30"))
 
 # Zalo chỉ được phép đẩy sự kiện vào hàng đợi khi tích hợp đã được bật rõ ràng.
-# Khi chạy pilot chưa gắn OA, Render đặt biến này là false để endpoint không xử lý
-# yêu cầu giả mạo. Khi kết nối thật, bật cờ và bắt buộc xác minh X-ZEvent-Signature
-# theo công thức chính thức của Zalo OA OpenAPI.
+# Production fail-closed: khi webhook công khai đã bật, kiểm tra chữ ký luôn là
+# bắt buộc bất kể biến môi trường vô tình đặt false. Local/test vẫn có thể tắt.
 ZALO_WEBHOOK_ENABLED = os.getenv("ZALO_WEBHOOK_ENABLED", "true").lower() in ("1", "true", "yes", "on")
-ZALO_WEBHOOK_SIGNATURE_REQUIRED = os.getenv("ZALO_WEBHOOK_SIGNATURE_REQUIRED", "false").lower() in ("1", "true", "yes", "on")
+_requested_signature_check = os.getenv("ZALO_WEBHOOK_SIGNATURE_REQUIRED", "false").lower() in ("1", "true", "yes", "on")
+ZALO_WEBHOOK_SIGNATURE_REQUIRED = bool(
+    _requested_signature_check or (PRODUCTION_MODE and ZALO_WEBHOOK_ENABLED)
+)
 ZALO_APP_ID = os.getenv("ZALO_APP_ID", "").strip()
 ZALO_OA_SECRET_KEY = os.getenv("ZALO_OA_SECRET_KEY", "").strip()
 # OA access token is stored only as a Render secret; direct replies remain off by default.
