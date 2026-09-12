@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Verify production health, provider, and Zalo boundary
+      - name: Verify production health, provider, Zalo boundary, and VNeID routing
         shell: bash
         run: |
           python - <<'PY'
@@ -88,15 +88,12 @@ jobs:
                   assert health.get("core_answer_provider") == expected_provider, f"core provider={health.get('core_answer_provider')}"
                   assert health.get("dynamic_answer_provider") == expected_provider, f"dynamic provider={health.get('dynamic_answer_provider')}"
 
-                  # Production webhook is fail-closed: credentials exist and
-                  # signature verification is mandatory.
                   if readiness.get("zalo_webhook_enabled"):
                       assert readiness.get("zalo_signature_ready") is True, "Zalo signature credentials missing"
                       assert readiness.get("zalo_signature_required") is True, "Zalo signature check disabled"
                   if readiness.get("zalo_direct_reply_enabled"):
                       assert readiness.get("zalo_direct_reply_ready") is True, "Zalo OA token missing"
 
-                  # Prove the public webhook actually rejects a forged request.
                   forged_body = json.dumps({
                       "app_id": "synthetic-app",
                       "timestamp": "1",
@@ -119,8 +116,6 @@ jobs:
                       forged_status = exc.code
                       assert exc.code == 401, f"forged webhook status={exc.code}"
 
-                  # Prove Dynamic remains user-scoped and returns the expected
-                  # Zalo chatbot contract when that random user has no pending message.
                   empty_uid = "synthetic-empty-" + uuid.uuid4().hex
                   with urllib.request.urlopen(base + "/zalo/ai?uid=" + empty_uid, timeout=8) as r:
                       dynamic = json.load(r)
@@ -128,10 +123,12 @@ jobs:
                   messages = ((dynamic.get("content") or {}).get("messages") or [])
                   assert messages and messages[0].get("type") == "text", "Dynamic text contract"
 
-                  # Neutral prompt checks Full Core provider liveness/output plumbing.
+                  # This is the exact natural-language class that previously
+                  # misrouted to the identity-card notebook. Production must
+                  # now retrieve VNeID sources and generate an AI answer.
                   payload = json.dumps({
                       "user_id": "synthetic-smoke-" + uuid.uuid4().hex,
-                      "message": "Trợ lý có thể hỗ trợ tôi những nội dung gì?"
+                      "message": "Bạn hãy hướng dẫn cho tôi làm định danh mức 2"
                   }, ensure_ascii=False).encode("utf-8")
                   req = urllib.request.Request(
                       base + "/api/chat",
@@ -144,6 +141,7 @@ jobs:
 
                   answer = str(chat.get("answer") or "").strip()
                   meta = chat.get("meta") or {}
+                  source_ids = [str(x) for x in (meta.get("retrieved_unit_ids") or [])]
                   assert answer, "empty answer"
                   assert meta.get("model") == expected_core, f"chat model={meta.get('model')}"
                   assert meta.get("provider") == expected_provider, f"chat provider={meta.get('provider')}"
@@ -155,6 +153,11 @@ jobs:
                       f"fallback path={meta.get('path')} "
                       f"errors={meta.get('verification_errors')}"
                   )
+                  assert source_ids, "VNeID question retrieved no sources"
+                  assert source_ids[0] == "VNEID_2026:level2", f"wrong first source={source_ids[0]}"
+                  assert all(x.startswith("VNEID_") for x in source_ids), f"wrong source notebook={source_ids}"
+                  assert "Công an cấp xã" in answer, f"missing commune guidance: {answer}"
+                  assert "5230/QĐ-BCA-C06" not in answer, f"identity fallback leaked: {answer}"
 
                   safe = {
                       "status": health.get("status"),
@@ -179,6 +182,8 @@ jobs:
                       "article_134_title": article.get("title"),
                       "full_core_live_path": meta.get("path"),
                       "full_core_verified": meta.get("verified"),
+                      "vneid_level2_first_source": source_ids[0],
+                      "vneid_level2_source_count": len(source_ids),
                   }
                   print(json.dumps(safe, ensure_ascii=False, indent=2))
                   with open("production-smoke.json", "w", encoding="utf-8") as f:
