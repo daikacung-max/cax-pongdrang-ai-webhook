@@ -34,11 +34,16 @@ def grounded_dynamic_fallback(question, retrieved_units):
                 "Người dưới 06 tuổi có thể được người đại diện hợp pháp nộp hồ sơ trực tuyến toàn trình qua Cổng dịch vụ công quốc gia hoặc VNeID; "
                 "thời hạn giải quyết chung không quá 07 ngày làm việc."
             )
-        if any(x in q for x in ["14 tuoi", "tu du 14", "cap moi", "lan dau"]):
+        if any(x in q for x in ["14 tuoi", "tu du 14"]):
             return (
                 "Người từ đủ 14 tuổi có thể làm thủ tục cấp thẻ căn cước tại Công an cấp xã hoặc Bộ phận một cửa cấp xã trong cả nước không phụ thuộc nơi cư trú "
                 "nếu đã triển khai, theo Quyết định 5230/QĐ-BCA-C06. Có thể đăng ký thời gian, địa điểm qua Cổng dịch vụ công quốc gia hoặc VNeID; "
                 "thời hạn giải quyết không quá 07 ngày làm việc."
+            )
+        if any(x in q for x in ["cap moi", "lan dau"]):
+            return (
+                "Thủ tục cấp căn cước hiện được giải quyết tại Công an cấp xã theo Quyết định 5230/QĐ-BCA-C06, nhưng cách thực hiện khác nhau theo độ tuổi. "
+                "Anh/chị cho biết người cần làm căn cước đã đủ 14 tuổi chưa để tôi hướng dẫn đúng trường hợp."
             )
         return (
             "Quyết định 5230/QĐ-BCA-C06 đã công bố nhóm thủ tục căn cước mới tại Công an cấp xã, gồm cấp/cấp đổi/cấp lại thẻ căn cước và các thủ tục khai thác, "
