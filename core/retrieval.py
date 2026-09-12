@@ -20,7 +20,7 @@ DOCUMENT_ALIASES = {
 _TWO_TIER_TTHC_DOMAINS = {
     "permanent_residence", "temporary_residence", "residence_confirmation", "residence",
     "identity_under14", "identity_reissue", "identity_over14_new", "identity_renewal",
-    "identity_data", "identity_general", "vehicle", "vehicle_transfer",
+    "identity_data", "identity_general", "vehicle", "vehicle_transfer", "vneid",
 }
 
 
@@ -62,7 +62,25 @@ def _detect_domain_in_text(text):
         return "temporary_residence", ["RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026", "TTHC_TEMP_RESIDENCE_2026"]
     if any(x in q for x in ["xac nhan cu tru", "xac nhan thong tin cu tru"]):
         return "residence_confirmation", ["RESIDENCE_CURRENT_2026"]
-    if any(x in q for x in ["vneid", "dinh danh dien tu", "tai khoan dinh danh", "muc do 1", "muc do 01", "muc do 2", "muc do 02"]):
+
+    # Người dân thường nói ngắn: "làm định danh mức 2", "đăng ký mức 2",
+    # "tài khoản mức 2" thay vì đọc đúng tên "tài khoản định danh điện tử".
+    # Ưu tiên nhận diện VNeID trước căn cước để không kéo nhầm notebook căn cước.
+    vneid_aliases = [
+        "vneid", "dinh danh dien tu", "tai khoan dinh danh", "tai khoan vneid",
+        "lam dinh danh", "dang ky dinh danh", "cap dinh danh", "kich hoat dinh danh",
+        "dinh danh muc 1", "dinh danh muc 01", "dinh danh muc do 1", "dinh danh muc do 01",
+        "dinh danh muc 2", "dinh danh muc 02", "dinh danh muc do 2", "dinh danh muc do 02",
+        "tai khoan muc 1", "tai khoan muc 01", "tai khoan muc do 1", "tai khoan muc do 01",
+        "tai khoan muc 2", "tai khoan muc 02", "tai khoan muc do 2", "tai khoan muc do 02",
+    ]
+    if any(x in q for x in vneid_aliases):
+        return "vneid", ["VNEID_2026", "VNEID_SIM_GUIDANCE_2026"]
+    # Chỉ coi cụm "mức 1/2" đứng một mình là VNeID khi câu có động từ đăng ký/cấp/kích hoạt,
+    # tránh bắt nhầm các ngữ cảnh khác cũng có từ "mức".
+    if any(x in q for x in ["muc 1", "muc 01", "muc do 1", "muc do 01", "muc 2", "muc 02", "muc do 2", "muc do 02"]) and any(
+        x in q for x in ["dang ky", "lam", "cap", "kich hoat", "tai khoan"]
+    ):
         return "vneid", ["VNEID_2026", "VNEID_SIM_GUIDANCE_2026"]
 
     identity_doc = ["CITIZEN_ID_5230_COMMUNE_2026"]
@@ -137,9 +155,9 @@ def _priority_unit_ids(domain, question):
     if domain == "residence_confirmation":
         return ["RESIDENCE_CURRENT_2026:confirmation", "RESIDENCE_CURRENT_2026:data_reuse"]
     if domain == "vneid":
-        if any(x in q for x in ["muc do 2", "muc do 02", "muc 2"]):
+        if any(x in q for x in ["muc do 2", "muc do 02", "muc 2", "muc 02", "dinh danh muc 2", "dinh danh muc 02"]):
             return ["VNEID_2026:level2", "VNEID_2026:overview", "VNEID_SIM_GUIDANCE_2026:sim"]
-        if any(x in q for x in ["muc do 1", "muc do 01", "muc 1"]):
+        if any(x in q for x in ["muc do 1", "muc do 01", "muc 1", "muc 01", "dinh danh muc 1", "dinh danh muc 01"]):
             return ["VNEID_2026:level1", "VNEID_2026:overview"]
         if "sim" in q or "so dien thoai" in q:
             return ["VNEID_SIM_GUIDANCE_2026:sim", "VNEID_2026:level2"]
