@@ -8,7 +8,15 @@ from core.demo import respond
 from core.planner import quick_plan
 from core.question_corpus import build_question_corpus
 from core.retrieval import retrieve
-from core.verifier import grounded_dynamic_fallback
+from core.current_fallback import grounded_dynamic_fallback
+
+
+CURRENT_SOURCE_PREFIX = {
+    "identity_reissue": "CITIZEN_ID_5230_COMMUNE_2026",
+    "identity_renewal": "CITIZEN_ID_5230_COMMUNE_2026",
+    "identity_under14": "CITIZEN_ID_5230_COMMUNE_2026",
+    "vehicle_first_registration": "VEHICLE_CURRENT_2026",
+}
 
 
 class QuestionCorpusTests(unittest.TestCase):
@@ -26,13 +34,20 @@ class QuestionCorpusTests(unittest.TestCase):
                 plan = quick_plan(case.question)
                 units = retrieve(plan, case.question) if plan["is_legal"] else []
                 if case.policy == "verified_source":
+                    expected_prefix = CURRENT_SOURCE_PREFIX.get(case.category, case.source_prefix)
                     self.assertTrue(
-                        any(str(unit.get("document_id") or "").startswith(case.source_prefix) for unit in units),
+                        any(str(unit.get("document_id") or "").startswith(expected_prefix) for unit in units),
                         case.question,
                     )
+                    # Current TTHC must never route the citizen to the removed
+                    # district-level administrative layer.
+                    if case.category.startswith("identity_") or case.category.startswith("vehicle_"):
+                        self.assertNotIn(
+                            "công an cấp huyện",
+                            " ".join(str(unit.get("text") or "").lower() for unit in units),
+                            case.question,
+                        )
                 else:
-                    # Với nội dung chưa có nguồn được duyệt riêng, chỉ kiểm tra
-                    # câu fallback an toàn; không biến corpus thành câu trả lời luật.
                     answer = grounded_dynamic_fallback(case.question, [])
                     self.assertTrue(
                         "chưa có nguồn" in answer.lower()
@@ -62,6 +77,8 @@ class QuestionCorpusTests(unittest.TestCase):
                 if case.policy == "verified_source":
                     self.assertEqual(result["source_state"], "grounded", case.question)
                     self.assertNotIn("Nguồn phù hợp đã được tìm thấy nhưng dữ kiện", answer)
+                    if case.category.startswith("identity_") or case.category.startswith("vehicle_"):
+                        self.assertNotIn("Công an cấp huyện", answer)
 
 
 if __name__ == "__main__":
