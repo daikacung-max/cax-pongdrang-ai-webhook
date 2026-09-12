@@ -17,6 +17,12 @@ DOCUMENT_ALIASES = {
     "xu ly vi pham hanh chinh": "XLVPHC_90_VBHN_2026",
 }
 
+_TWO_TIER_TTHC_DOMAINS = {
+    "permanent_residence", "temporary_residence", "residence_confirmation", "residence",
+    "identity_under14", "identity_reissue", "identity_over14_new", "identity_renewal",
+    "identity_data", "identity_general", "vehicle", "vehicle_transfer",
+}
+
 
 def _norm(text):
     text = str(text or "").lower()
@@ -183,6 +189,23 @@ def _candidate_score(unit, query, query_index):
     return score
 
 
+def _unit_allowed_for_domain(domain, unit):
+    """Tách notebook theo thủ tục và loại nội dung cấp hành chính đã bỏ.
+
+    Đây là bộ lọc trước khi context được đưa cho model. Audit DB vẫn giữ bản ghi
+    gốc nhưng người dân và LLM chỉ nhìn các source-unit hợp phạm vi hiện hành.
+    """
+    unit_id = str(unit.get("id") or "")
+    corpus = _norm((unit.get("title") or "") + " " + (unit.get("text") or ""))
+    if domain in _TWO_TIER_TTHC_DOMAINS and "cong an cap huyen" in corpus:
+        return False
+    if domain == "vehicle_transfer" and unit_id == "VEHICLE_CURRENT_2026:first_domestic_online":
+        return False
+    if domain == "vehicle" and str(unit.get("document_id") or "") == "VEHICLE_TRANSFER_LOCAL_2026":
+        return False
+    return True
+
+
 def retrieve(plan, question):
     candidates = {}
     for ref in plan.get("explicit_references", []):
@@ -206,7 +229,7 @@ def retrieve(plan, question):
 
     for pos, unit_id in enumerate(_priority_unit_ids(domain, question)):
         unit = db.get_unit(unit_id)
-        if unit:
+        if unit and _unit_allowed_for_domain(domain, unit):
             entry = dict(unit)
             entry["_why"] = "domain_priority"
             entry["_score"] = 9000 - pos
@@ -220,6 +243,8 @@ def retrieve(plan, question):
         if not found and document_filter is None:
             found = db.search_like(query, limit=max(LEGAL_TOP_K * 2, 12))
         for unit in found:
+            if not _unit_allowed_for_domain(domain, unit):
+                continue
             entry = dict(unit)
             score = _candidate_score(entry, query, query_index)
             old = candidates.get(entry["id"])
