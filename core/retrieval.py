@@ -85,24 +85,22 @@ def _detect_domain_in_text(text):
     if any(x in q for x in ["can cuoc", "cccd", "can cuoc cong dan"]):
         return "identity_general", identity_doc
 
-    # Tin báo mất/trộm/đe dọa phải được ưu tiên hơn tên tài sản (như xe máy).
     if any(x in q for x in ["bi trom", "bi de doa", "mat tai san", "mat xe", "mat dien thoai"]):
         return "incident_report", ["BLHS_2025", "BLTTHS_104_VBHN_2025", "CRIME_REPORT_GUIDANCE_2025"]
     if any(x in q for x in ["lua dao chuyen khoan", "bi lua", "nguoi lua dao", "chuyen khoan", "chuyen tien", "bi scam", "scam chuyen khoan"]):
         return "fraud_transfer", ["FRAUD_TRANSFER_GUIDANCE_2026"]
 
-    vehicle_docs = ["VEHICLE_CURRENT_2026", "VEHICLE_REGISTRATION_2026", "VEHICLE_TRANSFER_LOCAL_2026"]
     if any(x in q for x in ["sang ten", "chuyen nhuong", "thu hoi"]) and any(x in q for x in ["xe", "dang ky xe", "bien so"]):
-        return "vehicle_transfer", vehicle_docs
+        return "vehicle_transfer", ["VEHICLE_CURRENT_2026", "VEHICLE_TRANSFER_LOCAL_2026"]
     if any(x in q for x in ["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe", "cap bien so", "mua xe moi", "cap doi dang ky xe", "cap lai dang ky xe"]):
-        return "vehicle", vehicle_docs
+        return "vehicle", ["VEHICLE_CURRENT_2026", "VEHICLE_REGISTRATION_2026"]
 
     if any(x in q for x in ["cu tru", "tach ho", "xoa tam tru", "xoa thuong tru"]):
         return "residence", ["RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026", "RESIDENCE_PERMANENT_2026", "TTHC_TEMP_RESIDENCE_2026"]
     if any(x in q for x in ["to giac", "tin bao toi pham", "trinh bao toi pham", "bao an"]):
         return "crime_report", ["BLTTHS_104_VBHN_2025", "CRIME_REPORT_GUIDANCE_2025"]
     if any(x in q for x in ["karaoke", "hat karaoke", "loa keo", "tieng on", "on ao", "on nhieu"]):
-        return "noise_karaoke", ["NOISE_KARAOKE_282_2025", "ND282_2025_CURRENT"]
+        return "noise_karaoke", ["NOISE_KARAOKE_282_2025"]
     if any(x in q for x in ["ma tuy", "chat ma tuy", "su dung trai phep chat ma tuy", "cai nghien"]):
         return "drug_law", ["PCTMT_120_2025", "BLHS_2025", "ND282_2025_CURRENT"]
     if any(x in q for x in ["xu phat", "vi pham hanh chinh", "tham quyen xu phat"]):
@@ -127,17 +125,9 @@ def _domain(question, queries):
 def _priority_unit_ids(domain, question):
     q = _norm(question)
     if domain == "permanent_residence":
-        return [
-            "RESIDENCE_CURRENT_2026:permanent",
-            "RESIDENCE_CURRENT_2026:data_reuse",
-            "RESIDENCE_PERMANENT_2026:documents_by_case",
-        ]
+        return ["RESIDENCE_CURRENT_2026:permanent", "RESIDENCE_CURRENT_2026:data_reuse", "RESIDENCE_PERMANENT_2026:documents_by_case"]
     if domain == "temporary_residence":
-        return [
-            "RESIDENCE_CURRENT_2026:temporary",
-            "RESIDENCE_CURRENT_2026:data_reuse",
-            "TTHC_TEMP_RESIDENCE_2026:documents_policy",
-        ]
+        return ["RESIDENCE_CURRENT_2026:temporary", "RESIDENCE_CURRENT_2026:data_reuse", "TTHC_TEMP_RESIDENCE_2026:documents_policy"]
     if domain == "residence_confirmation":
         return ["RESIDENCE_CURRENT_2026:confirmation", "RESIDENCE_CURRENT_2026:data_reuse"]
     if domain == "vneid":
@@ -159,35 +149,15 @@ def _priority_unit_ids(domain, question):
     if domain in ("identity_data", "identity_general"):
         return ["CITIZEN_ID_5230_COMMUNE_2026:scope", "CITIZEN_ID_5230_COMMUNE_2026:other_commune_procedures"]
     if domain == "crime_report":
-        return [
-            "CRIME_REPORT_GUIDANCE_2025:channels",
-            "CRIME_REPORT_GUIDANCE_2025:rights",
-            "CRIME_REPORT_GUIDANCE_2025:local_intake",
-            "BLTTHS_104_VBHN_2025:article:145",
-            "BLTTHS_104_VBHN_2025:article:146",
-        ]
+        return ["CRIME_REPORT_GUIDANCE_2025:channels", "CRIME_REPORT_GUIDANCE_2025:rights", "CRIME_REPORT_GUIDANCE_2025:local_intake", "BLTTHS_104_VBHN_2025:article:145", "BLTTHS_104_VBHN_2025:article:146"]
     if domain == "noise_karaoke":
-        return [
-            "NOISE_KARAOKE_282_2025:quiet_places",
-            "NOISE_KARAOKE_282_2025:other_noise",
-            "NOISE_KARAOKE_282_2025:public_propaganda",
-        ]
+        return ["NOISE_KARAOKE_282_2025:quiet_places", "NOISE_KARAOKE_282_2025:other_noise", "NOISE_KARAOKE_282_2025:public_propaganda"]
     if domain == "fraud_transfer":
         return ["FRAUD_TRANSFER_GUIDANCE_2026:response"]
     if domain == "vehicle":
-        return [
-            "VEHICLE_CURRENT_2026:first_domestic_online",
-            "VEHICLE_CURRENT_2026:authority",
-            "VEHICLE_CURRENT_2026:legal_chain",
-            "VEHICLE_REGISTRATION_2026:first_registration_documents",
-        ]
+        return ["VEHICLE_CURRENT_2026:first_domestic_online", "VEHICLE_CURRENT_2026:authority", "VEHICLE_CURRENT_2026:legal_chain", "VEHICLE_REGISTRATION_2026:first_registration_documents"]
     if domain == "vehicle_transfer":
-        return [
-            "VEHICLE_CURRENT_2026:authority",
-            "VEHICLE_TRANSFER_LOCAL_2026:scope",
-            "VEHICLE_TRANSFER_LOCAL_2026:documents",
-            "VEHICLE_TRANSFER_LOCAL_2026:time",
-        ]
+        return ["VEHICLE_CURRENT_2026:authority", "VEHICLE_TRANSFER_LOCAL_2026:scope", "VEHICLE_TRANSFER_LOCAL_2026:documents", "VEHICLE_TRANSFER_LOCAL_2026:time"]
     if domain == "administrative_sanction":
         return ["SANCTION_AUTHORITY_02_VBHN_2026:status"]
     if domain == "drug_law":
@@ -215,7 +185,6 @@ def _candidate_score(unit, query, query_index):
 
 def retrieve(plan, question):
     candidates = {}
-
     for ref in plan.get("explicit_references", []):
         article = str(ref.get("article") or "").strip()
         doc_id = detect_document_from_hint(ref.get("law_hint"))
@@ -232,7 +201,6 @@ def retrieve(plan, question):
     if question not in queries:
         queries.append(question)
     domain, document_filter = _domain(question, queries)
-
     if domain == "unverified_topic":
         return []
 
