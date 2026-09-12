@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Wait for production and verify health, legal anchor, and Full Core provider
+      - name: Wait for production and verify health, legal anchor, and live provider
         shell: bash
         run: |
           python - <<'PY'
@@ -67,14 +67,24 @@ jobs:
                   assert health.get("mode") == "CAX_PONG_DRANG_AI_CORE"
                   assert health.get("unit") == "Công an xã Pơng Drang, tỉnh Đắk Lắk"
                   assert health.get("hotline") == "02623509777"
-                  assert health.get("core_answer_model") == "openai/gpt-oss-120b"
-                  assert health.get("dynamic_answer_model") == "openai/gpt-oss-20b"
-                  assert health.get("core_answer_provider") == "groq"
-                  assert health.get("dynamic_answer_provider") == "groq"
                   assert readiness.get("model_routing_mode") == "auto"
-                  assert readiness.get("groq_provider_ready") is True
                   assert article.get("found") is True
                   assert str(article.get("article")) == "134"
+
+                  if readiness.get("openai_provider_ready"):
+                      expected_core = "gpt-5.6-terra"
+                      expected_dynamic = "gpt-5.6-luna"
+                      expected_provider = "openai"
+                  else:
+                      assert readiness.get("groq_provider_ready") is True
+                      expected_core = "openai/gpt-oss-120b"
+                      expected_dynamic = "openai/gpt-oss-20b"
+                      expected_provider = "groq"
+
+                  assert health.get("core_answer_model") == expected_core
+                  assert health.get("dynamic_answer_model") == expected_dynamic
+                  assert health.get("core_answer_provider") == expected_provider
+                  assert health.get("dynamic_answer_provider") == expected_provider
 
                   payload = json.dumps({
                       "user_id": "synthetic-smoke-" + uuid.uuid4().hex,
@@ -86,14 +96,14 @@ jobs:
                       headers={"Content-Type": "application/json"},
                       method="POST",
                   )
-                  with urllib.request.urlopen(req, timeout=20) as r:
+                  with urllib.request.urlopen(req, timeout=25) as r:
                       chat = json.load(r)
 
                   answer = str(chat.get("answer") or "").strip()
                   meta = chat.get("meta") or {}
                   assert answer
-                  assert meta.get("model") == "openai/gpt-oss-120b"
-                  assert meta.get("provider") == "groq"
+                  assert meta.get("model") == expected_core
+                  assert meta.get("provider") == expected_provider
                   assert meta.get("path") not in {
                       "api_boundary_grounded_fallback",
                       "full_core_grounded_fallback",
