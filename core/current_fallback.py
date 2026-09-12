@@ -72,7 +72,7 @@ def grounded_dynamic_fallback(question, retrieved_units):
             return (
                 "Theo nguồn đăng ký xe hiện hành, cơ quan đăng ký xe được tổ chức ở cấp tỉnh và cấp xã theo phân cấp. Với thủ tục 1.012575 đối với xe sản xuất, "
                 "lắp ráp trong nước, chủ xe kê khai qua Cổng dịch vụ công hoặc VNeID; thời hạn cấp chứng nhận đăng ký xe và cấp mới biển số không quá 02 ngày làm việc "
-                "kể từ khi nhận đủ hồ sơ hợp lệ. Không áp dụng hướng dẫn cũ đến Công an cấp huyện."
+                "kể từ khi nhận đủ hồ sơ hợp lệ."
             )
 
     return legacy_grounded_fallback(question, retrieved_units)
