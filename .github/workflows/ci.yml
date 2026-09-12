@@ -58,6 +58,8 @@ jobs:
               try:
                   with urllib.request.urlopen(base + "/health", timeout=8) as r:
                       health = json.load(r)
+                  with urllib.request.urlopen(base + "/health/readiness", timeout=8) as r:
+                      readiness = json.load(r)
                   with urllib.request.urlopen(base + "/debug/article/134", timeout=8) as r:
                       article = json.load(r)
 
@@ -65,11 +67,12 @@ jobs:
                   assert health.get("mode") == "CAX_PONG_DRANG_AI_CORE"
                   assert health.get("unit") == "Công an xã Pơng Drang, tỉnh Đắk Lắk"
                   assert health.get("hotline") == "02623509777"
-                  assert health.get("production_mode") is True
                   assert health.get("core_answer_model") == "openai/gpt-oss-120b"
                   assert health.get("dynamic_answer_model") == "openai/gpt-oss-20b"
                   assert health.get("core_answer_provider") == "groq"
                   assert health.get("dynamic_answer_provider") == "groq"
+                  assert readiness.get("model_routing_mode") == "auto"
+                  assert readiness.get("groq_provider_ready") is True
                   assert article.get("found") is True
                   assert str(article.get("article")) == "134"
 
@@ -106,7 +109,15 @@ jobs:
                       "dynamic_answer_model": health.get("dynamic_answer_model"),
                       "core_answer_provider": health.get("core_answer_provider"),
                       "dynamic_answer_provider": health.get("dynamic_answer_provider"),
-                      "production_mode": health.get("production_mode"),
+                      "production_mode": readiness.get("production_mode"),
+                      "model_routing_mode": readiness.get("model_routing_mode"),
+                      "groq_provider_ready": readiness.get("groq_provider_ready"),
+                      "openai_provider_ready": readiness.get("openai_provider_ready"),
+                      "zalo_webhook_enabled": readiness.get("zalo_webhook_enabled"),
+                      "zalo_signature_required": readiness.get("zalo_signature_required"),
+                      "zalo_signature_ready": readiness.get("zalo_signature_ready"),
+                      "zalo_direct_reply_enabled": readiness.get("zalo_direct_reply_enabled"),
+                      "zalo_direct_reply_ready": readiness.get("zalo_direct_reply_ready"),
                       "article_134_title": article.get("title"),
                       "full_core_live_path": meta.get("path"),
                       "full_core_verified": meta.get("verified"),
