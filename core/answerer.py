@@ -132,7 +132,11 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None,
                 reasoning_effort=GROQ_CORE_REASONING_EFFORT,
                 timeout=CORE_TIMEOUT_SECONDS,
                 temperature=0.05 if legal_context else 0.25,
-                max_completion_tokens=480,
+                # GPT-OSS tính reasoning tokens vào cùng completion budget. 480
+                # token có thể bị reasoning dùng gần hết và để content rỗng/yếu.
+                # 1600 vẫn nằm rất xa giới hạn model nhưng đủ chỗ cho low-effort
+                # reasoning + câu trả lời cuối; timeout 12s tiếp tục chặn tail latency.
+                max_completion_tokens=1600,
                 safety_identifier=safety_identifier,
             ),
             "legal_claims": [],
