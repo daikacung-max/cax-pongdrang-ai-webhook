@@ -9,10 +9,12 @@ import os
 import sys
 
 import app_core as _app_core
+import core.service as _service_module
 from adapters.vbee_tts import blueprint as vbee_blueprint
 from adapters.readiness import blueprint as readiness_blueprint
 from config import LOCAL_BIND_HOST
 from core.current_knowledge import ensure_current_knowledge
+from core.current_fallback import grounded_dynamic_fallback as current_grounded_fallback
 
 
 # app_core first loads the long-lived verified snapshots. The current overlay is
@@ -29,6 +31,11 @@ _app_core.ensure_legal_db = _ensure_legal_db_with_current_sources
 # app_core already initialized once during import, therefore apply the overlay
 # immediately for this process as well.
 ensure_current_knowledge()
+
+# Dynamic and API-boundary fallbacks must use the same current-source overlay.
+# This prevents a provider timeout from resurrecting superseded TTHC guidance.
+_service_module.grounded_dynamic_fallback = current_grounded_fallback
+_app_core.grounded_dynamic_fallback = current_grounded_fallback
 
 if "vbee_tts" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(vbee_blueprint)
