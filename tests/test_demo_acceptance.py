@@ -27,11 +27,11 @@ class DemoAcceptanceTests(unittest.TestCase):
             ("Tôi muốn nộp hồ sơ đăng ký tạm trú", "intake_requested", "needs_information", "chỗ ở"),
             ("Đăng ký thường trú cần gì?", "advice_only", "not_requested", "07 ngày làm việc"),
             ("Tôi thuê nhà, muốn đăng ký thường trú", "advice_only", "not_requested", "nhà thuê"),
-            ("Đăng ký xe máy mới cần gì?", "advice_only", "not_requested", "ĐKX10"),
+            ("Đăng ký xe máy mới cần gì?", "advice_only", "not_requested", "cấp tỉnh và cấp xã"),
             ("Tôi muốn sang tên xe máy", "advice_only", "not_requested", "Công an cấp xã được phân cấp"),
             ("Con tôi 10 tuổi cần làm căn cước", "advice_only", "not_requested", "dưới 14 tuổi"),
-            ("Tôi bị mất căn cước", "advice_only", "not_requested", "Công an cấp tỉnh"),
-            ("Thẻ căn cước của tôi bị hư hỏng", "advice_only", "not_requested", "Công an cấp tỉnh"),
+            ("Tôi bị mất căn cước", "advice_only", "not_requested", "Công an cấp xã"),
+            ("Thẻ căn cước của tôi bị hư hỏng", "advice_only", "not_requested", "Công an cấp xã"),
             ("Tôi bị người khác đánh", "advice_only", "not_requested", "đi khám"),
             ("Tôi bị đánh, thương tích 5%", "advice_only", "not_requested", "Điều 134"),
             ("Người đó dùng dao đánh tôi", "advice_only", "not_requested", "cần làm rõ"),
@@ -42,12 +42,12 @@ class DemoAcceptanceTests(unittest.TestCase):
             ("Tôi bị người khác đe dọa", "advice_only", "not_requested", "Sự việc xảy ra khi nào"),
             ("Tôi bị mất điện thoại", "advice_only", "not_requested", "chưa có nguồn"),
             ("Tôi bị mất giấy tờ", "advice_only", "not_requested", "chưa có nguồn"),
-            ("Tôi muốn đổi căn cước", "advice_only", "not_requested", "Công an cấp tỉnh"),
+            ("Tôi muốn đổi căn cước", "advice_only", "not_requested", "Công an cấp xã"),
             ("Tôi cần cấp căn cước lần đầu", "advice_only", "not_requested", "đủ 14 tuổi chưa"),
             ("Tôi muốn nộp hồ sơ đăng ký xe máy mới", "intake_requested", "needs_information", "đăng ký lần đầu"),
             ("Tôi muốn trình báo bị đe dọa", "intake_requested", "needs_information", "Sự việc xảy ra khi nào"),
             ("Có được bảo mật người tố giác không?", "advice_only", "not_requested", "giữ bí mật"),
-            ("Tôi cần xác nhận cư trú", "advice_only", "not_requested", "nguồn"),
+            ("Tôi cần xác nhận cư trú", "advice_only", "not_requested", "1/2 ngày làm việc"),
             ("Tôi muốn hỏi về giấy phép xây dựng", "advice_only", "not_requested", "Anh/chị đang hỏi về xây dựng"),
         )
         forbidden_phone = ("113", "114", "115")
@@ -59,6 +59,7 @@ class DemoAcceptanceTests(unittest.TestCase):
                 self.assertEqual(result["mode"], mode)
                 self.assertEqual(result["handoff_status"], handoff)
                 self.assertIn(phrase, answer)
+                self.assertNotIn("Công an cấp huyện", answer)
                 self.assertFalse(any(number in answer for number in forbidden_phone))
 
     def test_four_turn_assault_context_keeps_new_facts(self):
