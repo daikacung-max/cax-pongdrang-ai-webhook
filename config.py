@@ -10,12 +10,16 @@ GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1/chat/
 OPENAI_API_KEY = "".join((os.getenv("OPENAI_API_KEY") or "").split())
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1/chat/completions")
 
-# AI Core đầy đủ dùng 120B. Zalo Dynamic bị giới hạn thời gian phản hồi rất ngắn,
-# nên dùng GPT-OSS 20B cho nhánh real-time; câu trả lời pháp luật vẫn đi qua
-# retrieval + verifier/fallback dựa trên nguồn.
-ANSWER_MODEL = os.getenv("ANSWER_MODEL", "openai/gpt-oss-120b")
-DYNAMIC_ANSWER_MODEL = os.getenv("DYNAMIC_ANSWER_MODEL", "openai/gpt-oss-20b")
-PLANNER_MODEL = os.getenv("PLANNER_MODEL", "openai/gpt-oss-20b")
+# AI Core ưu tiên GPT-5.6 khi OpenAI API đã được cấu hình. Nếu chưa có khóa
+# OpenAI, hệ thống tự giữ GPT-OSS/Groq để production không bị gián đoạn.
+# Dynamic: Luna (tốc độ/chi phí), Full Core: Terra (cân bằng), escalation: Sol.
+_DEFAULT_DYNAMIC_MODEL = "gpt-5.6-luna" if OPENAI_API_KEY else "openai/gpt-oss-20b"
+_DEFAULT_ANSWER_MODEL = "gpt-5.6-terra" if OPENAI_API_KEY else "openai/gpt-oss-120b"
+_DEFAULT_PLANNER_MODEL = "gpt-5.6-luna" if OPENAI_API_KEY else "openai/gpt-oss-20b"
+
+ANSWER_MODEL = os.getenv("ANSWER_MODEL", _DEFAULT_ANSWER_MODEL)
+DYNAMIC_ANSWER_MODEL = os.getenv("DYNAMIC_ANSWER_MODEL", _DEFAULT_DYNAMIC_MODEL)
+PLANNER_MODEL = os.getenv("PLANNER_MODEL", _DEFAULT_PLANNER_MODEL)
 ESCALATION_MODEL = os.getenv("ESCALATION_MODEL", "gpt-5.6-sol")
 DYNAMIC_CANDIDATE_MODEL = os.getenv("DYNAMIC_CANDIDATE_MODEL", "gpt-5.6-luna")
 FULL_CORE_CANDIDATE_MODEL = os.getenv("FULL_CORE_CANDIDATE_MODEL", "gpt-5.6-terra")
@@ -32,10 +36,13 @@ CORE_REASONING_EFFORT = os.getenv("CORE_REASONING_EFFORT", "medium")
 # GPT-OSS trên Groq tính token suy luận vào cùng ngân sách hoàn thành. Với câu
 # trả lời có nguồn dài, mức thấp dành phần ngân sách còn lại cho JSON trả lời.
 GROQ_CORE_REASONING_EFFORT = os.getenv("GROQ_CORE_REASONING_EFFORT", "low")
-DYNAMIC_REASONING_EFFORT = os.getenv("DYNAMIC_REASONING_EFFORT", "low")
+DYNAMIC_REASONING_EFFORT = os.getenv(
+    "DYNAMIC_REASONING_EFFORT",
+    "none" if str(DYNAMIC_ANSWER_MODEL).startswith("gpt-5.6") else "low",
+)
 CORE_TIMEOUT_SECONDS = float(os.getenv("CORE_TIMEOUT_SECONDS", "12"))
-# Dynamic GET có thể phải đợi webhook tới khoảng 0.4-0.6s; dành khoảng 1.05s cho model.
-# Nếu model chậm, AI Core tự dùng grounded fallback từ nguồn đã kiểm chứng.
+# Dynamic phải fail-fast. Nếu model chậm, AI Core dùng grounded fallback từ
+# nguồn đã kiểm chứng thay vì kéo dài vượt deadline của kênh Zalo.
 DYNAMIC_TIMEOUT_SECONDS = float(os.getenv("DYNAMIC_TIMEOUT_SECONDS", "1.05"))
 MAX_ZALO_MESSAGES = int(os.getenv("MAX_ZALO_MESSAGES", "4"))
 TARGET_ZALO_CHARS = int(os.getenv("TARGET_ZALO_CHARS", "650"))
