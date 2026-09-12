@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Verify production health, legal anchor, and live provider
+      - name: Verify production health, legal anchor, live provider, and Zalo security
         shell: bash
         run: |
           python - <<'PY'
@@ -67,6 +67,7 @@ jobs:
                   assert health.get("mode") == "CAX_PONG_DRANG_AI_CORE", "AI Core mode"
                   assert health.get("unit") == "Công an xã Pơng Drang, tỉnh Đắk Lắk", "unit"
                   assert health.get("hotline") == "02623509777", "hotline"
+                  assert readiness.get("production_mode") is True, "production mode"
                   assert readiness.get("model_routing_mode") == "auto", "model routing"
                   assert article.get("found") is True, "article 134 missing"
                   assert str(article.get("article")) == "134", "article mismatch"
@@ -86,8 +87,16 @@ jobs:
                   assert health.get("core_answer_provider") == expected_provider, f"core provider={health.get('core_answer_provider')}"
                   assert health.get("dynamic_answer_provider") == expected_provider, f"dynamic provider={health.get('dynamic_answer_provider')}"
 
-                  # Neutral prompt: this smoke checks provider liveness and output
-                  # plumbing, not the special greeting policy enforced by verifier.
+                  # Production webhook is fail-closed: if enabled it must have
+                  # configured signing credentials and enforce verification.
+                  if readiness.get("zalo_webhook_enabled"):
+                      assert readiness.get("zalo_signature_ready") is True, "Zalo signature credentials missing"
+                      assert readiness.get("zalo_signature_required") is True, "Zalo signature check disabled"
+                  if readiness.get("zalo_direct_reply_enabled"):
+                      assert readiness.get("zalo_direct_reply_ready") is True, "Zalo OA token missing"
+
+                  # Neutral prompt checks provider liveness/output plumbing,
+                  # independent from special greeting-verifier behavior.
                   payload = json.dumps({
                       "user_id": "synthetic-smoke-" + uuid.uuid4().hex,
                       "message": "Trợ lý có thể hỗ trợ tôi những nội dung gì?"
