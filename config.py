@@ -68,9 +68,20 @@ ZALO_WEBHOOK_SIGNATURE_REQUIRED = bool(
 )
 ZALO_APP_ID = os.getenv("ZALO_APP_ID", "").strip()
 ZALO_OA_SECRET_KEY = os.getenv("ZALO_OA_SECRET_KEY", "").strip()
-# OA access token is stored only as a Render secret; direct replies remain off by default.
+
+# Direct Reply ở chế độ AUTO: khi OA Access Token hợp lệ xuất hiện, production
+# tự chuyển từ đường Dynamic/pending sang gửi phản hồi trực tiếp qua OA API.
+# Có thể ép "dynamic" để tắt hoặc "direct" để yêu cầu direct reply rõ ràng.
 ZALO_OA_ACCESS_TOKEN = os.getenv("ZALO_OA_ACCESS_TOKEN", "").strip()
-ZALO_DIRECT_REPLY_ENABLED = os.getenv("ZALO_DIRECT_REPLY_ENABLED", "false").lower() in ("1", "true", "yes", "on")
+ZALO_REPLY_MODE = os.getenv("ZALO_REPLY_MODE", "auto").strip().lower()
+_requested_direct_reply = os.getenv("ZALO_DIRECT_REPLY_ENABLED", "false").lower() in ("1", "true", "yes", "on")
+ZALO_DIRECT_REPLY_ENABLED = bool(
+    _requested_direct_reply
+    or (ZALO_REPLY_MODE == "direct")
+    or (ZALO_REPLY_MODE == "auto" and PRODUCTION_MODE and ZALO_WEBHOOK_ENABLED and ZALO_OA_ACCESS_TOKEN)
+)
+if ZALO_REPLY_MODE == "dynamic":
+    ZALO_DIRECT_REPLY_ENABLED = False
 
 # Lịch sử hội thoại dùng Postgres khi DATABASE_URL được cấu hình; local/test vẫn
 # dùng SQLite. user_id luôn được HMAC trước khi ghi xuống storage.
