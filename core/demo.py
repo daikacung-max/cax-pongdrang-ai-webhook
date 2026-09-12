@@ -5,7 +5,8 @@ from core.clarification import clarification_for_unverified_topic
 from core.intake import assess
 from core.planner import plan
 from core.retrieval import retrieve
-from core.verifier import finalize, grounded_dynamic_fallback
+from core.verifier import finalize
+from core.current_fallback import grounded_dynamic_fallback
 
 
 def _no_source_answer(intake, question=""):
