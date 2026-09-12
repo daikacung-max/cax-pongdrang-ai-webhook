@@ -11,6 +11,23 @@ def utc_now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def knowledge_as_of(as_of=None):
+    """Ngày chốt hiệu lực của kho tri thức, định dạng YYYY-MM-DD.
+
+    Mặc định dùng ngày UTC hiện tại. Test/audit có thể truyền ngày cụ thể để
+    tái hiện chính xác trạng thái pháp luật tại một thời điểm lịch sử.
+    """
+    value = str(as_of or "").strip()
+    return value[:10] if value else datetime.now(timezone.utc).date().isoformat()
+
+
+def _active_sql(alias, as_of):
+    return (
+        f"({alias}.effective_from IS NULL OR {alias}.effective_from='' OR {alias}.effective_from<=?) "
+        f"AND ({alias}.effective_to IS NULL OR {alias}.effective_to='' OR {alias}.effective_to>=?)"
+    ), [as_of, as_of]
+
+
 @contextmanager
 def connect():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -108,6 +125,32 @@ def upsert_document(doc):
         ))
 
 
+def expire_document(document_id, effective_to):
+    """Ngừng một snapshot cũ mà không xóa dấu vết audit của nó."""
+    with connect() as con:
+        con.execute("UPDATE documents SET effective_to=? WHERE id=?", (str(effective_to), str(document_id)))
+
+
+def get_document(document_id, as_of=None, include_inactive=False):
+    with connect() as con:
+        sql = "SELECT * FROM documents d WHERE d.id=?"
+        params = [str(document_id)]
+        if not include_inactive:
+            day = knowledge_as_of(as_of)
+            active, active_params = _active_sql("d", day)
+            sql += " AND " + active
+            params.extend(active_params)
+        row = con.execute(sql, params).fetchone()
+        if not row:
+            return None
+        result = dict(row)
+        try:
+            result["metadata"] = json.loads(result.get("metadata_json") or "{}")
+        except Exception:
+            result["metadata"] = {}
+        return result
+
+
 def replace_document_units(document_id, units):
     with connect() as con:
         old_ids = [row["id"] for row in con.execute(
@@ -138,32 +181,53 @@ def replace_document_units(document_id, units):
             ))
 
 
-def get_unit(unit_id):
+def get_unit(unit_id, as_of=None, include_inactive=False):
     with connect() as con:
-        row = con.execute("""
+        sql = """
             SELECT u.*, d.title AS document_title, d.number AS document_number,
                    d.issuer AS document_issuer, d.source_path
             FROM legal_units u JOIN documents d ON d.id=u.document_id
             WHERE u.id=?
-        """, (unit_id,)).fetchone()
+        """
+        params = [unit_id]
+        if not include_inactive:
+            day = knowledge_as_of(as_of)
+            for alias in ("d", "u"):
+                active, active_params = _active_sql(alias, day)
+                sql += " AND " + active
+                params.extend(active_params)
+        row = con.execute(sql, params).fetchone()
         return dict(row) if row else None
 
 
-def get_article(document_id, article):
+def get_article(document_id, article, as_of=None, include_inactive=False):
     with connect() as con:
-        rows = con.execute("""
+        sql = """
             SELECT u.*, d.title AS document_title, d.number AS document_number,
                    d.issuer AS document_issuer, d.source_path
             FROM legal_units u JOIN documents d ON d.id=u.document_id
-            WHERE u.document_id=? AND u.article=? ORDER BY u.id
-        """, (document_id, str(article))).fetchall()
+            WHERE u.document_id=? AND u.article=?
+        """
+        params = [document_id, str(article)]
+        if not include_inactive:
+            day = knowledge_as_of(as_of)
+            for alias in ("d", "u"):
+                active, active_params = _active_sql(alias, day)
+                sql += " AND " + active
+                params.extend(active_params)
+        sql += " ORDER BY u.id"
+        rows = con.execute(sql, params).fetchall()
         return [dict(x) for x in rows]
 
 
-def search_fts(query, limit=8, document_ids=None):
+def search_fts(query, limit=8, document_ids=None, as_of=None):
     query = (query or "").strip()
     if not query:
         return []
+    day = knowledge_as_of(as_of)
+    # Xin nhiều candidate hơn giới hạn đầu ra để snapshot hết hiệu lực không làm
+    # mất chỗ của nguồn đang hoạt động trong top-k.
+    raw_limit = max(int(limit) * 4, 32)
     with connect() as con:
         sql = """
             SELECT f.unit_id, bm25(legal_units_fts, 0.0, 0.0, 3.0, 5.0, 1.0) AS rank
@@ -175,35 +239,42 @@ def search_fts(query, limit=8, document_ids=None):
             sql += f" AND f.document_id IN ({placeholders})"
             params.extend(document_ids)
         sql += " ORDER BY rank LIMIT ?"
-        params.append(int(limit))
+        params.append(raw_limit)
         try:
             ids = con.execute(sql, params).fetchall()
         except sqlite3.OperationalError:
             return []
     result = []
     for row in ids:
-        unit = get_unit(row["unit_id"])
+        unit = get_unit(row["unit_id"], as_of=day)
         if unit:
             unit["_rank"] = row["rank"]
             result.append(unit)
+            if len(result) >= int(limit):
+                break
     return result
 
 
-def search_like(query, limit=8):
+def search_like(query, limit=8, as_of=None):
     tokens = [x for x in query.split() if len(x) >= 2][:5]
     if not tokens:
         return []
+    day = knowledge_as_of(as_of)
     with connect() as con:
         clauses, params = [], []
         for token in tokens:
             clauses.append("(u.title LIKE ? OR u.text LIKE ?)")
             params.extend([f"%{token}%", f"%{token}%"])
+        d_active, d_params = _active_sql("d", day)
+        u_active, u_params = _active_sql("u", day)
         sql = f"""
             SELECT u.*, d.title AS document_title, d.number AS document_number,
                    d.issuer AS document_issuer, d.source_path
             FROM legal_units u JOIN documents d ON d.id=u.document_id
-            WHERE {' OR '.join(clauses)} LIMIT ?
+            WHERE ({' OR '.join(clauses)}) AND {d_active} AND {u_active}
+            LIMIT ?
         """
+        params.extend(d_params + u_params)
         params.append(int(limit))
         return [dict(x) for x in con.execute(sql, params).fetchall()]
 
