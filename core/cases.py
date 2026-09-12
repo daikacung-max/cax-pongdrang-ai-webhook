@@ -16,6 +16,7 @@ import sqlite3
 
 OPEN_STATUSES = ("received", "in_review", "needs_information", "transferred")
 ALLOWED_STATUSES = OPEN_STATUSES + ("closed",)
+DEMO_USER_PREFIXES = ("demo:", "demo-ai:")
 
 
 def _now():
@@ -71,7 +72,14 @@ def init_schema():
 
 
 def create_or_get_open(user_id, intake):
-    """Tạo đúng một hồ sơ đang mở cho cùng người và nhóm việc."""
+    """Tạo đúng một hồ sơ đang mở cho cùng người và nhóm việc.
+
+    Các phiên thử nghiệm có prefix ``demo:``/``demo-ai:`` tuyệt đối không được
+    tạo hồ sơ thật, dù nội dung thử có câu "tôi muốn nộp hồ sơ".
+    """
+    raw_user_id = str(user_id or "").strip().lower()
+    if raw_user_id.startswith(DEMO_USER_PREFIXES):
+        return None
     if intake.get("handoff_status") != "ready_for_officer":
         return None
     procedure = str(intake.get("procedure_code") or "").strip()
