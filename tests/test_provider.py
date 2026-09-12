@@ -46,13 +46,15 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(provider.payload["reasoning_effort"], "low")
         self.assertNotIn("reasoning_format", provider.payload)
 
-    def test_full_groq_answer_uses_text_mode(self):
+    def test_full_groq_answer_uses_text_mode_with_reasoning_headroom(self):
         with patch("core.answerer.chat_text", return_value="Anh/chị nên giữ lại video camera.") as text_call:
             from core.answerer import answer
-            result = answer("Tôi có camera", [], legal_context="SOURCE", model="openai/gpt-oss-20b")
+            result = answer("Tôi có camera", [], legal_context="SOURCE", model="openai/gpt-oss-120b")
         self.assertEqual(result["answer"], "Anh/chị nên giữ lại video camera.")
         self.assertEqual(result["legal_claims"], [])
         text_call.assert_called_once()
+        self.assertEqual(text_call.call_args.kwargs["max_completion_tokens"], 1600)
+        self.assertEqual(text_call.call_args.kwargs["reasoning_effort"], "low")
 
 
 if __name__ == "__main__":
