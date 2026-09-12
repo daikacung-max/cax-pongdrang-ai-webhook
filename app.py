@@ -1,56 +1,26 @@
 """Stable WSGI entrypoint for CAX PƠNG DRANG AI CORE.
 
-The implementation lives in :mod:`app_core`.  This module intentionally keeps
-backwards compatibility with existing tests/operational tools that import or
-patch selected ``app.*`` globals.
+The implementation lives in :mod:`app_core`.  After optional integrations are
+mounted, ``app`` is aliased to that runtime module so legacy imports/patches and
+production routes always reference the same state.
 """
 
 import os
 import sys
-import types
 
 import app_core as _app_core
 from adapters.vbee_tts import blueprint as vbee_blueprint
 from config import LOCAL_BIND_HOST
 
 
-app = _app_core.app
-ensure_legal_db = _app_core.ensure_legal_db
-split_zalo_messages = _app_core.split_zalo_messages
+if "vbee_tts" not in _app_core.app.blueprints:
+    _app_core.app.register_blueprint(vbee_blueprint)
 
-# Existing tests and small operational scripts historically patched these names
-# on ``app``. Route functions now live in app_core, so assignments must be
-# mirrored there as well or the patch would look successful while doing nothing.
-_FORWARD_NAMES = {
-    "OFFICER_API_TOKEN",
-    "ENABLE_DEMO_CONSOLE",
-    "ZALO_WEBHOOK_ENABLED",
-    "ZALO_WEBHOOK_SIGNATURE_REQUIRED",
-    "ZALO_APP_ID",
-    "ZALO_OA_SECRET_KEY",
-    "ZALO_DIRECT_REPLY_ENABLED",
-    "core",
-    "pending",
-}
-for _name in _FORWARD_NAMES:
-    globals()[_name] = getattr(_app_core, _name)
-
-
-class _CompatModule(types.ModuleType):
-    def __setattr__(self, name, value):
-        if name in _FORWARD_NAMES:
-            setattr(_app_core, name, value)
-        super().__setattr__(name, value)
-
-
-sys.modules[__name__].__class__ = _CompatModule
-
-# Register optional integrations only at the stable entrypoint.
-if "vbee_tts" not in app.blueprints:
-    app.register_blueprint(vbee_blueprint)
-
-__all__ = ["app", "ensure_legal_db", "split_zalo_messages"] + sorted(_FORWARD_NAMES)
+# One module state only. This preserves ``from app import app`` and helpers such
+# as split_zalo_messages while ensuring patch("app.X") changes the exact globals
+# used by Flask route functions defined in app_core.
+sys.modules[__name__] = _app_core
 
 
 if __name__ == "__main__":
-    app.run(host=LOCAL_BIND_HOST, port=int(os.getenv("PORT", "10000")))
+    _app_core.app.run(host=LOCAL_BIND_HOST, port=int(os.getenv("PORT", "10000")))
