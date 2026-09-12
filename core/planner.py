@@ -33,7 +33,6 @@ PLAN_SCHEMA = {
 
 
 def _fix_common_typos(text):
-    """Chuẩn hóa một số lỗi gõ rất thường gặp trước khi phân loại ý định."""
     q = str(text or "")
     replacements = {
         "thuong chu": "thuong tru",
@@ -61,7 +60,7 @@ def _norm(text):
     return _fix_common_typos(text)
 
 
-# Từ vựng này chỉ dùng để tạo truy vấn tìm nguồn, không phải câu trả lời mẫu.
+# Từ vựng này chỉ tạo truy vấn fallback/local. Nó không phải câu trả lời mẫu.
 SEARCH_VOCAB = [
     (["bi danh", "danh nguoi", "nguoi khac danh", "bi nguoi khac danh", "bi thuong", "thuong tich", "dung dao", "hung khi"],
      "Tội cố ý gây thương tích hoặc gây tổn hại cho sức khỏe của người khác"),
@@ -94,8 +93,6 @@ LEGAL_HINTS = [
     "dang ky xe", "sang ten", "chuyen nhuong", "thu hoi", "can cuoc", "to giac", "thuong tich", "bi thuong", "bi danh", "nguoi khac danh", "hanh hung", "camera", "dung dao", "hung khi",
     "bi lua", "bi lua chuyen khoan", "nguoi lua dao", "chuyen tien", "chuyen khoan", "bi scam", "trom", "ma tuy", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid",
     "dinh danh dien tu", "tai khoan dinh danh", "xe mo to", "xe may", "xe gan may", "bien so xe", "ho khau", "nhap khau",
-    # Các cụm dưới đây vẫn đi vào cổng fail-closed nếu chưa có nguồn được duyệt;
-    # chúng không cho phép model tự trả lời chi tiết bằng kiến thức nền.
     "ho chieu", "xuat nhap canh", "thi thuc", "ly lich tu phap", "khieu nai", "to cao", "don thu", "khoi kien", "toa an", "thi hanh an", "trieu tap", "dieu tra", "luat su", "dat dai", "tranh chap dat", "nha o", "thue nha", "ly hon", "thua ke", "hop dong", "vay tien", "no tien", "lao dong", "bao hiem xa hoi", "bhxh", "thue", "hoa don", "khai sinh", "khai tu", "ket hon", "ho tich", "tai khoan bi hack", "mat zalo", "mat facebook", "o nhiem", "tieng on", "karaoke", "loa keo", "xay dung", "phong chay", "chua chay", "pccc", "co bac", "bao luc gia dinh", "xam hai tre em", "mat nguoi", "that lac nguoi", "vu khi", "cong cu ho tro", "phao", "phat giao thong", "phat nguoi", "giay phep lai xe",
 ]
 
@@ -106,7 +103,6 @@ def _contextual_question(question, history):
         for x in history
         if x.get("role") == "user" and str(x.get("content") or "").strip()
     ]
-    # Tính cả câu hiện tại trong ngân sách tối đa bốn lượt người dùng.
     context = (previous_user_turns + [str(question or "").strip()])[
         -max(1, RETRIEVAL_HISTORY_USER_TURNS):
     ]
@@ -138,12 +134,74 @@ def quick_plan(question):
     }
 
 
+def _sanitize_plan(candidate, baseline, contextual):
+    """Giữ planner AI trong vai trò tạo truy vấn; không cho nó tạo căn cứ pháp lý."""
+    result = dict(baseline)
+    if not isinstance(candidate, dict):
+        return result
+
+    result["is_legal"] = bool(candidate.get("is_legal") or baseline.get("is_legal"))
+    queries = []
+    for value in list(candidate.get("search_queries") or []) + list(baseline.get("search_queries") or []):
+        value = str(value or "").strip()
+        if value and value not in queries:
+            queries.append(value[:220])
+    if contextual and contextual not in queries:
+        queries.append(contextual[:220])
+    result["search_queries"] = queries[:4]
+
+    # Chỉ chấp nhận số Điều thực sự xuất hiện trong hội thoại, tránh planner tự bịa.
+    explicit_in_text = set(re.findall(r"\bdieu\s+(\d+[a-z]?)\b", _norm(contextual)))
+    refs = []
+    for item in candidate.get("explicit_references") or []:
+        article = str((item or {}).get("article") or "").lower().strip()
+        if article in explicit_in_text:
+            refs.append({"law_hint": str((item or {}).get("law_hint") or "")[:120], "article": article})
+    for item in baseline.get("explicit_references") or []:
+        if item not in refs:
+            refs.append(item)
+    result["explicit_references"] = refs[:4]
+
+    result["needs_clarification"] = bool(candidate.get("needs_clarification", False))
+    question = candidate.get("clarification_question")
+    result["clarification_question"] = str(question).strip()[:280] if question else None
+    complexity = candidate.get("complexity")
+    result["complexity"] = complexity if complexity in ("simple", "complex") else baseline.get("complexity", "simple")
+    reasons = [str(x or "").strip()[:120] for x in candidate.get("complexity_reasons") or [] if str(x or "").strip()]
+    result["complexity_reasons"] = reasons[:3]
+    return result
+
+
 def plan(question, history, dynamic=False, safety_identifier=None):
     contextual = _contextual_question(question, history)
-    # Trong pilot, planner xác định bằng quy tắc trên ngữ cảnh gần nhất thay vì
-    # để model tự viết truy vấn. Các nhóm nguồn đã duyệt đều có từ vựng/điều
-    # kiện rõ ràng; cách này giữ nguyên luồng Planner -> FTS5 nhưng ngăn một
-    # model phản hồi không ổn định kéo Điều luật không liên quan vào câu trả lời.
-    # Những nội dung chưa có nguồn tiếp tục đi fail-closed.
     baseline = quick_plan(contextual)
-    return baseline
+
+    # Zalo Dynamic tuyệt đối không tốn thêm model call: planner cục bộ + retrieval.
+    if dynamic:
+        return baseline
+
+    system = """
+Bạn là bộ lập kế hoạch truy xuất nguồn cho CAX PƠNG DRANG AI CORE.
+Không trả lời người dân, không kết luận tội danh, không tự viết nội dung pháp luật.
+Nhiệm vụ duy nhất: hiểu câu hỏi mới trong mạch hội thoại, xác định có cần nguồn pháp luật/TTHC hay không, và tạo tối đa 4 truy vấn ngắn để tìm đúng nguồn.
+Nếu người dân chỉ nói thêm một dữ kiện ngắn như tỷ lệ thương tích, dùng dao, có camera, hãy hiểu đó có thể là phần tiếp theo của vụ việc trước.
+Chỉ ghi explicit_references khi chính người dân đã nêu rõ số Điều. Không tự đoán số Điều.
+Đánh dấu complexity=complex khi phải kết hợp nhiều nhánh pháp lý, nhiều văn bản, nhiều tình tiết có thể thay đổi kết quả, hoặc cần đối chiếu ngoại lệ.
+""".strip()
+    user = f"Ngữ cảnh hội thoại cần lập kế hoạch truy xuất:\n{contextual}"
+    try:
+        candidate = chat_structured(
+            model=PLANNER_MODEL,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            schema_name="legal_search_plan",
+            schema=PLAN_SCHEMA,
+            reasoning_effort="low",
+            timeout=min(CORE_TIMEOUT_SECONDS, 4.0),
+            temperature=0.0,
+            max_completion_tokens=320,
+            safety_identifier=safety_identifier,
+        )
+        return _sanitize_plan(candidate, baseline, contextual)
+    except Exception:
+        # Provider/planner không bao giờ được làm hỏng khả năng trả lời cốt lõi.
+        return baseline
