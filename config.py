@@ -10,16 +10,25 @@ GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1/chat/
 OPENAI_API_KEY = "".join((os.getenv("OPENAI_API_KEY") or "").split())
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1/chat/completions")
 
-# AI Core ưu tiên GPT-5.6 khi OpenAI API đã được cấu hình. Nếu chưa có khóa
-# OpenAI, hệ thống tự giữ GPT-OSS/Groq để production không bị gián đoạn.
-# Dynamic: Luna (tốc độ/chi phí), Full Core: Terra (cân bằng), escalation: Sol.
-_DEFAULT_DYNAMIC_MODEL = "gpt-5.6-luna" if OPENAI_API_KEY else "openai/gpt-oss-20b"
-_DEFAULT_ANSWER_MODEL = "gpt-5.6-terra" if OPENAI_API_KEY else "openai/gpt-oss-120b"
-_DEFAULT_PLANNER_MODEL = "gpt-5.6-luna" if OPENAI_API_KEY else "openai/gpt-oss-20b"
+# Model routing mặc định ở chế độ AUTO. Các biến ANSWER_MODEL/DYNAMIC_ANSWER_MODEL
+# cũ trên Render sẽ không vô tình ghim hệ thống vào một model mãi mãi. Khi OpenAI
+# API key tồn tại, AI Core tự dùng GPT-5.6; nếu chưa có, hệ thống giữ GPT-OSS/Groq
+# để không làm gián đoạn dịch vụ. Chuyển MODEL_ROUTING_MODE=manual nếu cần khóa
+# model thủ công cho một đợt thử nghiệm có chủ đích.
+MODEL_ROUTING_MODE = os.getenv("MODEL_ROUTING_MODE", "auto").strip().lower()
+_AUTO_DYNAMIC_MODEL = "gpt-5.6-luna" if OPENAI_API_KEY else "openai/gpt-oss-20b"
+_AUTO_ANSWER_MODEL = "gpt-5.6-terra" if OPENAI_API_KEY else "openai/gpt-oss-120b"
+_AUTO_PLANNER_MODEL = "gpt-5.6-luna" if OPENAI_API_KEY else "openai/gpt-oss-20b"
 
-ANSWER_MODEL = os.getenv("ANSWER_MODEL", _DEFAULT_ANSWER_MODEL)
-DYNAMIC_ANSWER_MODEL = os.getenv("DYNAMIC_ANSWER_MODEL", _DEFAULT_DYNAMIC_MODEL)
-PLANNER_MODEL = os.getenv("PLANNER_MODEL", _DEFAULT_PLANNER_MODEL)
+if MODEL_ROUTING_MODE == "manual":
+    ANSWER_MODEL = os.getenv("ANSWER_MODEL", _AUTO_ANSWER_MODEL).strip() or _AUTO_ANSWER_MODEL
+    DYNAMIC_ANSWER_MODEL = os.getenv("DYNAMIC_ANSWER_MODEL", _AUTO_DYNAMIC_MODEL).strip() or _AUTO_DYNAMIC_MODEL
+    PLANNER_MODEL = os.getenv("PLANNER_MODEL", _AUTO_PLANNER_MODEL).strip() or _AUTO_PLANNER_MODEL
+else:
+    ANSWER_MODEL = _AUTO_ANSWER_MODEL
+    DYNAMIC_ANSWER_MODEL = _AUTO_DYNAMIC_MODEL
+    PLANNER_MODEL = _AUTO_PLANNER_MODEL
+
 ESCALATION_MODEL = os.getenv("ESCALATION_MODEL", "gpt-5.6-sol")
 DYNAMIC_CANDIDATE_MODEL = os.getenv("DYNAMIC_CANDIDATE_MODEL", "gpt-5.6-luna")
 FULL_CORE_CANDIDATE_MODEL = os.getenv("FULL_CORE_CANDIDATE_MODEL", "gpt-5.6-terra")
