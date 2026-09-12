@@ -7,15 +7,9 @@ from config import PENDING_TTL_SECONDS
 
 class PendingZaloMessages:
     """
-    Hàng đợi tương thích Zalo Chatbot Dynamic.
-
-    Log thực tế cho thấy GET /zalo/ai có thể đến TRƯỚC POST /zalo/webhook.
-    Vì timestamp của Render là lúc request hoàn tất, khoảng chênh nhìn thấy 100-150ms
-    có thể tương ứng gần 400ms tính từ lúc GET bắt đầu. Do đó pop() chờ tối đa 0.65s
-    để webhook kịp đưa câu hỏi vào hàng đợi.
-
-    Nếu Dynamic không truyền user_id thì vẫn fallback FIFO. Kiến trúc này phù hợp
-    demo/tải thấp; AI Core /api/chat vẫn dùng user_id riêng chính xác.
+    Hàng đợi tương thích Zalo Chatbot Dynamic, đồng thời giữ bộ nhớ chống lặp
+    webhook theo msg_id. Direct Reply chỉ cần claim msg_id mà không để lại một
+    pending message có thể bị /zalo/ai xử lý lại lần thứ hai.
     """
 
     def __init__(self):
@@ -32,13 +26,25 @@ class PendingZaloMessages:
             if now - ts > 180:
                 self._seen.pop(msg_id, None)
 
+    def _claim_locked(self, msg_id=""):
+        msg_id = str(msg_id or "").strip()
+        if msg_id and msg_id in self._seen:
+            return False
+        if msg_id:
+            self._seen[msg_id] = time.time()
+        return True
+
+    def claim(self, msg_id=""):
+        """Đánh dấu một webhook đã nhận mà không đưa nội dung vào pending queue."""
+        with self._condition:
+            self._purge_locked()
+            return self._claim_locked(msg_id)
+
     def push(self, user_id, text, msg_id=""):
         with self._condition:
             self._purge_locked()
-            if msg_id and msg_id in self._seen:
+            if not self._claim_locked(msg_id):
                 return False
-            if msg_id:
-                self._seen[msg_id] = time.time()
             self._queue.append({
                 "user_id": str(user_id),
                 "text": str(text),
