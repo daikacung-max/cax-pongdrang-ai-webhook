@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Wait for production and verify health, legal anchor, and live provider
+      - name: Verify production health, legal anchor, and live provider
         shell: bash
         run: |
           python - <<'PY'
@@ -54,37 +54,37 @@ jobs:
 
           base = "https://cax-pongdrang-ai.onrender.com"
           last_error = None
-          for _ in range(24):
+          for attempt in range(1, 7):
               try:
-                  with urllib.request.urlopen(base + "/health", timeout=8) as r:
+                  with urllib.request.urlopen(base + "/health", timeout=6) as r:
                       health = json.load(r)
-                  with urllib.request.urlopen(base + "/health/readiness", timeout=8) as r:
+                  with urllib.request.urlopen(base + "/health/readiness", timeout=6) as r:
                       readiness = json.load(r)
-                  with urllib.request.urlopen(base + "/debug/article/134", timeout=8) as r:
+                  with urllib.request.urlopen(base + "/debug/article/134", timeout=6) as r:
                       article = json.load(r)
 
-                  assert health.get("status") == "ok"
-                  assert health.get("mode") == "CAX_PONG_DRANG_AI_CORE"
-                  assert health.get("unit") == "Công an xã Pơng Drang, tỉnh Đắk Lắk"
-                  assert health.get("hotline") == "02623509777"
-                  assert readiness.get("model_routing_mode") == "auto"
-                  assert article.get("found") is True
-                  assert str(article.get("article")) == "134"
+                  assert health.get("status") == "ok", "health status"
+                  assert health.get("mode") == "CAX_PONG_DRANG_AI_CORE", "AI Core mode"
+                  assert health.get("unit") == "Công an xã Pơng Drang, tỉnh Đắk Lắk", "unit"
+                  assert health.get("hotline") == "02623509777", "hotline"
+                  assert readiness.get("model_routing_mode") == "auto", "model routing"
+                  assert article.get("found") is True, "article 134 missing"
+                  assert str(article.get("article")) == "134", "article mismatch"
 
                   if readiness.get("openai_provider_ready"):
                       expected_core = "gpt-5.6-terra"
                       expected_dynamic = "gpt-5.6-luna"
                       expected_provider = "openai"
                   else:
-                      assert readiness.get("groq_provider_ready") is True
+                      assert readiness.get("groq_provider_ready") is True, "no LLM provider ready"
                       expected_core = "openai/gpt-oss-120b"
                       expected_dynamic = "openai/gpt-oss-20b"
                       expected_provider = "groq"
 
-                  assert health.get("core_answer_model") == expected_core
-                  assert health.get("dynamic_answer_model") == expected_dynamic
-                  assert health.get("core_answer_provider") == expected_provider
-                  assert health.get("dynamic_answer_provider") == expected_provider
+                  assert health.get("core_answer_model") == expected_core, f"core model={health.get('core_answer_model')}"
+                  assert health.get("dynamic_answer_model") == expected_dynamic, f"dynamic model={health.get('dynamic_answer_model')}"
+                  assert health.get("core_answer_provider") == expected_provider, f"core provider={health.get('core_answer_provider')}"
+                  assert health.get("dynamic_answer_provider") == expected_provider, f"dynamic provider={health.get('dynamic_answer_provider')}"
 
                   payload = json.dumps({
                       "user_id": "synthetic-smoke-" + uuid.uuid4().hex,
@@ -96,19 +96,19 @@ jobs:
                       headers={"Content-Type": "application/json"},
                       method="POST",
                   )
-                  with urllib.request.urlopen(req, timeout=25) as r:
+                  with urllib.request.urlopen(req, timeout=20) as r:
                       chat = json.load(r)
 
                   answer = str(chat.get("answer") or "").strip()
                   meta = chat.get("meta") or {}
-                  assert answer
-                  assert meta.get("model") == expected_core
-                  assert meta.get("provider") == expected_provider
+                  assert answer, "empty answer"
+                  assert meta.get("model") == expected_core, f"chat model={meta.get('model')}"
+                  assert meta.get("provider") == expected_provider, f"chat provider={meta.get('provider')}"
                   assert meta.get("path") not in {
                       "api_boundary_grounded_fallback",
                       "full_core_grounded_fallback",
                       "legal_no_source_fail_closed",
-                  }
+                  }, f"fallback path={meta.get('path')}"
 
                   safe = {
                       "status": health.get("status"),
@@ -138,11 +138,14 @@ jobs:
                   break
               except Exception as exc:
                   last_error = exc
-                  time.sleep(10)
+                  print(f"attempt={attempt} error={type(exc).__name__}: {exc}", flush=True)
+                  if attempt < 6:
+                      time.sleep(5)
           else:
               raise SystemExit(f"Production smoke failed: {type(last_error).__name__}: {last_error}")
           PY
       - name: Upload production smoke result
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: production-smoke
