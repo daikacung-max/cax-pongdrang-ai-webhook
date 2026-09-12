@@ -3,150 +3,48 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Demo Trợ lý AI Công an xã Pơng Drang</title>
+  <title>Thử nghiệm CAX PƠNG DRANG AI CORE</title>
   <style>
-    :root { color-scheme: light; --ink:#182638; --navy:#0b3862; --soft:#f0f5f8; --line:#d5e0e8; --me:#d9efff; --bot:#fff; --warn:#fff5dc; --pass:#e5f5e8; --fail:#ffe7e7; }
-    * { box-sizing:border-box; } body { margin:0; background:#e8eef2; color:var(--ink); font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; }
-    main { max-width:980px; min-height:100vh; margin:auto; background:#fff; box-shadow:0 0 30px #55708025; display:flex; flex-direction:column; }
-    header { padding:20px 22px 16px; color:#fff; background:linear-gradient(120deg,var(--navy),#12609a); }
-    h1 { margin:0; font-size:20px; } header p { margin:5px 0 0; opacity:.9; font-size:14px; }
-    .notice { margin:14px 18px 0; padding:10px 12px; background:var(--warn); border:1px solid #f0d38c; border-radius:9px; font-size:13px; }
-    .tabs { display:flex; gap:8px; padding:14px 18px 0; border-bottom:1px solid var(--line); }
-    .tab { background:#eef3f7; color:var(--navy); padding:9px 13px; border:1px solid var(--line); border-bottom:0; border-radius:9px 9px 0 0; cursor:pointer; }
-    .tab.active { background:#fff; font-weight:700; }
-    .panel { display:none; } .panel.active { display:block; }
-    #messages { padding:18px; overflow:auto; min-height:420px; background:var(--soft); }
-    .message { max-width:88%; margin:9px 0; padding:10px 12px; border:1px solid var(--line); border-radius:14px; white-space:pre-wrap; }
-    .user { margin-left:auto; background:var(--me); border-bottom-right-radius:3px; } .assistant { background:var(--bot); border-bottom-left-radius:3px; }
-    .meta { display:inline-block; margin:0 0 3px; padding:3px 8px; border-radius:999px; background:#dcebdc; color:#245d2a; font-size:12px; }
-    .meta.intake { background:#e5ddf9; color:#543b94; } .meta.pending { background:#fde8cc; color:#8a4b08; }
-    form { display:flex; gap:8px; padding:14px 18px; border-top:1px solid var(--line); } textarea { flex:1; resize:none; min-height:48px; padding:10px; border:1px solid #aebfcd; border-radius:8px; font:inherit; }
-    button { border:0; border-radius:8px; padding:10px 16px; background:var(--navy); color:#fff; font-weight:600; cursor:pointer; }
-    button.secondary { background:#66788a; }
-    footer { padding:0 18px 14px; color:#506273; font-size:12px; display:flex; justify-content:space-between; gap:12px; align-items:center; }
-    .self-wrap { padding:18px; background:#f7fafc; min-height:460px; }
-    .self-head { display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
-    .self-head h2 { margin:0; font-size:18px; }
-    .summary { padding:12px; border:1px solid var(--line); background:#fff; border-radius:10px; margin-bottom:12px; }
-    .tests { display:grid; gap:10px; }
-    .test-card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px; }
-    .test-card.pass { background:var(--pass); border-color:#abd7b4; } .test-card.fail { background:var(--fail); border-color:#e9aaaa; }
-    .test-top { display:flex; justify-content:space-between; gap:10px; font-weight:700; }
-    .badge { border-radius:999px; padding:2px 8px; font-size:12px; } .pass .badge { background:#c9e9cf; color:#245d2a; } .fail .badge { background:#f5caca; color:#8d2222; }
-    details { margin-top:8px; } pre { white-space:pre-wrap; word-break:break-word; background:#ffffffaa; padding:9px; border-radius:7px; border:1px solid #d8e1e7; font-size:12px; }
-    .muted { color:#627487; font-size:13px; }
-    @media (max-width:600px) { main { min-height:100vh; } .message { max-width:94%; } .self-head { align-items:stretch; } }
+    :root{color-scheme:light;--ink:#182638;--navy:#0b3862;--soft:#f0f5f8;--line:#d5e0e8;--me:#d9efff;--bot:#fff;--warn:#fff5dc;--pass:#e5f5e8;--fail:#ffe7e7;--ai:#e9e3ff}
+    *{box-sizing:border-box}body{margin:0;background:#e8eef2;color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:980px;min-height:100vh;margin:auto;background:#fff;box-shadow:0 0 30px #55708025;display:flex;flex-direction:column}
+    header{padding:20px 22px 16px;color:#fff;background:linear-gradient(120deg,var(--navy),#12609a)}h1{margin:0;font-size:20px}header p{margin:5px 0 0;opacity:.9;font-size:14px}.notice{margin:14px 18px 0;padding:10px 12px;background:var(--warn);border:1px solid #f0d38c;border-radius:9px;font-size:13px}
+    .tabs{display:flex;gap:8px;padding:14px 18px 0;border-bottom:1px solid var(--line)}.tab{background:#eef3f7;color:var(--navy);padding:9px 13px;border:1px solid var(--line);border-bottom:0;border-radius:9px 9px 0 0;cursor:pointer}.tab.active{background:#fff;font-weight:700}.panel{display:none}.panel.active{display:block}
+    #messages{padding:18px;overflow:auto;min-height:430px;background:var(--soft)}.message{max-width:88%;margin:9px 0;padding:10px 12px;border:1px solid var(--line);border-radius:14px;white-space:pre-wrap}.user{margin-left:auto;background:var(--me);border-bottom-right-radius:3px}.assistant{background:var(--bot);border-bottom-left-radius:3px}
+    .meta{display:inline-block;margin:2px 5px 3px 0;padding:3px 8px;border-radius:999px;background:var(--ai);color:#49378d;font-size:12px}.meta.good{background:#dcebdc;color:#245d2a}.meta.warn{background:#fde8cc;color:#8a4b08}.chat-info{padding:10px 18px;background:#f8fbfd;border-bottom:1px solid var(--line);font-size:13px;color:#506273}
+    form{display:flex;gap:8px;padding:14px 18px;border-top:1px solid var(--line)}textarea{flex:1;resize:none;min-height:48px;padding:10px;border:1px solid #aebfcd;border-radius:8px;font:inherit}button{border:0;border-radius:8px;padding:10px 16px;background:var(--navy);color:#fff;font-weight:600;cursor:pointer}button.secondary{background:#66788a}footer{padding:0 18px 14px;color:#506273;font-size:12px;display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .self-wrap{padding:18px;background:#f7fafc;min-height:460px}.self-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}.self-head h2{margin:0;font-size:18px}.summary{padding:12px;border:1px solid var(--line);background:#fff;border-radius:10px;margin-bottom:12px}.tests{display:grid;gap:10px}.test-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}.test-card.pass{background:var(--pass);border-color:#abd7b4}.test-card.fail{background:var(--fail);border-color:#e9aaaa}.test-top{display:flex;justify-content:space-between;gap:10px;font-weight:700}.badge{border-radius:999px;padding:2px 8px;font-size:12px}.pass .badge{background:#c9e9cf;color:#245d2a}.fail .badge{background:#f5caca;color:#8d2222}details{margin-top:8px}pre{white-space:pre-wrap;word-break:break-word;background:#ffffffaa;padding:9px;border-radius:7px;border:1px solid #d8e1e7;font-size:12px}.muted{color:#627487;font-size:13px}
+    @media(max-width:600px){main{min-height:100vh}.message{max-width:94%}.self-head{align-items:stretch}}
   </style>
 </head>
 <body>
-  <main>
-    <header><h1>Trợ lý AI Công an xã Pơng Drang</h1><p>Không gian thử nghiệm CAX PƠNG DRANG AI CORE</p></header>
-    <div class="notice">Chỉ nhập dữ liệu giả lập. Khu thử nghiệm không gửi nội dung đến Zalo OA, không chuyển cán bộ và không tạo hồ sơ nghiệp vụ thật.</div>
+<main>
+  <header><h1>CAX PƠNG DRANG AI CORE</h1><p>Phòng thử nghiệm hội thoại và kiểm định nguồn</p></header>
+  <div class="notice"><b>Tab hội thoại dùng AI Core thật.</b> AI nhận lại lịch sử của cùng phiên và tự tạo câu trả lời mới. Tab tự test phía sau vẫn deterministic để kiểm tra nguồn/pháp lý. Chỉ dùng dữ liệu giả lập.</div>
+  <div class="tabs"><button class="tab active" data-panel="chat-panel">💬 AI trò chuyện</button><button class="tab" data-panel="self-panel">🧪 Tự test nguồn</button></div>
 
-    <div class="tabs">
-      <button class="tab active" data-panel="chat-panel">💬 Test hội thoại</button>
-      <button class="tab" data-panel="self-panel">🧪 Tự test AI Core</button>
-    </div>
+  <section id="chat-panel" class="panel active">
+    <div class="chat-info">🧠 Full AI Core • có bộ nhớ theo phiên • nguồn pháp luật được retrieve + verifier kiểm tra • không tạo hồ sơ nghiệp vụ thật</div>
+    <section id="messages" aria-live="polite"></section>
+    <form id="chat-form"><textarea id="message" placeholder="Hãy trò chuyện nhiều lượt, ví dụ: Tôi bị người khác đánh..." required></textarea><button type="submit">Gửi</button></form>
+    <footer><span id="status">Sẵn sàng trò chuyện</span><button id="new-chat" class="secondary" type="button">Đoạn chat mới</button></footer>
+  </section>
 
-    <section id="chat-panel" class="panel active">
-      <section id="messages" aria-live="polite"></section>
-      <form id="chat-form"><textarea id="message" placeholder="Ví dụ: Tôi bị mất căn cước, cấp lại ở đâu?" required></textarea><button type="submit">Gửi</button></form>
-      <footer><span id="status">Sẵn sàng tư vấn</span><button id="new-chat" class="secondary" type="button">Đoạn chat mới</button></footer>
-    </section>
-
-    <section id="self-panel" class="panel">
-      <div class="self-wrap">
-        <div class="self-head">
-          <div><h2>🧪 Tự test AI Core</h2><div class="muted">Chạy bộ tình huống chuẩn để kiểm tra routing, nguồn hiện hành và fallback.</div></div>
-          <button id="run-tests" type="button">Chạy toàn bộ test</button>
-        </div>
-        <div id="test-summary" class="summary">Chưa chạy. Bấm <b>Chạy toàn bộ test</b> để kiểm tra.</div>
-        <div id="test-results" class="tests"></div>
-      </div>
-    </section>
-  </main>
-  <script>
-    const messages = document.getElementById('messages');
-    const form = document.getElementById('chat-form');
-    const input = document.getElementById('message');
-    const status = document.getElementById('status');
-    const newChat = document.getElementById('new-chat');
-    const runTests = document.getElementById('run-tests');
-    const testSummary = document.getElementById('test-summary');
-    const testResults = document.getElementById('test-results');
-    const demoVersion = '2026-09-12-selftest-1';
-    let sessionId = localStorage.getItem('caxDemoSession');
-
-    if (localStorage.getItem('caxDemoVersion') !== demoVersion) {
-      sessionId = crypto.randomUUID();
-      localStorage.setItem('caxDemoSession', sessionId);
-      localStorage.setItem('caxDemoVersion', demoVersion);
-    } else if (!sessionId) {
-      sessionId = crypto.randomUUID();
-      localStorage.setItem('caxDemoSession', sessionId);
-    }
-
-    document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-      document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById(tab.dataset.panel).classList.add('active');
-    }));
-
-    function addMessage(role, text, label = '') {
-      if (label) { const tag = document.createElement('div'); tag.className = 'meta ' + (label.includes('tiếp nhận') ? 'intake' : label.includes('bổ sung') ? 'pending' : ''); tag.textContent = label; messages.append(tag); messages.append(document.createElement('br')); }
-      const item = document.createElement('div'); item.className = 'message ' + role; item.textContent = text; messages.append(item); messages.scrollTop = messages.scrollHeight;
-    }
-    function labelFor(data) {
-      if (data.handoff_status === 'ready_for_officer') return 'Demo: đủ thông tin để tiếp nhận';
-      if (data.handoff_status === 'needs_information') return 'Demo: cần bổ sung để tiếp nhận';
-      return 'Chỉ tư vấn';
-    }
-    async function loadHistory() {
-      const res = await fetch('/demo/api/history?session_id=' + encodeURIComponent(sessionId));
-      if (!res.ok) return;
-      const data = await res.json();
-      data.messages.forEach(item => addMessage(item.role === 'user' ? 'user' : 'assistant', item.content));
-    }
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault(); const text = input.value.trim(); if (!text) return;
-      addMessage('user', text); input.value = ''; status.textContent = 'Đang xử lý…';
-      try {
-        const res = await fetch('/demo/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id:sessionId, message:text})});
-        const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Không thể xử lý');
-        addMessage('assistant', data.answer, labelFor(data)); status.textContent = data.handoff_status === 'not_requested' ? 'Chỉ tư vấn' : 'Demo tiếp nhận theo yêu cầu';
-      } catch (err) { addMessage('assistant', 'Bản demo chưa xử lý được yêu cầu này. Anh/chị vui lòng thử lại.'); status.textContent = 'Có lỗi'; }
-    });
-    newChat.addEventListener('click', () => { sessionId = crypto.randomUUID(); localStorage.setItem('caxDemoSession', sessionId); messages.innerHTML = ''; status.textContent = 'Sẵn sàng tư vấn'; input.focus(); });
-
-    function renderTest(item) {
-      const card = document.createElement('article');
-      card.className = 'test-card ' + (item.passed ? 'pass' : 'fail');
-      const sourceText = (item.sources || []).join('\n') || '(không có nguồn)';
-      card.innerHTML = `<div class="test-top"><span>${item.name}</span><span class="badge">${item.passed ? 'PASS' : 'FAIL'}</span></div>
-        <div class="muted">${item.question} • ${item.latency_ms} ms</div>
-        <details><summary>Xem chẩn đoán</summary><b>Nguồn retrieve</b><pre>${escapeHtml(sourceText)}</pre><b>Câu trả lời</b><pre>${escapeHtml(item.answer || '')}</pre></details>`;
-      testResults.append(card);
-    }
-    function escapeHtml(value) {
-      return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-    }
-    runTests.addEventListener('click', async () => {
-      runTests.disabled = true; runTests.textContent = 'Đang chạy…';
-      testResults.innerHTML = ''; testSummary.textContent = 'Đang kiểm tra planner, retrieval và nguồn hiện hành…';
-      try {
-        const res = await fetch('/demo/api/self-test', {method:'POST'});
-        const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Không chạy được self-test');
-        testSummary.innerHTML = `<b>${data.status === 'pass' ? '✅ TẤT CẢ ĐẠT' : '⚠️ CÓ TEST LỖI'}</b> • ${data.passed}/${data.total} PASS • ${data.failed} FAIL • ${data.duration_ms} ms<br><span class="muted">${escapeHtml(data.note || '')}</span>`;
-        data.results.forEach(renderTest);
-      } catch (err) {
-        testSummary.textContent = 'Không chạy được self-test: ' + err.message;
-      } finally {
-        runTests.disabled = false; runTests.textContent = 'Chạy toàn bộ test';
-      }
-    });
-
-    loadHistory();
-  </script>
+  <section id="self-panel" class="panel"><div class="self-wrap"><div class="self-head"><div><h2>🧪 Tự test nguồn AI Core</h2><div class="muted">Bộ test deterministic, dùng để phát hiện sai routing/nguồn. Đây không phải cửa sổ hội thoại AI.</div></div><button id="run-tests" type="button">Chạy toàn bộ test</button></div><div id="test-summary" class="summary">Chưa chạy.</div><div id="test-results" class="tests"></div></div></section>
+</main>
+<script>
+const messages=document.getElementById('messages'),form=document.getElementById('chat-form'),input=document.getElementById('message'),statusEl=document.getElementById('status'),newChat=document.getElementById('new-chat'),runTests=document.getElementById('run-tests'),testSummary=document.getElementById('test-summary'),testResults=document.getElementById('test-results');
+const demoVersion='2026-09-12-real-ai-1';let sessionId=localStorage.getItem('caxDemoSession');
+if(localStorage.getItem('caxDemoVersion')!==demoVersion){sessionId=crypto.randomUUID();localStorage.setItem('caxDemoSession',sessionId);localStorage.setItem('caxDemoVersion',demoVersion)}else if(!sessionId){sessionId=crypto.randomUUID();localStorage.setItem('caxDemoSession',sessionId)}
+document.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));tab.classList.add('active');document.getElementById(tab.dataset.panel).classList.add('active')}));
+function addMessage(role,text,labels=[]){if(labels.length){const wrap=document.createElement('div');labels.forEach(x=>{const tag=document.createElement('span');tag.className='meta '+(x.kind||'');tag.textContent=x.text;wrap.append(tag)});messages.append(wrap)}const item=document.createElement('div');item.className='message '+role;item.textContent=text;messages.append(item);messages.scrollTop=messages.scrollHeight}
+function aiLabels(data){const labels=[{text:'AI Core thật'}];if(data.memory)labels.push({text:'🧠 nhớ hội thoại',kind:'good'});if(data.verified)labels.push({text:'✓ verified',kind:'good'});if((data.sources||[]).length)labels.push({text:'📚 '+data.sources.length+' nguồn'});if(data.fallback)labels.push({text:'⚠ fallback',kind:'warn'});if(data.model)labels.push({text:data.model});return labels}
+async function loadHistory(){const res=await fetch('/demo/api/ai-history?session_id='+encodeURIComponent(sessionId));if(!res.ok)return;const data=await res.json();data.messages.forEach(item=>addMessage(item.role==='user'?'user':'assistant',item.content,item.role==='assistant'?[{text:'lịch sử'}]:[]))}
+form.addEventListener('submit',async event=>{event.preventDefault();const text=input.value.trim();if(!text)return;addMessage('user',text);input.value='';statusEl.textContent='AI đang đọc lịch sử + nguồn và suy luận…';try{const res=await fetch('/demo/api/ai-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sessionId,message:text})});const data=await res.json();if(!res.ok)throw new Error(data.error||'Không thể xử lý');addMessage('assistant',data.answer,aiLabels(data));statusEl.textContent=data.fallback?'Đã trả lời bằng fallback bám nguồn':'AI Core đã trả lời và ghi nhớ lượt này'}catch(err){addMessage('assistant','AI Core chưa xử lý được lượt này: '+err.message,[{text:'Lỗi model/API',kind:'warn'}]);statusEl.textContent='Có lỗi'}});
+newChat.addEventListener('click',()=>{sessionId=crypto.randomUUID();localStorage.setItem('caxDemoSession',sessionId);messages.innerHTML='';statusEl.textContent='Phiên mới, bộ nhớ hội thoại đã tách';input.focus()});
+function esc(v){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function renderTest(item){const card=document.createElement('article');card.className='test-card '+(item.passed?'pass':'fail');const sourceText=(item.sources||[]).join('\n')||'(không có nguồn)';card.innerHTML=`<div class="test-top"><span>${esc(item.name)}</span><span class="badge">${item.passed?'PASS':'FAIL'}</span></div><div class="muted">${esc(item.question)} • ${item.latency_ms} ms</div><details><summary>Xem chẩn đoán</summary><b>Nguồn retrieve</b><pre>${esc(sourceText)}</pre><b>Câu trả lời kiểm định</b><pre>${esc(item.answer||'')}</pre></details>`;testResults.append(card)}
+runTests.addEventListener('click',async()=>{runTests.disabled=true;runTests.textContent='Đang chạy…';testResults.innerHTML='';testSummary.textContent='Đang kiểm tra nguồn…';try{const res=await fetch('/demo/api/self-test',{method:'POST'});const data=await res.json();if(!res.ok)throw new Error(data.error||'Không chạy được');testSummary.innerHTML=`<b>${data.status==='pass'?'✅ TẤT CẢ ĐẠT':'⚠️ CÓ TEST LỖI'}</b> • ${data.passed}/${data.total} PASS • ${data.failed} FAIL • ${data.duration_ms} ms`;data.results.forEach(renderTest)}catch(err){testSummary.textContent='Không chạy được self-test: '+err.message}finally{runTests.disabled=false;runTests.textContent='Chạy toàn bộ test'}});
+loadHistory();
+</script>
 </body>
 </html>
