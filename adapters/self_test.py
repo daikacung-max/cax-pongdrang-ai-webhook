@@ -21,7 +21,7 @@ SELF_TEST_CASES = [
     },
     {
         "name": "Căn cước lần đầu từ đủ 14 tuổi",
-        "question": "Tôi 15 tuổi làm căn cước lần đầu ở đâu?",
+        "question": "Tôi đã đủ 14 tuổi, làm căn cước lần đầu ở đâu?",
         "must_have": ["Công an cấp xã", "07 ngày làm việc"],
         "must_not_have": ["Công an cấp huyện"],
         "source_prefix": "CITIZEN_ID_5230_COMMUNE_2026",
