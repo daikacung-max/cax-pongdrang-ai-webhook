@@ -38,12 +38,13 @@ class DemoTests(unittest.TestCase):
         self.assertEqual(result["handoff_status"], "needs_information")
         self.assertIn("chỗ ở", result["answer"])
 
-    def test_lost_identity_card_uses_verified_reissue_guidance_not_criminal_law(self):
+    def test_lost_identity_card_uses_verified_current_guidance_not_criminal_law(self):
         result = respond(str(uuid.uuid4()), "Tôi bị mất căn cước")
         self.assertEqual(result["mode"], "advice_only")
         self.assertEqual(result["source_state"], "grounded")
-        self.assertIn("Công an cấp tỉnh", result["answer"])
+        self.assertIn("Công an cấp xã", result["answer"])
         self.assertIn("07 ngày làm việc", result["answer"])
+        self.assertNotIn("Công an cấp huyện", result["answer"])
         self.assertNotIn("Điều 134", result["answer"])
 
     def test_assault_starts_with_evidence_and_one_followup(self):
@@ -102,8 +103,6 @@ class DemoTests(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_demo_console_rejects_invalid_session(self):
-        # The route is intentionally disabled by default; test the session validator
-        # through its public API only when temporarily enabled.
         import app as application
         old_enabled = application.ENABLE_DEMO_CONSOLE
         application.ENABLE_DEMO_CONSOLE = True
