@@ -34,3 +34,61 @@ jobs:
         with:
           name: ai-core-test-output
           path: test-output.txt
+
+  production-smoke:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Wait for healthy production and verify legal anchor
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          import urllib.request
+
+          base = "https://cax-pongdrang-ai.onrender.com"
+          last_error = None
+          for _ in range(18):
+              try:
+                  with urllib.request.urlopen(base + "/health", timeout=8) as r:
+                      health = json.load(r)
+                  with urllib.request.urlopen(base + "/debug/article/134", timeout=8) as r:
+                      article = json.load(r)
+                  assert health.get("status") == "ok"
+                  assert health.get("mode") == "CAX_PONG_DRANG_AI_CORE"
+                  assert health.get("unit") == "Công an xã Pơng Drang, tỉnh Đắk Lắk"
+                  assert health.get("hotline") == "02623509777"
+                  assert article.get("found") is True
+                  assert str(article.get("article")) == "134"
+                  safe = {
+                      "status": health.get("status"),
+                      "mode": health.get("mode"),
+                      "unit": health.get("unit"),
+                      "hotline": health.get("hotline"),
+                      "core_answer_model": health.get("core_answer_model"),
+                      "dynamic_answer_model": health.get("dynamic_answer_model"),
+                      "core_answer_provider": health.get("core_answer_provider"),
+                      "dynamic_answer_provider": health.get("dynamic_answer_provider"),
+                      "production_mode": health.get("production_mode"),
+                      "article_134_title": article.get("title"),
+                  }
+                  print(json.dumps(safe, ensure_ascii=False, indent=2))
+                  with open("production-smoke.json", "w", encoding="utf-8") as f:
+                      json.dump(safe, f, ensure_ascii=False, indent=2)
+                  break
+              except Exception as exc:
+                  last_error = exc
+                  time.sleep(10)
+          else:
+              raise SystemExit(f"Production smoke failed: {type(last_error).__name__}: {last_error}")
+          PY
+      - name: Upload production smoke result
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-smoke
+          path: production-smoke.json
