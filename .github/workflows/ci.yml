@@ -23,7 +23,6 @@ jobs:
         env:
           ENABLE_DEMO_CONSOLE: 'false'
           PRODUCTION_MODE: 'false'
-          ZALO_WEBHOOK_ENABLED: 'false'
         shell: bash
         run: |
           set -o pipefail
