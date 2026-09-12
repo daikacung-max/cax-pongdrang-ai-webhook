@@ -24,4 +24,13 @@ jobs:
           ENABLE_DEMO_CONSOLE: 'false'
           PRODUCTION_MODE: 'false'
           ZALO_WEBHOOK_ENABLED: 'false'
-        run: python -m unittest discover -s tests -v
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m unittest discover -s tests -v 2>&1 | tee test-output.txt
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-core-test-output
+          path: test-output.txt
