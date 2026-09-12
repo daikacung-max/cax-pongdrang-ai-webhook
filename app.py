@@ -12,6 +12,7 @@ import app_core as _app_core
 import core.service as _service_module
 from adapters.vbee_tts import blueprint as vbee_blueprint
 from adapters.readiness import blueprint as readiness_blueprint
+from adapters.self_test import blueprint as self_test_blueprint
 from config import LOCAL_BIND_HOST
 from core.current_knowledge import ensure_current_knowledge
 from core.current_fallback import grounded_dynamic_fallback as current_grounded_fallback
@@ -41,6 +42,8 @@ if "vbee_tts" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(vbee_blueprint)
 if "ai_core_readiness" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(readiness_blueprint)
+if "ai_core_self_test" not in _app_core.app.blueprints:
+    _app_core.app.register_blueprint(self_test_blueprint)
 
 # One module state only. This preserves ``from app import app`` and helpers such
 # as split_zalo_messages while ensuring patch("app.X") changes the exact globals
