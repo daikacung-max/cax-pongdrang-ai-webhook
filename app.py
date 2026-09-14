@@ -16,7 +16,14 @@ from adapters.vbee_tts import blueprint as vbee_blueprint
 from adapters.readiness import blueprint as readiness_blueprint
 from adapters.self_test import blueprint as self_test_blueprint
 from adapters.demo_ai import blueprint as demo_ai_blueprint
-from config import LOCAL_BIND_HOST
+from adapters.zalo_oa_api import ZaloOAClient
+from config import (
+    LOCAL_BIND_HOST,
+    ZALO_APP_ID,
+    ZALO_APP_SECRET_KEY,
+    ZALO_OA_ACCESS_TOKEN,
+    ZALO_OA_REFRESH_TOKEN,
+)
 from core.artifact_planner import enrich_plan as enrich_artifact_plan
 from core.current_knowledge import ensure_current_knowledge
 from core.current_fallback import grounded_dynamic_fallback as current_grounded_fallback
@@ -115,15 +122,21 @@ def _official_zalo_signature(data, raw_body):
 
     configured_app_id = str(_app_core.ZALO_APP_ID or "").strip()
     if configured_app_id and not hmac.compare_digest(incoming_app_id, configured_app_id):
-        # Safe operational signal only. Never log either identifier or the secret.
         _app_core.app.logger.warning("zalo_webhook signature_valid config_app_id_drift=true")
     return True
 
 
-# Replace the stricter legacy validator at runtime. The route in app_core looks
-# up this module-global function on every request, so production and tests share
-# the same behavior.
 _app_core._valid_zalo_webhook_signature = _official_zalo_signature
+
+# Runtime OA client supports both a pre-provisioned access token and OAuth v4
+# refresh credentials. This lets direct reply recover automatically when an
+# access token expires without changing the AI Core path.
+_app_core.zalo_oa_client = ZaloOAClient(
+    ZALO_OA_ACCESS_TOKEN,
+    refresh_token=ZALO_OA_REFRESH_TOKEN,
+    app_id=ZALO_APP_ID,
+    app_secret=ZALO_APP_SECRET_KEY,
+)
 
 if "vbee_tts" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(vbee_blueprint)
