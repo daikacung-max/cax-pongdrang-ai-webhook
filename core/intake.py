@@ -135,7 +135,11 @@ def assess(question, history):
         }
 
     by_code = {item["code"]: item for item in matches}
-    uncertain_theft = any(x in text for x in ("khong xac dinh bi trom", "chua xac dinh bi trom", "khong ro co bi trom"))
+    uncertain_theft = any(x in text for x in (
+        "khong xac dinh bi trom", "khong xac dinh co bi trom",
+        "chua xac dinh bi trom", "chua xac dinh co bi trom",
+        "khong ro bi trom", "khong ro co bi trom",
+    ))
     if "identity_card_reissue" in by_code:
         chosen = by_code["identity_card_reissue"]
     elif uncertain_theft and "lost_document" in by_code:
