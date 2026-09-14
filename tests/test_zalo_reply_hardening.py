@@ -17,8 +17,15 @@ class FakeSession:
     def __init__(self):
         self.calls = []
 
-    def post(self, url, params=None, json=None, timeout=None):
-        self.calls.append({"url": url, "params": params, "json": json, "timeout": timeout})
+    def post(self, url, params=None, headers=None, data=None, json=None, timeout=None, **kwargs):
+        self.calls.append({
+            "url": url,
+            "params": params,
+            "headers": headers,
+            "data": data,
+            "json": json,
+            "timeout": timeout,
+        })
         return FakeResponse()
 
 
@@ -48,6 +55,7 @@ class ZaloReplyHardeningTests(unittest.TestCase):
 
         self.assertTrue(client.send_text("user-1", long_text))
         self.assertEqual(len(session.calls), len(chunks))
+        self.assertTrue(all(call["headers"]["access_token"] == "token" for call in session.calls))
         self.assertTrue(all(call["json"]["recipient"]["user_id"] == "user-1" for call in session.calls))
 
 
