@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Verify production health, provider, Zalo boundary, and VNeID routing
+      - name: Verify production health, Notebook demo, provider, Zalo boundary, and VNeID routing
         shell: bash
         run: |
           python - <<'PY'
@@ -64,15 +64,27 @@ jobs:
                       readiness = json.load(r)
                   with urllib.request.urlopen(base + "/debug/article/134", timeout=6) as r:
                       article = json.load(r)
+                  with urllib.request.urlopen(base + "/demo", timeout=8) as r:
+                      demo_html = r.read().decode("utf-8", errors="replace")
+                  with urllib.request.urlopen(base + "/demo/api/notebook-sources", timeout=8) as r:
+                      notebook = json.load(r)
 
                   assert health.get("status") == "ok", "health status"
                   assert health.get("mode") == "CAX_PONG_DRANG_AI_CORE", "AI Core mode"
                   assert health.get("unit") == "Công an xã Pơng Drang, tỉnh Đắk Lắk", "unit"
                   assert health.get("hotline") == "02623509777", "hotline"
+                  assert health.get("demo_console_enabled") is True, "demo console disabled"
                   assert readiness.get("production_mode") is True, "production mode"
                   assert readiness.get("model_routing_mode") == "auto", "model routing"
                   assert article.get("found") is True, "article 134 missing"
                   assert str(article.get("article")) == "134", "article mismatch"
+
+                  assert "HÀNH CHÍNH CÔNG - CÔNG AN XÃ PƠNG DRANG" in demo_html, "Notebook demo title missing"
+                  assert int(notebook.get("source_count") or 0) == 19, f"Notebook source_count={notebook.get('source_count')}"
+                  source_titles = [str(x.get("title") or "") for x in (notebook.get("sources") or [])]
+                  assert len(source_titles) == 19, f"Notebook sources={len(source_titles)}"
+                  assert source_titles[0] == "1. Đăng ký thường trú.pdf", f"first Notebook source={source_titles[:1]}"
+                  assert source_titles[-1] == "19. Sát hạch cấp giấy phép lái xe.pdf", f"last Notebook source={source_titles[-1:]}"
 
                   if readiness.get("openai_provider_ready"):
                       expected_core = "gpt-5.6-terra"
@@ -159,6 +171,8 @@ jobs:
                       "mode": health.get("mode"),
                       "unit": health.get("unit"),
                       "hotline": health.get("hotline"),
+                      "demo_console_enabled": health.get("demo_console_enabled"),
+                      "notebook_source_count": notebook.get("source_count"),
                       "core_answer_model": health.get("core_answer_model"),
                       "dynamic_answer_model": health.get("dynamic_answer_model"),
                       "core_answer_provider": health.get("core_answer_provider"),
