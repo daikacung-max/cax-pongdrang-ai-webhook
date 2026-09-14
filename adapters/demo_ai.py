@@ -61,8 +61,9 @@ def ai_chat():
     notebook_sources_used = used_sources_for_unit_ids(unit_ids)
     return jsonify({
         "answer": result.get("answer") or "",
-        "mode": "artifact_full_ai_core",
+        "mode": "full_ai_core",
         "core_origin": "user_supplied_work",
+        "artifact_backed": True,
         "memory": True,
         "verified": bool(meta.get("verified")),
         "path": meta.get("path"),
