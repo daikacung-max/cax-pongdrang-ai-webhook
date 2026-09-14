@@ -53,6 +53,9 @@ class NotebookMirrorTests(unittest.TestCase):
         self.assertTrue(units)
         self.assertEqual(units[0]["id"], "RESIDENCE_NOTEBOOK_2026:delete_temporary")
         self.assertIn("02 ngày làm việc", units[0]["text"])
+        labels = used_sources_for_unit_ids([x["id"] for x in units])
+        self.assertTrue(labels)
+        self.assertEqual(labels[0]["title"], "9. Xóa ĐK tạm trú.pdf")
 
     def test_user_facing_source_label_hides_internal_unit_id(self):
         labels = used_sources_for_unit_ids(["CRIMINAL_RECORD_CURRENT_2026:citizen"])
