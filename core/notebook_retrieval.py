@@ -24,6 +24,7 @@ def _norm(text):
 def _pack(priority_ids, document_ids, question):
     result = []
     seen = set()
+    allowed_documents = {str(x) for x in document_ids or []}
     for unit_id in priority_ids:
         unit = db.get_unit(unit_id)
         if unit and unit["id"] not in seen:
@@ -33,10 +34,12 @@ def _pack(priority_ids, document_ids, question):
             result.append(item)
             seen.add(item["id"])
     if len(result) < LEGAL_TOP_K:
-        # LIKE is intentionally used here because Vietnamese FTS tokenisation can
-        # be brittle for short colloquial questions. The document filter keeps
-        # the search inside the selected Notebook source pack.
-        for unit in db.search_like(question, limit=max(LEGAL_TOP_K * 2, 12), document_ids=document_ids):
+        # search_like() is intentionally broad for short colloquial Vietnamese.
+        # Filter in Python so the model still sees only the selected Notebook
+        # source pack; db.search_like itself has no document_ids parameter.
+        for unit in db.search_like(question, limit=max(LEGAL_TOP_K * 4, 24)):
+            if str(unit.get("document_id") or "") not in allowed_documents:
+                continue
             if unit["id"] in seen:
                 continue
             item = dict(unit)
