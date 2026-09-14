@@ -1,59 +1,74 @@
-"""Source registry mirrored from the user's Gemini Notebook HTML snapshot.
+"""Artifact-first source registry for CAX PƠNG DRANG AI CORE.
 
-The HTML snapshot contains the 19 source titles and Notebook behaviour metadata,
-but not the raw PDF bytes. This module preserves the exact source catalogue and
-maps each source group to current verified AI-Core document ids where available.
-
-Never use a catalogue title by itself as legal evidence. Retrieval still relies
-on active verified/current documents in the legal DB.
+The 19 titles and Notebook framing come from the user-supplied HTML artifact.
+`document_ids` are only verification/update adapters. They may change as law
+changes, but they do not replace or rename the user's artifact sources.
 """
 
-NOTEBOOK_TITLE = "HÀNH CHÍNH CÔNG - CÔNG AN XÃ PƠNG DRANG"
-NOTEBOOK_SOURCE_COUNT = 19
-NOTEBOOK_SNAPSHOT_DATE = "2025-09-26"
+from core.artifact_core import (
+    ARTIFACT_ORIGIN,
+    ARTIFACT_SOURCE_COUNT,
+    ARTIFACT_SNAPSHOT_DATE,
+    ARTIFACT_TITLE,
+    SOURCE_TITLES,
+)
+
+NOTEBOOK_TITLE = ARTIFACT_TITLE
+NOTEBOOK_SOURCE_COUNT = ARTIFACT_SOURCE_COUNT
+NOTEBOOK_SNAPSHOT_DATE = ARTIFACT_SNAPSHOT_DATE
+
+
+def _source(index, source_id, domains, document_ids):
+    return {
+        "id": source_id,
+        "index": index,
+        "title": SOURCE_TITLES[index - 1],
+        "domains": list(domains),
+        "origin": ARTIFACT_ORIGIN,
+        # Compatibility field consumed by existing UI/retrieval. Semantically
+        # these are support/update documents, not a replacement for the source.
+        "document_ids": list(document_ids),
+        "support_document_ids": list(document_ids),
+    }
+
 
 SOURCES = [
-    {"id":"nb01-permanent-residence","title":"1. Đăng ký thường trú.pdf","domains":["permanent_residence"],"document_ids":["RESIDENCE_PERMANENT_2026"]},
-    {"id":"nb02-delete-permanent-residence","title":"2. Xóa ĐK thường trú.pdf","domains":["residence","delete_permanent_residence"],"document_ids":[]},
-    {"id":"nb03-temporary-residence","title":"3. ĐK tạm trú.pdf","domains":["temporary_residence"],"document_ids":["TTHC_TEMP_RESIDENCE_2026"]},
-    {"id":"nb04-extend-temporary-residence","title":"4. Gia hạn tạm trú.pdf","domains":["extend_temporary_residence","temporary_residence"],"document_ids":[]},
-    {"id":"nb05-household-split","title":"5. Tách hộ.pdf","domains":["household_split","residence"],"document_ids":[]},
-    {"id":"nb06-adjust-residence","title":"6. Điều chỉnh TT về CT.pdf","domains":["adjust_residence","residence"],"document_ids":[]},
-    {"id":"nb07-declare-residence-information","title":"7. Khai báo TT về CT.pdf","domains":["declare_residence_information","residence"],"document_ids":[]},
-    {"id":"nb08-residence-confirmation","title":"8. Xác nhận TT về CT.pdf","domains":["residence_confirmation"],"document_ids":[]},
-    {"id":"nb09-delete-temporary-residence","title":"9. Xóa ĐK tạm trú.pdf","domains":["delete_temporary_residence","residence"],"document_ids":[]},
-    {"id":"nb10-temporary-absence","title":"10. Khai báo tạm vắng.pdf","domains":["temporary_absence","residence"],"document_ids":[]},
-    {"id":"nb11-stay-notification","title":"11. Thông báo lưu trú.pdf","domains":["stay_notification","residence"],"document_ids":[]},
-    {"id":"nb12-vehicle-registration","title":"12. ĐK QL phương tiện Giao thông.pdf","domains":["vehicle","vehicle_transfer"],"document_ids":["VEHICLE_CURRENT_2026","VEHICLE_REGISTRATION_2026","VEHICLE_TRANSFER_LOCAL_2026"]},
-    {"id":"nb13-immigration","title":"13. Xuất nhập cảnh.pdf","domains":["passport","immigration"],"document_ids":["PASSPORT_CURRENT_2026"]},
-    {"id":"nb14-security-business","title":"14. Quản lý ngành nghề.pdf","domains":["security_business"],"document_ids":["SECURITY_BUSINESS_CURRENT_2026"]},
-    {"id":"nb15-electronic-identity","title":"15. Định danh và XTĐT.pdf","domains":["vneid"],"document_ids":["VNEID_2026","VNEID_SIM_GUIDANCE_2026"]},
-    {"id":"nb16-citizen-identity-card","title":"16. Cấp quản lý CCCD.pdf","domains":["identity_under14","identity_reissue","identity_over14_new","identity_renewal","identity_data","identity_general"],"document_ids":["CITIZEN_ID_5230_COMMUNE_2026"]},
-    {"id":"nb17-weapons-explosives-tools","title":"17. Quản lý VK VLN CCHT.pdf","domains":["weapons_management"],"document_ids":["WEAPONS_CURRENT_2026"]},
-    {"id":"nb18-criminal-record","title":"18. Lý lịch tư pháp.pdf","domains":["criminal_record"],"document_ids":["CRIMINAL_RECORD_CURRENT_2026"]},
-    {"id":"nb19-driving-licence","title":"19. Sát hạch cấp giấy phép lái xe.pdf","domains":["driving_licence"],"document_ids":["DRIVING_LICENCE_CURRENT_2026"]},
+    _source(1, "nb01-permanent-residence", ["permanent_residence"], ["RESIDENCE_CURRENT_2026", "RESIDENCE_PERMANENT_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(2, "nb02-delete-permanent-residence", ["delete_permanent_residence", "residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(3, "nb03-temporary-residence", ["temporary_residence"], ["RESIDENCE_CURRENT_2026", "TTHC_TEMP_RESIDENCE_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(4, "nb04-extend-temporary-residence", ["extend_temporary_residence", "temporary_residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(5, "nb05-household-split", ["household_split", "residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(6, "nb06-adjust-residence", ["adjust_residence", "residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(7, "nb07-declare-residence-information", ["declare_residence_information", "residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(8, "nb08-residence-confirmation", ["residence_confirmation"], ["RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(9, "nb09-delete-temporary-residence", ["delete_temporary_residence", "residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(10, "nb10-temporary-absence", ["temporary_absence", "residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(11, "nb11-stay-notification", ["stay_notification", "residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(12, "nb12-vehicle-registration", ["vehicle", "vehicle_transfer", "vehicle_management"], ["VEHICLE_CURRENT_2026", "VEHICLE_REGISTRATION_2026", "VEHICLE_TRANSFER_LOCAL_2026"]),
+    _source(13, "nb13-immigration", ["passport", "immigration"], ["PASSPORT_CURRENT_2026"]),
+    _source(14, "nb14-security-business", ["security_business"], ["SECURITY_BUSINESS_CURRENT_2026"]),
+    _source(15, "nb15-electronic-identity", ["vneid", "electronic_identity"], ["VNEID_2026", "VNEID_SIM_GUIDANCE_2026"]),
+    _source(16, "nb16-citizen-identity-card", ["identity_under14", "identity_reissue", "identity_over14_new", "identity_renewal", "identity_data", "identity_general", "citizen_identity_card"], ["CITIZEN_ID_5230_COMMUNE_2026"]),
+    _source(17, "nb17-weapons-explosives-tools", ["weapons_management", "weapons_explosives_tools"], ["WEAPONS_CURRENT_2026"]),
+    _source(18, "nb18-criminal-record", ["criminal_record"], ["CRIMINAL_RECORD_CURRENT_2026"]),
+    _source(19, "nb19-driving-licence", ["driving_licence"], ["DRIVING_LICENCE_CURRENT_2026"]),
 ]
 
-_SOURCE_BY_ID = {item["id"]: item for item in SOURCES}
-
-# One current residence document contains several procedures. Map its individual
-# source units back to the exact PDF labels mirrored from the Notebook, so the UI
-# cites source 9 for xóa tạm trú instead of ambiguously labelling it source 1.
-_UNIT_SOURCE_IDS = {
-    "RESIDENCE_NOTEBOOK_2026:permanent": "nb01-permanent-residence",
-    "RESIDENCE_NOTEBOOK_2026:delete_permanent": "nb02-delete-permanent-residence",
-    "RESIDENCE_NOTEBOOK_2026:temporary": "nb03-temporary-residence",
-    "RESIDENCE_NOTEBOOK_2026:extend_temporary": "nb04-extend-temporary-residence",
-    "RESIDENCE_NOTEBOOK_2026:split_household": "nb05-household-split",
-    "RESIDENCE_NOTEBOOK_2026:adjust": "nb06-adjust-residence",
-    "RESIDENCE_NOTEBOOK_2026:declare": "nb07-declare-residence-information",
-    "RESIDENCE_NOTEBOOK_2026:confirmation": "nb08-residence-confirmation",
-    "RESIDENCE_NOTEBOOK_2026:delete_temporary": "nb09-delete-temporary-residence",
-    "RESIDENCE_NOTEBOOK_2026:temporary_absence": "nb10-temporary-absence",
-    "RESIDENCE_NOTEBOOK_2026:stay_notification": "nb11-stay-notification",
-    "RESIDENCE_CURRENT_2026:permanent": "nb01-permanent-residence",
-    "RESIDENCE_CURRENT_2026:temporary": "nb03-temporary-residence",
-    "RESIDENCE_CURRENT_2026:confirmation": "nb08-residence-confirmation",
+# Exact unit-to-artifact mapping for shared support documents. Without this,
+# many residence procedures would all appear to cite source #1 just because
+# they share RESIDENCE_CURRENT_2026 as an update/verification document.
+UNIT_SOURCE_INDEX = {
+    "RESIDENCE_CURRENT_2026:permanent": 1,
+    "RESIDENCE_NOTEBOOK_2026:delete_permanent": 2,
+    "RESIDENCE_CURRENT_2026:temporary": 3,
+    "RESIDENCE_NOTEBOOK_2026:extend_temporary": 4,
+    "RESIDENCE_NOTEBOOK_2026:split_household": 5,
+    "RESIDENCE_NOTEBOOK_2026:adjust": 6,
+    "RESIDENCE_NOTEBOOK_2026:declare": 7,
+    "RESIDENCE_CURRENT_2026:confirmation": 8,
+    "RESIDENCE_NOTEBOOK_2026:delete_temporary": 9,
+    "RESIDENCE_NOTEBOOK_2026:temporary_absence": 10,
+    "RESIDENCE_NOTEBOOK_2026:stay_notification": 11,
 }
 
 
@@ -71,10 +86,10 @@ def source_for_document(document_id):
 
 def source_for_unit_id(unit_id):
     unit_id = str(unit_id or "")
-    source_id = _UNIT_SOURCE_IDS.get(unit_id)
-    if source_id:
-        return dict(_SOURCE_BY_ID[source_id])
-    return source_for_document(unit_id.split(":", 1)[0])
+    if unit_id in UNIT_SOURCE_INDEX:
+        return dict(SOURCES[UNIT_SOURCE_INDEX[unit_id] - 1])
+    document_id = unit_id.split(":", 1)[0]
+    return source_for_document(document_id)
 
 
 def used_sources_for_unit_ids(unit_ids):
@@ -93,3 +108,4 @@ def source_ids_for_domain(domain):
 
 
 assert len(SOURCES) == NOTEBOOK_SOURCE_COUNT
+assert [s["title"] for s in SOURCES] == list(SOURCE_TITLES)
