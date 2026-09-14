@@ -79,7 +79,7 @@ PROCEDURES = (
         "keywords": ("lua dao chuyen khoan", "bi lua", "chuyen tien", "chuyen khoan", "bi scam"),
         "fields": (
             ("transaction_time", "anh/chị chuyển khoản vào thời điểm nào", ("hom nay", "hom qua", "ngay", "luc", "gio")),
-            ("evidence", "anh/chị còn lưu giao dịch, tin nhắn hoặc chứng cứ liên quan không", ("sao ke", "tin nhan", "so tai khoan", "anh", "chung tu", "camera", "video", "clip", "nguoi chung kien", "bien so", "tai lieu")),
+            ("evidence", "anh/chị còn lưu giao dịch, tin nhắn hoặc chứng cứ liên quan không", ("sao ke", "tin nhan", "so tai khoan", "anh chup", "anh hien truong", "chung tu", "camera", "video", "clip", "nguoi chung kien", "bien so", "tai lieu")),
         ),
     },
     {
@@ -88,7 +88,7 @@ PROCEDURES = (
         "keywords": ("bi danh", "nguoi khac danh", "bi hanh hung", "thuong tich", "dung dao", "camera", "video"),
         "fields": (
             ("injury", "anh/chị đã đi khám hoặc có kết quả thương tích chưa", ("thuong tich", "%", "di kham", "giay chung thuong")),
-            ("evidence", "anh/chị còn lưu video, ảnh, tin nhắn hoặc thông tin người biết sự việc không", ("camera", "video", "clip", "anh", "tin nhan", "nguoi chung kien", "tai lieu")),
+            ("evidence", "anh/chị còn lưu video, ảnh, tin nhắn hoặc thông tin người biết sự việc không", ("camera", "video", "clip", "anh chup", "anh hien truong", "tin nhan", "nguoi chung kien", "tai lieu")),
         ),
     },
     {
@@ -135,10 +135,11 @@ def assess(question, history):
         }
 
     by_code = {item["code"]: item for item in matches}
-    # Core event outranks supporting evidence. Camera/video/plate details may be
-    # evidence for many incidents and must never change the incident category.
+    uncertain_theft = any(x in text for x in ("khong xac dinh bi trom", "chua xac dinh bi trom", "khong ro co bi trom"))
     if "identity_card_reissue" in by_code:
         chosen = by_code["identity_card_reissue"]
+    elif uncertain_theft and "lost_document" in by_code:
+        chosen = by_code["lost_document"]
     elif any(x in text for x in ("lua dao chuyen khoan", "bi lua", "chuyen tien", "chuyen khoan", "bi scam")) and "fraud_transfer" in by_code:
         chosen = by_code["fraud_transfer"]
     elif any(x in text for x in ("bi danh", "nguoi khac danh", "bi hanh hung", "thuong tich", "dung dao")) and "assault_evidence" in by_code:
