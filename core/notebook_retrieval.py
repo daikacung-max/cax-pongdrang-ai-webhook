@@ -1,49 +1,65 @@
-"""Notebook-style source router layered over the existing legal retriever.
+"""Artifact-first retrieval layered over current-law verification documents.
 
-Only categories mirrored from the user's 19-source Gemini Notebook that were not
-already explicit in the legacy router are handled here. Everything else falls
-through to the existing retriever unchanged.
+Routing follows the 19-source user artifact. The selected artifact source is the
+primary semantic boundary. Current verified documents are support/update data
+inside that boundary; they do not rename or replace the artifact source.
 """
-
-import re
-import unicodedata
 
 from config import LEGAL_TOP_K
 from core import db
+from core.artifact_router import source_index_for_question
+from core.notebook_manifest import SOURCES
 from core.retrieval import retrieve as legacy_retrieve
 
 
-def _norm(text):
-    text = unicodedata.normalize("NFD", str(text or "").lower())
-    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
-    text = text.replace("đ", "d")
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    return re.sub(r"\s+", " ", text).strip()
+PRIORITY_UNITS = {
+    1: ["RESIDENCE_CURRENT_2026:permanent", "RESIDENCE_CURRENT_2026:data_reuse"],
+    2: ["RESIDENCE_NOTEBOOK_2026:delete_permanent", "RESIDENCE_CURRENT_2026:data_reuse"],
+    3: ["RESIDENCE_CURRENT_2026:temporary", "RESIDENCE_CURRENT_2026:data_reuse"],
+    4: ["RESIDENCE_NOTEBOOK_2026:extend_temporary", "RESIDENCE_CURRENT_2026:data_reuse"],
+    5: ["RESIDENCE_NOTEBOOK_2026:split_household", "RESIDENCE_CURRENT_2026:data_reuse"],
+    6: ["RESIDENCE_NOTEBOOK_2026:adjust", "RESIDENCE_CURRENT_2026:data_reuse"],
+    7: ["RESIDENCE_NOTEBOOK_2026:declare", "RESIDENCE_CURRENT_2026:data_reuse"],
+    8: ["RESIDENCE_CURRENT_2026:confirmation", "RESIDENCE_CURRENT_2026:data_reuse"],
+    9: ["RESIDENCE_NOTEBOOK_2026:delete_temporary", "RESIDENCE_CURRENT_2026:data_reuse"],
+    10: ["RESIDENCE_NOTEBOOK_2026:temporary_absence"],
+    11: ["RESIDENCE_NOTEBOOK_2026:stay_notification"],
+    13: ["PASSPORT_CURRENT_2026:issue", "PASSPORT_CURRENT_2026:scope"],
+    14: ["SECURITY_BUSINESS_CURRENT_2026:new_certificate", "SECURITY_BUSINESS_CURRENT_2026:scope"],
+    17: ["WEAPONS_CURRENT_2026:support_tool_permit", "WEAPONS_CURRENT_2026:scope"],
+    18: ["CRIMINAL_RECORD_CURRENT_2026:citizen"],
+    19: ["DRIVING_LICENCE_CURRENT_2026:scope", "DRIVING_LICENCE_CURRENT_2026:test_center_type3"],
+}
+
+# Rich legacy retrievers already contain current sub-routing for these domains.
+LEGACY_RICH_SOURCES = {12, 15, 16}
 
 
-def _pack(priority_ids, document_ids, question):
+def _pack(source_index, question):
+    source = SOURCES[source_index - 1]
+    allowed_documents = {str(x) for x in source.get("support_document_ids") or source.get("document_ids") or []}
     result = []
     seen = set()
-    allowed_documents = {str(x) for x in document_ids or []}
-    for unit_id in priority_ids:
+    for unit_id in PRIORITY_UNITS.get(source_index, []):
         unit = db.get_unit(unit_id)
         if unit and unit["id"] not in seen:
             item = dict(unit)
-            item["_why"] = "notebook_priority"
+            item["_why"] = "artifact_priority"
+            item["_artifact_source_id"] = source["id"]
+            item["_artifact_source_title"] = source["title"]
             item["_score"] = 9500 - len(result)
             result.append(item)
             seen.add(item["id"])
     if len(result) < LEGAL_TOP_K:
-        # search_like() is intentionally broad for short colloquial Vietnamese.
-        # Filter in Python so the model still sees only the selected Notebook
-        # source pack; db.search_like itself has no document_ids parameter.
-        for unit in db.search_like(question, limit=max(LEGAL_TOP_K * 4, 24)):
+        for unit in db.search_like(question, limit=max(LEGAL_TOP_K * 5, 30)):
             if str(unit.get("document_id") or "") not in allowed_documents:
                 continue
             if unit["id"] in seen:
                 continue
             item = dict(unit)
-            item["_why"] = "notebook_search"
+            item["_why"] = "artifact_support_search"
+            item["_artifact_source_id"] = source["id"]
+            item["_artifact_source_title"] = source["title"]
             item["_score"] = 5000 - len(result)
             result.append(item)
             seen.add(item["id"])
@@ -52,56 +68,24 @@ def _pack(priority_ids, document_ids, question):
     return result[:LEGAL_TOP_K]
 
 
+def _tag_artifact(units, source_index):
+    source = SOURCES[source_index - 1]
+    tagged = []
+    for unit in units:
+        item = dict(unit)
+        item["_artifact_source_id"] = source["id"]
+        item["_artifact_source_title"] = source["title"]
+        tagged.append(item)
+    return tagged
+
+
 def retrieve(plan, question):
-    q = _norm(question)
+    source_index = source_index_for_question(question)
+    if source_index is None:
+        # Out-of-artifact questions may still use safety/intake legal sources,
+        # but they are not presented as part of the 19-source work.
+        return legacy_retrieve(plan, question)
 
-    # Residence sub-notebooks not previously separated by the old router.
-    residence_routes = [
-        (["xoa dang ky thuong tru", "xoa thuong tru"], "RESIDENCE_NOTEBOOK_2026:delete_permanent"),
-        (["gia han tam tru"], "RESIDENCE_NOTEBOOK_2026:extend_temporary"),
-        (["tach ho"], "RESIDENCE_NOTEBOOK_2026:split_household"),
-        (["dieu chinh thong tin cu tru", "dieu chinh tt ve ct"], "RESIDENCE_NOTEBOOK_2026:adjust"),
-        (["khai bao thong tin ve cu tru", "khai bao tt ve ct"], "RESIDENCE_NOTEBOOK_2026:declare"),
-        (["xoa dang ky tam tru", "xoa tam tru"], "RESIDENCE_NOTEBOOK_2026:delete_temporary"),
-        (["khai bao tam vang", "tam vang"], "RESIDENCE_NOTEBOOK_2026:temporary_absence"),
-        (["thong bao luu tru", "luu tru"], "RESIDENCE_NOTEBOOK_2026:stay_notification"),
-    ]
-    for aliases, unit_id in residence_routes:
-        if any(alias in q for alias in aliases):
-            return _pack(
-                [unit_id, "RESIDENCE_CURRENT_2026:data_reuse"],
-                ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"],
-                question,
-            )
-
-    if any(x in q for x in ["ho chieu", "xuat nhap canh", "passport"]):
-        return _pack(
-            ["PASSPORT_CURRENT_2026:issue", "PASSPORT_CURRENT_2026:scope"],
-            ["PASSPORT_CURRENT_2026"], question,
-        )
-
-    if any(x in q for x in ["nganh nghe kinh doanh", "an ninh trat tu", "giay chung nhan du dieu kien ve an ninh"]):
-        return _pack(
-            ["SECURITY_BUSINESS_CURRENT_2026:new_certificate", "SECURITY_BUSINESS_CURRENT_2026:scope"],
-            ["SECURITY_BUSINESS_CURRENT_2026"], question,
-        )
-
-    if any(x in q for x in ["vu khi", "vat lieu no", "cong cu ho tro", "ccht"]):
-        return _pack(
-            ["WEAPONS_CURRENT_2026:support_tool_permit", "WEAPONS_CURRENT_2026:scope"],
-            ["WEAPONS_CURRENT_2026"], question,
-        )
-
-    if any(x in q for x in ["ly lich tu phap", "phieu ly lich tu phap"]):
-        return _pack(
-            ["CRIMINAL_RECORD_CURRENT_2026:citizen"],
-            ["CRIMINAL_RECORD_CURRENT_2026"], question,
-        )
-
-    if any(x in q for x in ["giay phep lai xe", "gplx", "sat hach lai xe", "san tap lai"]):
-        return _pack(
-            ["DRIVING_LICENCE_CURRENT_2026:scope", "DRIVING_LICENCE_CURRENT_2026:test_center_type3"],
-            ["DRIVING_LICENCE_CURRENT_2026"], question,
-        )
-
-    return legacy_retrieve(plan, question)
+    if source_index in LEGACY_RICH_SOURCES:
+        return _tag_artifact(legacy_retrieve(plan, question), source_index)
+    return _pack(source_index, question)
