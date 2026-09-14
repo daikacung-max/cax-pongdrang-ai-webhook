@@ -24,25 +24,34 @@ PRIORITY_UNITS = {
     9: ["RESIDENCE_NOTEBOOK_2026:delete_temporary", "RESIDENCE_CURRENT_2026:data_reuse"],
     10: ["RESIDENCE_NOTEBOOK_2026:temporary_absence"],
     11: ["RESIDENCE_NOTEBOOK_2026:stay_notification"],
+    12: ["VEHICLE_CURRENT_2026:first_domestic_online", "VEHICLE_CURRENT_2026:authority"],
     13: ["PASSPORT_CURRENT_2026:issue", "PASSPORT_CURRENT_2026:scope"],
     14: ["SECURITY_BUSINESS_CURRENT_2026:new_certificate", "SECURITY_BUSINESS_CURRENT_2026:scope"],
+    15: ["VNEID_2026:overview", "VNEID_2026:level2", "VNEID_2026:level1"],
+    16: ["CITIZEN_ID_5230_COMMUNE_2026:scope"],
     17: ["WEAPONS_CURRENT_2026:support_tool_permit", "WEAPONS_CURRENT_2026:scope"],
     18: ["CRIMINAL_RECORD_CURRENT_2026:citizen"],
     19: ["DRIVING_LICENCE_CURRENT_2026:scope", "DRIVING_LICENCE_CURRENT_2026:test_center_type3"],
 }
 
-# Rich legacy retrievers already contain current sub-routing for these domains.
+# Rich legacy retrieval remains useful for nuanced sub-intents, but every result
+# is filtered back through the artifact-selected support-document boundary.
 LEGACY_RICH_SOURCES = {12, 15, 16}
+
+
+def _allowed_documents(source_index):
+    source = SOURCES[source_index - 1]
+    return {str(x) for x in source.get("support_document_ids") or source.get("document_ids") or []}
 
 
 def _pack(source_index, question):
     source = SOURCES[source_index - 1]
-    allowed_documents = {str(x) for x in source.get("support_document_ids") or source.get("document_ids") or []}
+    allowed_documents = _allowed_documents(source_index)
     result = []
     seen = set()
     for unit_id in PRIORITY_UNITS.get(source_index, []):
         unit = db.get_unit(unit_id)
-        if unit and unit["id"] not in seen:
+        if unit and str(unit.get("document_id") or "") in allowed_documents and unit["id"] not in seen:
             item = dict(unit)
             item["_why"] = "artifact_priority"
             item["_artifact_source_id"] = source["id"]
@@ -68,15 +77,20 @@ def _pack(source_index, question):
     return result[:LEGAL_TOP_K]
 
 
-def _tag_artifact(units, source_index):
+def _bounded_legacy(plan, question, source_index):
     source = SOURCES[source_index - 1]
-    tagged = []
-    for unit in units:
+    allowed = _allowed_documents(source_index)
+    bounded = []
+    for unit in legacy_retrieve(plan, question):
+        if str(unit.get("document_id") or "") not in allowed:
+            continue
         item = dict(unit)
         item["_artifact_source_id"] = source["id"]
         item["_artifact_source_title"] = source["title"]
-        tagged.append(item)
-    return tagged
+        bounded.append(item)
+    if bounded:
+        return bounded[:LEGAL_TOP_K]
+    return _pack(source_index, question)
 
 
 def retrieve(plan, question):
@@ -87,5 +101,5 @@ def retrieve(plan, question):
         return legacy_retrieve(plan, question)
 
     if source_index in LEGACY_RICH_SOURCES:
-        return _tag_artifact(legacy_retrieve(plan, question), source_index)
+        return _bounded_legacy(plan, question, source_index)
     return _pack(source_index, question)
