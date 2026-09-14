@@ -5,6 +5,8 @@ This overlay intercepts domains whose authority/procedure changed in 2026 so a
 provider timeout can never resurrect superseded guidance.
 """
 
+import re
+
 from core.verifier import grounded_dynamic_fallback as legacy_grounded_fallback, norm
 
 
@@ -28,7 +30,10 @@ def grounded_dynamic_fallback(question, retrieved_units):
                 "không phụ thuộc nơi cư trú nếu đã triển khai. Anh/chị cũng có thể đăng ký thời gian, địa điểm qua Cổng dịch vụ công quốc gia hoặc VNeID; "
                 "thời hạn giải quyết không quá 07 ngày làm việc. Nếu thông tin dân cư có thay đổi thì cần điều chỉnh dữ liệu trước khi cấp đổi."
             )
-        if any(x in q for x in ["duoi 14", "tre em", "con toi", "be nha toi"]):
+        under14_language = any(x in q for x in [
+            "duoi 14", "tre em", "con toi", "be nha toi", "nguoi dai dien", "dua con", "dua tre"
+        ]) or bool(re.search(r"\b(?:con|be|tre)\s+\d{1,2}\s+tuoi\b", q))
+        if under14_language:
             return (
                 "Theo Quyết định 5230/QĐ-BCA-C06, người từ đủ 06 đến dưới 14 tuổi làm căn cước trực tiếp tại Công an cấp xã cùng người đại diện hợp pháp. "
                 "Người dưới 06 tuổi có thể được người đại diện hợp pháp nộp hồ sơ trực tuyến toàn trình qua Cổng dịch vụ công quốc gia hoặc VNeID; "
