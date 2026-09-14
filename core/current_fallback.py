@@ -14,11 +14,23 @@ def _has(units, document_id):
     return any(str(x.get("document_id") or "") == document_id for x in (units or []))
 
 
-def grounded_dynamic_fallback(question, retrieved_units):
+def _citizen_norm(question):
     q = norm(question)
+    q = q.replace("dang ki", "dang ky")
+    q = q.replace("lam lai can cuoc", "cap lai can cuoc")
+    q = q.replace("lam lai cccd", "cap lai cccd")
+    return q
+
+
+def grounded_dynamic_fallback(question, retrieved_units):
+    q = _citizen_norm(question)
 
     if _has(retrieved_units, "CITIZEN_ID_5230_COMMUNE_2026"):
-        if any(x in q for x in ["mat can cuoc", "mat cccd", "cap lai", "hu hong", "khong su dung duoc"]):
+        is_reissue = any(x in q for x in [
+            "mat can cuoc", "mat cccd", "cap lai can cuoc", "cap lai cccd",
+            "cap lai", "hu hong", "khong su dung duoc", "can cuoc bi mat", "cccd bi mat",
+        ])
+        if is_reissue:
             return (
                 "Theo thủ tục hiện hành được công bố tại Quyết định 5230/QĐ-BCA-C06, anh/chị có thể đề nghị cấp lại thẻ căn cước tại Công an cấp xã "
                 "hoặc Bộ phận một cửa cấp xã trong cả nước không phụ thuộc nơi cư trú nếu đã triển khai. Trường hợp mất thẻ hoặc thẻ hư hỏng không sử dụng được "
@@ -73,10 +85,15 @@ def grounded_dynamic_fallback(question, retrieved_units):
             )
 
     if _has(retrieved_units, "VEHICLE_CURRENT_2026"):
-        if any(x in q for x in ["mua xe moi", "dang ky xe", "lan dau", "bien so"]):
+        if any(x in q for x in ["mua xe moi", "dang ky xe", "lan dau", "bien so", "dkx10", "xe may moi"]):
+            form_note = (
+                "Giấy khai đăng ký xe mẫu ĐKX10 là thành phần hồ sơ đăng ký lần đầu theo nguồn thủ tục hiện hành. "
+                if "dkx10" in q else ""
+            )
             return (
-                "Theo nguồn đăng ký xe hiện hành, cơ quan đăng ký xe được tổ chức ở cấp tỉnh và cấp xã theo phân cấp. Với thủ tục 1.012575 đối với xe sản xuất, "
-                "lắp ráp trong nước, chủ xe kê khai qua Cổng dịch vụ công hoặc VNeID; thời hạn cấp chứng nhận đăng ký xe và cấp mới biển số không quá 02 ngày làm việc "
+                form_note
+                + "Cơ quan đăng ký xe hiện được tổ chức ở cấp tỉnh và cấp xã theo phân cấp. Với thủ tục đăng ký lần đầu xe sản xuất, lắp ráp trong nước, "
+                "chủ xe kê khai qua Cổng dịch vụ công hoặc VNeID; thời hạn cấp chứng nhận đăng ký xe và cấp mới biển số không quá 02 ngày làm việc "
                 "kể từ khi nhận đủ hồ sơ hợp lệ."
             )
 
