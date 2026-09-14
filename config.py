@@ -30,10 +30,6 @@ FULL_CORE_CANDIDATE_MODEL = os.getenv("FULL_CORE_CANDIDATE_MODEL", "gpt-5.6-terr
 ENABLE_MODEL_ESCALATION = os.getenv("ENABLE_MODEL_ESCALATION", "false").lower() in ("1", "true", "yes", "on")
 
 DB_PATH = Path(os.getenv("LEGAL_DB_PATH", str(BASE_DIR / "data" / "legal.db")))
-# Full Core now keeps a longer conversational window so follow-up turns can refer
-# naturally to facts supplied earlier in the same discussion. The legal source
-# remains re-retrieved each turn; old assistant legal claims are never trusted as
-# a source of law.
 MAX_HISTORY_MESSAGES = int(os.getenv("MAX_HISTORY_MESSAGES", "16"))
 DYNAMIC_HISTORY_MESSAGES = int(os.getenv("DYNAMIC_HISTORY_MESSAGES", "12"))
 DYNAMIC_HISTORY_MAX_CHARS = int(os.getenv("DYNAMIC_HISTORY_MAX_CHARS", "6000"))
@@ -60,14 +56,26 @@ ZALO_WEBHOOK_SIGNATURE_REQUIRED = bool(
 )
 ZALO_APP_ID = os.getenv("ZALO_APP_ID", "").strip()
 ZALO_OA_SECRET_KEY = os.getenv("ZALO_OA_SECRET_KEY", "").strip()
-
+# OAuth secret can be configured separately. Existing deployments may use the
+# same application secret for webhook/OAuth, so the current OA secret is a safe
+# compatibility fallback without ever exposing either value.
+ZALO_APP_SECRET_KEY = os.getenv("ZALO_APP_SECRET_KEY", ZALO_OA_SECRET_KEY).strip()
 ZALO_OA_ACCESS_TOKEN = os.getenv("ZALO_OA_ACCESS_TOKEN", "").strip()
+ZALO_OA_REFRESH_TOKEN = os.getenv("ZALO_OA_REFRESH_TOKEN", "").strip()
+ZALO_OAUTH_REFRESH_READY = bool(
+    ZALO_APP_ID and ZALO_APP_SECRET_KEY and ZALO_OA_REFRESH_TOKEN
+)
 ZALO_REPLY_MODE = os.getenv("ZALO_REPLY_MODE", "auto").strip().lower()
 _requested_direct_reply = os.getenv("ZALO_DIRECT_REPLY_ENABLED", "false").lower() in ("1", "true", "yes", "on")
 ZALO_DIRECT_REPLY_ENABLED = bool(
     _requested_direct_reply
     or (ZALO_REPLY_MODE == "direct")
-    or (ZALO_REPLY_MODE == "auto" and PRODUCTION_MODE and ZALO_WEBHOOK_ENABLED and ZALO_OA_ACCESS_TOKEN)
+    or (
+        ZALO_REPLY_MODE == "auto"
+        and PRODUCTION_MODE
+        and ZALO_WEBHOOK_ENABLED
+        and (ZALO_OA_ACCESS_TOKEN or ZALO_OAUTH_REFRESH_READY)
+    )
 )
 if ZALO_REPLY_MODE == "dynamic":
     ZALO_DIRECT_REPLY_ENABLED = False
@@ -75,8 +83,6 @@ if ZALO_REPLY_MODE == "dynamic":
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 HISTORY_HMAC_SECRET = os.getenv("HISTORY_HMAC_SECRET", "").strip()
 HISTORY_RETENTION_DAYS = int(os.getenv("HISTORY_RETENTION_DAYS", "30"))
-# Storage retains more turns than a single model request so the active window can
-# grow without instantly deleting older context. This is still bounded/retained.
 HISTORY_MAX_MESSAGES = int(os.getenv("HISTORY_MAX_MESSAGES", "40"))
 HISTORY_POOL_MAX_SIZE = int(os.getenv("HISTORY_POOL_MAX_SIZE", "5"))
 
