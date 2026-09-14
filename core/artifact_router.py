@@ -41,16 +41,24 @@ def source_index_for_question(question):
     if not q:
         return None
 
-    # Residence sources 1-11. Specific semantic intents always precede generic
-    # occurrences of "tạm trú/thường trú".
+    # Residence sources 1-11. Specific intents always precede generic mentions.
     if _all(q, "xoa", "thuong tru"):
         return 2
-    if _all(q, "tam tru", "gia han") or _all(q, "tam tru", "het han") or _has(q, "keo dai tam tru"):
+    if (_all(q, "tam tru", "gia han") or _all(q, "tam tru", "het han")
+            or _all(q, "tam tru", "keo dai") or _has(q, "keo dai thoi han tam tru")):
         return 4
     if _has(q, "tach ho", "tach khau", "tach khoi ho", "tach ra khoi ho") or (_all(q, "tach", "ho") and not _has(q, "ho chieu")):
         return 5
-    if _all(q, "dieu chinh", "cu tru") or _all(q, "sua", "thong tin", "cu tru"):
+    if (_all(q, "dieu chinh", "cu tru") or _all(q, "sua", "thong tin", "cu tru")
+            or (_all(q, "du lieu", "cu tru") and _has(q, "thay doi", "cap nhat"))
+            or (_all(q, "thong tin", "cu tru") and _has(q, "thay doi", "cap nhat"))):
         return 6
+    # Tạm vắng and lưu trú are narrower than generic "khai báo ... cư trú".
+    if _has(q, "tam vang"):
+        return 10
+    if (_has(q, "thong bao luu tru", "khai bao luu tru", "luu tru qua dem")
+            or (_all(q, "co so luu tru", "thong bao") and _has(q, "nguoi o lai", "khach"))):
+        return 11
     if _all(q, "khai bao", "thong tin", "cu tru") or (
         "khai bao" in q
         and _has(q, "chua du dieu kien", "khong du dieu kien")
@@ -59,12 +67,10 @@ def source_index_for_question(question):
         return 7
     if _all(q, "xac nhan", "cu tru"):
         return 8
-    if _all(q, "xoa", "tam tru") or (_has(q, "khong con o", "khong con sinh song") and "tam tru" in q) or _has(q, "tam tru cu") and "khong con" in q:
+    if (_all(q, "xoa", "tam tru")
+            or (_has(q, "khong con o", "khong con sinh song") and "tam tru" in q)
+            or (_has(q, "tam tru cu") and "khong con" in q)):
         return 9
-    if _has(q, "tam vang"):
-        return 10
-    if _has(q, "thong bao luu tru", "khai bao luu tru", "luu tru qua dem"):
-        return 11
     if _has(q, "dang ky thuong tru", "thuong tru", "nhap khau"):
         return 1
     if _has(q, "dang ky tam tru", "tam tru"):
