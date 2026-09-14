@@ -17,6 +17,8 @@ from adapters.demo_ai import blueprint as demo_ai_blueprint
 from config import LOCAL_BIND_HOST
 from core.current_knowledge import ensure_current_knowledge
 from core.current_fallback import grounded_dynamic_fallback as current_grounded_fallback
+from core.notebook_current_sources import ensure_notebook_current_sources
+from core.notebook_retrieval import retrieve as notebook_retrieve
 from core.source_guard import merge_verification
 
 
@@ -28,12 +30,19 @@ _original_ensure_legal_db = _app_core.ensure_legal_db
 def _ensure_legal_db_with_current_sources():
     _original_ensure_legal_db()
     ensure_current_knowledge()
+    ensure_notebook_current_sources()
 
 
 _app_core.ensure_legal_db = _ensure_legal_db_with_current_sources
-# app_core already initialized once during import, therefore apply the overlay
+# app_core already initialized once during import, therefore apply the overlays
 # immediately for this process as well.
 ensure_current_knowledge()
+ensure_notebook_current_sources()
+
+# Notebook-style routing extends the normal retriever with the exact source
+# groups mirrored from the uploaded Gemini Notebook. Existing domains still use
+# the legacy retriever underneath.
+_service_module.retrieve = notebook_retrieve
 
 # Dynamic and API-boundary fallbacks must use the same current-source overlay.
 # This prevents a provider timeout from resurrecting superseded TTHC guidance.
