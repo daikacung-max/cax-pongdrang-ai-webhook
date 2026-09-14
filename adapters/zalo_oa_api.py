@@ -51,14 +51,14 @@ def _split_text(text, max_chars=1800, max_messages=4):
 class ZaloOAClient:
     """Gửi tin Tư vấn OA và tự làm mới access token khi có refresh token.
 
-    Zalo OA OpenAPI hiện dùng header ``access_token`` cho API gửi tin. OAuth v4
-    dùng ``/v4/oa/access_token`` để đổi refresh token lấy access token mới.
-    Refresh token mới chỉ được giữ trong bộ nhớ tiến trình; không ghi token vào
-    log hoặc response công khai.
+    OA OpenAPI dùng header ``access_token``. OAuth v4 dùng
+    ``/v4/oa/access_token`` để đổi refresh token lấy access token mới. Token mới
+    chỉ được giữ trong bộ nhớ tiến trình và không bao giờ được ghi vào log.
     """
 
     endpoint = "https://openapi.zalo.me/v3.0/oa/message/cs"
     token_endpoint = "https://oauth.zaloapp.com/v4/oa/access_token"
+    INVALID_ACCESS_TOKEN_ERRORS = {-124, "-124"}
 
     def __init__(
         self,
@@ -129,23 +129,36 @@ class ZaloOAClient:
             timeout=timeout,
         )
 
+    @staticmethod
+    def _json_body(response):
+        try:
+            return response.json()
+        except Exception as exc:
+            raise ZaloOAReplyError("OA reply API returned invalid JSON") from exc
+
     def _send_one(self, user_id, text, timeout=2.0):
         if not self.access_token:
             self._refresh_access_token(timeout=max(timeout, 3.0))
 
         response = self._post_message(user_id, text, timeout)
-        # Chỉ tự refresh/retry khi HTTP cho biết token/ủy quyền không còn hợp lệ.
-        # Các lỗi quota/quyền nghiệp vụ khác phải fail-closed, không retry mù.
         if response.status_code in (401, 403) and self.refresh_ready:
             self._refresh_access_token(timeout=max(timeout, 3.0))
             response = self._post_message(user_id, text, timeout)
 
         if response.status_code != 200:
             raise ZaloOAReplyError("OA reply request was rejected")
-        try:
-            body = response.json()
-        except Exception as exc:
-            raise ZaloOAReplyError("OA reply API returned invalid JSON") from exc
+
+        body = self._json_body(response)
+        # Zalo OA thường phản hồi lỗi nghiệp vụ trong JSON dù HTTP vẫn là 200.
+        # -124 là access token không hợp lệ. Refresh đúng một lần rồi retry để
+        # tránh vòng lặp vô hạn; quota/quyền gửi và lỗi khác vẫn fail-closed.
+        if body.get("error") in self.INVALID_ACCESS_TOKEN_ERRORS and self.refresh_ready:
+            self._refresh_access_token(timeout=max(timeout, 3.0))
+            response = self._post_message(user_id, text, timeout)
+            if response.status_code != 200:
+                raise ZaloOAReplyError("OA reply retry was rejected")
+            body = self._json_body(response)
+
         if body.get("error", 0) not in (0, "0", None):
             raise ZaloOAReplyError("OA reply API returned an error")
         return True
