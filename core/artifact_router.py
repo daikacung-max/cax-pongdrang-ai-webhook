@@ -22,6 +22,9 @@ def norm(text):
         .replace("vnied", "vneid")
         .replace("vned", "vneid")
         .replace("cccd", "can cuoc")
+        .replace("tam chu", "tam tru")
+        .replace("thuong chu", "thuong tru")
+        .replace("ly lich", "ly lich")
     )
 
 
@@ -34,7 +37,6 @@ def source_index_for_question(question):
     if not q:
         return None
 
-    # Residence sub-procedures must be checked before broad "tạm trú/thường trú".
     if _has(q, "xoa dang ky thuong tru", "xoa thuong tru"):
         return 2
     if _has(q, "gia han tam tru", "keo dai tam tru"):
@@ -58,7 +60,6 @@ def source_index_for_question(question):
     if _has(q, "dang ky tam tru", "tam tru"):
         return 3
 
-    # Other artifact source groups.
     if _has(q, "dang ky xe", "quan ly phuong tien", "bien so", "sang ten xe", "thu hoi dang ky xe", "xe may", "xe mo to", "xe gan may", "xe o to"):
         return 12
     if _has(q, "ho chieu", "xuat nhap canh", "passport", "thi thuc", "visa"):
