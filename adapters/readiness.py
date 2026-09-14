@@ -10,6 +10,8 @@ from config import (
     ZALO_APP_ID,
     ZALO_OA_SECRET_KEY,
     ZALO_OA_ACCESS_TOKEN,
+    ZALO_OA_REFRESH_TOKEN,
+    ZALO_OAUTH_REFRESH_READY,
     ZALO_DIRECT_REPLY_ENABLED,
     ZALO_REPLY_MODE,
 )
@@ -23,14 +25,12 @@ def readiness():
     """Operational readiness without exposing any credential or identifier."""
     signature_secret_ready = bool(ZALO_OA_SECRET_KEY)
     signature_config_complete = bool(ZALO_APP_ID and ZALO_OA_SECRET_KEY)
-    direct_reply_ready = bool(ZALO_OA_ACCESS_TOKEN)
-    # We only call Zalo end-to-end ready when this service itself can send the
-    # reply back through OA API. Dynamic mode can still be used by a separately
-    # configured Zalo consumer, but that external configuration is not
-    # observable from Render and therefore must not be reported as proven here.
+    direct_reply_ready = bool(ZALO_OA_ACCESS_TOKEN or ZALO_OAUTH_REFRESH_READY)
     end_to_end_reply_ready = bool(
-        ZALO_WEBHOOK_ENABLED and signature_secret_ready and
-        ZALO_DIRECT_REPLY_ENABLED and direct_reply_ready
+        ZALO_WEBHOOK_ENABLED
+        and signature_secret_ready
+        and ZALO_DIRECT_REPLY_ENABLED
+        and direct_reply_ready
     )
     return jsonify({
         "production_mode": bool(PRODUCTION_MODE),
@@ -45,5 +45,8 @@ def readiness():
         "zalo_reply_mode": ZALO_REPLY_MODE,
         "zalo_direct_reply_enabled": bool(ZALO_DIRECT_REPLY_ENABLED),
         "zalo_direct_reply_ready": direct_reply_ready,
+        "zalo_access_token_present": bool(ZALO_OA_ACCESS_TOKEN),
+        "zalo_refresh_token_present": bool(ZALO_OA_REFRESH_TOKEN),
+        "zalo_oauth_refresh_ready": bool(ZALO_OAUTH_REFRESH_READY),
         "zalo_end_to_end_reply_ready": end_to_end_reply_ready,
     }), 200
