@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Verify production health, Notebook demo, provider, Zalo boundary, and VNeID routing
+      - name: Verify production health, real Notebook demo, provider, Zalo boundary, and VNeID routing
         shell: bash
         run: |
           python - <<'PY'
@@ -51,23 +51,37 @@ jobs:
           import re
           import time
           import urllib.error
+          import urllib.parse
           import urllib.request
           import uuid
 
           base = "https://cax-pongdrang-ai.onrender.com"
+
+          def get_json(path, timeout=8):
+              with urllib.request.urlopen(base + path, timeout=timeout) as r:
+                  return json.load(r)
+
+          def post_json(path, payload, timeout=20, headers=None):
+              req_headers = {"Content-Type": "application/json"}
+              req_headers.update(headers or {})
+              req = urllib.request.Request(
+                  base + path,
+                  data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                  headers=req_headers,
+                  method="POST",
+              )
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                  return json.load(r)
+
           last_error = None
           for attempt in range(1, 7):
               try:
-                  with urllib.request.urlopen(base + "/health", timeout=6) as r:
-                      health = json.load(r)
-                  with urllib.request.urlopen(base + "/health/readiness", timeout=6) as r:
-                      readiness = json.load(r)
-                  with urllib.request.urlopen(base + "/debug/article/134", timeout=6) as r:
-                      article = json.load(r)
+                  health = get_json("/health", 6)
+                  readiness = get_json("/health/readiness", 6)
+                  article = get_json("/debug/article/134", 6)
                   with urllib.request.urlopen(base + "/demo", timeout=8) as r:
                       demo_html = r.read().decode("utf-8", errors="replace")
-                  with urllib.request.urlopen(base + "/demo/api/notebook-sources", timeout=8) as r:
-                      notebook = json.load(r)
+                  notebook = get_json("/demo/api/notebook-sources", 8)
 
                   assert health.get("status") == "ok", "health status"
                   assert health.get("mode") == "CAX_PONG_DRANG_AI_CORE", "AI Core mode"
@@ -102,10 +116,10 @@ jobs:
                   assert health.get("dynamic_answer_provider") == expected_provider, f"dynamic provider={health.get('dynamic_answer_provider')}"
 
                   if readiness.get("zalo_webhook_enabled"):
-                      assert readiness.get("zalo_signature_ready") is True, "Zalo signature credentials missing"
+                      assert readiness.get("zalo_signature_secret_ready") is True, "Zalo signature secret missing"
                       assert readiness.get("zalo_signature_required") is True, "Zalo signature check disabled"
                   if readiness.get("zalo_direct_reply_enabled"):
-                      assert readiness.get("zalo_direct_reply_ready") is True, "Zalo OA token missing"
+                      assert readiness.get("zalo_direct_reply_ready") is True, "Zalo OA reply credentials missing"
 
                   forged_body = json.dumps({
                       "app_id": "synthetic-app",
@@ -127,25 +141,16 @@ jobs:
                       assert exc.code == 401, f"forged webhook status={exc.code}"
 
                   empty_uid = "synthetic-empty-" + uuid.uuid4().hex
-                  with urllib.request.urlopen(base + "/zalo/ai?uid=" + empty_uid, timeout=8) as r:
-                      dynamic = json.load(r)
+                  dynamic = get_json("/zalo/ai?uid=" + empty_uid, 8)
                   assert dynamic.get("version") == "chatbot", "Dynamic version"
                   messages = ((dynamic.get("content") or {}).get("messages") or [])
                   assert messages and messages[0].get("type") == "text", "Dynamic text contract"
 
-                  payload = json.dumps({
+                  question = "Bạn hãy hướng dẫn cho tôi làm định danh mức 2"
+                  chat = post_json("/api/chat", {
                       "user_id": "synthetic-smoke-" + uuid.uuid4().hex,
-                      "message": "Bạn hãy hướng dẫn cho tôi làm định danh mức 2"
-                  }, ensure_ascii=False).encode("utf-8")
-                  req = urllib.request.Request(
-                      base + "/api/chat",
-                      data=payload,
-                      headers={"Content-Type": "application/json"},
-                      method="POST",
-                  )
-                  with urllib.request.urlopen(req, timeout=20) as r:
-                      chat = json.load(r)
-
+                      "message": question,
+                  })
                   answer = str(chat.get("answer") or "").strip()
                   meta = chat.get("meta") or {}
                   source_ids = [str(x) for x in (meta.get("retrieved_unit_ids") or [])]
@@ -166,6 +171,29 @@ jobs:
                   for phrase in ("Số xx", "giờ hành chính", "tài khoản ngân hàng", "mã số thuế", "hồ sơ y tế"):
                       assert phrase.casefold() not in answer.casefold(), f"unsourced detail {phrase}: {answer}"
 
+                  # Exercise the exact API used by the visible Notebook-like demo,
+                  # then confirm that its conversation turn is persisted.
+                  demo_session = str(uuid.uuid4())
+                  demo_chat = post_json("/demo/api/ai-chat", {
+                      "session_id": demo_session,
+                      "message": question,
+                  })
+                  assert demo_chat.get("mode") == "full_ai_core", "demo is not Full Core"
+                  assert demo_chat.get("artifact_backed") is True, "demo lost Artifact Core"
+                  assert demo_chat.get("memory") is True, "demo memory flag"
+                  assert str(demo_chat.get("answer") or "").strip(), "demo empty answer"
+                  assert demo_chat.get("model") == expected_core, f"demo model={demo_chat.get('model')}"
+                  assert demo_chat.get("provider") == expected_provider, f"demo provider={demo_chat.get('provider')}"
+                  assert demo_chat.get("notebook_sources"), "demo reported no Notebook source"
+                  demo_history = get_json(
+                      "/demo/api/ai-history?session_id=" + urllib.parse.quote(demo_session),
+                      8,
+                  )
+                  demo_messages = demo_history.get("messages") or []
+                  assert len(demo_messages) >= 2, f"demo memory missing turn: {demo_messages}"
+                  assert demo_messages[-2].get("role") == "user", "demo user turn not stored"
+                  assert demo_messages[-1].get("role") == "assistant", "demo assistant turn not stored"
+
                   safe = {
                       "status": health.get("status"),
                       "mode": health.get("mode"),
@@ -173,6 +201,8 @@ jobs:
                       "hotline": health.get("hotline"),
                       "demo_console_enabled": health.get("demo_console_enabled"),
                       "notebook_source_count": notebook.get("source_count"),
+                      "demo_live_chat": True,
+                      "demo_memory": True,
                       "core_answer_model": health.get("core_answer_model"),
                       "dynamic_answer_model": health.get("dynamic_answer_model"),
                       "core_answer_provider": health.get("core_answer_provider"),
@@ -188,6 +218,8 @@ jobs:
                       "zalo_dynamic_contract": "chatbot_text",
                       "zalo_direct_reply_enabled": readiness.get("zalo_direct_reply_enabled"),
                       "zalo_direct_reply_ready": readiness.get("zalo_direct_reply_ready"),
+                      "zalo_oauth_refresh_ready": readiness.get("zalo_oauth_refresh_ready"),
+                      "zalo_end_to_end_reply_ready": readiness.get("zalo_end_to_end_reply_ready"),
                       "article_134_title": article.get("title"),
                       "full_core_live_path": meta.get("path"),
                       "full_core_verified": meta.get("verified"),
