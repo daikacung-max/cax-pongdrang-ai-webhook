@@ -26,6 +26,11 @@ def _fix_common_typos(text):
         "thuong chu": "thuong tru", "thuong trú": "thuong tru", "tam chu": "tam tru",
         "vne id": "vneid", "vne-id": "vneid", "vned": "vneid", "vnied": "vneid",
         "can cuoc cong dan": "can cuoc", "ho khau thuong chu": "ho khau thuong tru",
+        "dang ki": "dang ky", "dăng ky": "dang ky", "đang ky": "dang ky",
+        "dinh danh muc 2": "dinh danh dien tu muc do 2",
+        "dinh danh muc do 2": "dinh danh dien tu muc do 2",
+        "dinh danh muc 02": "dinh danh dien tu muc do 02",
+        "tai khoan muc 2": "tai khoan dinh danh muc do 2",
     }.items():
         q = q.replace(old, new)
     return q
@@ -49,14 +54,14 @@ SEARCH_VOCAB = [
     (["tam tru", "dang ky tam tru", "ho so tam tru"], "Đăng ký tạm trú Công an cấp xã 03 ngày làm việc nguyên tắc hồ sơ dữ liệu VNeID"),
     (["thuong tru", "dang ky thuong tru", "ho khau thuong tru", "nhap khau"], "Đăng ký thường trú Công an cấp xã 07 ngày làm việc thành phần hồ sơ phụ thuộc trường hợp chỗ ở"),
     (["xac nhan cu tru", "xac nhan thong tin cu tru"], "xác nhận thông tin cư trú Công an cấp xã"),
-    (["vneid", "dinh danh dien tu", "tai khoan dinh danh", "muc do 1", "muc do 01", "muc do 2", "muc do 02"], "Cấp tài khoản định danh điện tử VNeID mức độ 01 mức độ 02 Công an xã căn cước số điện thoại chính chủ"),
-    (["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe", "mua xe moi"], "Đăng ký lần đầu xe mô tô xe gắn máy Giấy khai đăng ký xe ĐKX10 giấy tờ chủ xe giấy tờ của xe"),
-    (["tre em", "duoi 14", "con toi", "be nha toi"], "Cấp thẻ căn cước cho người dưới 14 tuổi thực hiện tại Công an cấp xã"),
+    (["vneid", "dinh danh dien tu", "tai khoan dinh danh", "dinh danh muc 2", "dinh danh muc do 2", "tai khoan muc 2", "muc do 1", "muc do 01", "muc do 2", "muc do 02"], "Cấp tài khoản định danh điện tử VNeID mức độ 01 mức độ 02 Công an xã căn cước số điện thoại chính chủ"),
+    (["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe", "mua xe moi", "dkx10"], "Đăng ký lần đầu xe mô tô xe gắn máy Giấy khai đăng ký xe ĐKX10 giấy tờ chủ xe giấy tờ của xe"),
+    (["tre em", "duoi 14", "con toi", "be nha toi", "dua con", "nguoi dai dien"], "Cấp thẻ căn cước cho người dưới 14 tuổi thực hiện tại Công an cấp xã"),
     (["to giac", "tin bao toi pham", "trinh bao toi pham"], "Hướng dẫn tố giác báo tin về tội phạm Công an cấp xã"),
     (["karaoke", "hat karaoke", "loa keo", "tieng on", "on ao", "on nhieu"], "Nghị định 282/2025/NĐ-CP Điều 9 tiếng ồn karaoke bảo đảm sự yên tĩnh chung"),
 ]
 
-LEGAL_HINTS = ["luat", "bo luat", "dieu ", "xu phat", "toi pham", "cong an", "tam tru", "thuong tru", "cu tru", "dang ky xe", "sang ten", "chuyen nhuong", "thu hoi", "can cuoc", "to giac", "thuong tich", "bi thuong", "bi danh", "nguoi khac danh", "hanh hung", "camera", "dung dao", "hung khi", "bi lua", "chuyen tien", "chuyen khoan", "trom", "ma tuy", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid", "dinh danh dien tu", "tai khoan dinh danh", "xe mo to", "xe may", "xe gan may", "bien so xe", "ho khau", "nhap khau", "ho chieu", "khieu nai", "to cao", "dieu tra", "luat su", "dat dai", "ly hon", "thua ke", "vay tien", "lao dong", "bao hiem xa hoi", "khai sinh", "khai tu", "ket hon", "ho tich", "tieng on", "karaoke", "pccc", "co bac", "bao luc gia dinh", "xam hai tre em", "vu khi", "phao", "phat giao thong", "giay phep lai xe"]
+LEGAL_HINTS = ["luat", "bo luat", "dieu ", "xu phat", "toi pham", "cong an", "tam tru", "thuong tru", "cu tru", "dang ky xe", "sang ten", "chuyen nhuong", "thu hoi", "can cuoc", "to giac", "thuong tich", "bi thuong", "bi danh", "nguoi khac danh", "hanh hung", "camera", "dung dao", "hung khi", "bi lua", "chuyen tien", "chuyen khoan", "trom", "ma tuy", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid", "dinh danh dien tu", "tai khoan dinh danh", "dinh danh muc 2", "dinh danh muc do 2", "xe mo to", "xe may", "xe gan may", "bien so xe", "dkx10", "ho khau", "nhap khau", "ho chieu", "khieu nai", "to cao", "dieu tra", "luat su", "dat dai", "ly hon", "thua ke", "vay tien", "lao dong", "bao hiem xa hoi", "khai sinh", "khai tu", "ket hon", "ho tich", "tieng on", "karaoke", "pccc", "co bac", "bao luc gia dinh", "xam hai tre em", "vu khi", "phao", "phat giao thong", "giay phep lai xe"]
 OBVIOUS_NONLEGAL = {"xin chao", "chao", "chao anh chi", "hello", "hi", "cam on", "cam on anh chi", "ok", "okay"}
 
 
