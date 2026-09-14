@@ -17,6 +17,7 @@ from adapters.demo_ai import blueprint as demo_ai_blueprint
 from config import LOCAL_BIND_HOST
 from core.current_knowledge import ensure_current_knowledge
 from core.current_fallback import grounded_dynamic_fallback as current_grounded_fallback
+from core.source_guard import merge_verification
 
 
 # app_core first loads the long-lived verified snapshots. The current overlay is
@@ -38,6 +39,27 @@ ensure_current_knowledge()
 # This prevents a provider timeout from resurrecting superseded TTHC guidance.
 _service_module.grounded_dynamic_fallback = current_grounded_fallback
 _app_core.grounded_dynamic_fallback = current_grounded_fallback
+
+# Add a second grounding gate around model output. The normal verifier handles
+# legal claims/numbers; this guard catches operational details the model may
+# improvise (physical addresses, office hours, invented integration examples,
+# or internal source IDs) even when the core legal claim itself is correct.
+_original_service_verify = _service_module.verify
+_original_service_verify_dynamic = _service_module.verify_dynamic_text
+
+
+def _verify_with_source_guard(draft, retrieved_units, question=""):
+    result = _original_service_verify(draft, retrieved_units, question=question)
+    return merge_verification(result, (draft or {}).get("answer", ""), retrieved_units)
+
+
+def _verify_dynamic_with_source_guard(answer, retrieved_units, question=""):
+    result = _original_service_verify_dynamic(answer, retrieved_units, question=question)
+    return merge_verification(result, answer, retrieved_units)
+
+
+_service_module.verify = _verify_with_source_guard
+_service_module.verify_dynamic_text = _verify_dynamic_with_source_guard
 
 if "vbee_tts" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(vbee_blueprint)
