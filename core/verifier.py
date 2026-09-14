@@ -98,6 +98,22 @@ def _has_identity_under14_source(units):
     return any(str(x.get("document_id") or "") == "CITIZEN_ID_UNDER14_2026" for x in units)
 
 
+def _source_blob(units):
+    """Nguồn kiểm chứng gồm cả nội dung và metadata pháp lý đã xác minh.
+
+    Số hiệu văn bản/tên tài liệu là dữ kiện nguồn hợp lệ dù không được lặp lại
+    trong từng đoạn text nhỏ. Gom metadata vào blob giúp verifier không gắn cờ
+    nhầm các số hiệu như 5230 khi chính document_number đã xác nhận chúng.
+    """
+    blocks = []
+    for unit in units or []:
+        blocks.append("\n".join(str(unit.get(key) or "") for key in (
+            "document_title", "document_number", "document_issuer",
+            "article", "title", "text",
+        )))
+    return "\n".join(blocks)
+
+
 def _unsafe_residence_requirements(answer):
     q = norm(answer)
     risky = [
@@ -118,13 +134,17 @@ def _unsupported_procedural_details(answer, source_blob, question=""):
     answer_norm = norm(answer)
     allowed = norm(source_blob + "\n" + str(question or ""))
     candidates = set()
+    form_candidates = []
 
-    # Mã biểu mẫu là nơi model dễ bịa nhất, ví dụ TK99 hay ĐKX01.
+    # Mã biểu mẫu là nơi model dễ bịa nhất, ví dụ TK99 hay ĐKX01. Tuy nhiên
+    # nguồn có thể ghi "Phiếu đề nghị ... mẫu TK01" trong khi câu trả lời rút
+    # gọn thành "Phiếu TK01". Khi đúng code và đúng loại biểu mẫu đều có trong
+    # nguồn thì đó là paraphrase hợp lệ, không phải hallucination.
     for match in re.finditer(
         r"\b(?:mau|phieu|to khai|don)\s+([a-zđ]{0,8}\d+[a-z0-9-]*)\b",
         answer_norm,
     ):
-        candidates.add(match.group(0))
+        form_candidates.append((match.group(0), match.group(1)))
 
     sensitive_phrases = [
         "uy ban nhan dan", "cong an huyen", "cong an tinh",
@@ -134,7 +154,15 @@ def _unsupported_procedural_details(answer, source_blob, question=""):
         "don khieu nai", "ho so khieu nai", "yeu cau dieu tra",
     ]
     candidates.update(x for x in sensitive_phrases if x in answer_norm)
-    return sorted(x for x in candidates if x not in allowed)
+
+    unsupported = {x for x in candidates if x not in allowed}
+    for phrase, code in form_candidates:
+        if phrase in allowed:
+            continue
+        if code in allowed and any(kind in allowed for kind in ("mau", "phieu", "to khai", "don")):
+            continue
+        unsupported.add(phrase)
+    return sorted(unsupported)
 
 
 def _article_134_dynamic_errors(answer, retrieved_units):
@@ -210,12 +238,9 @@ def verify(draft, retrieved_units, question=""):
         errors.append("assistant_must_not_impersonate_officer")
     if norm(question) in {"xin chao", "chao", "chao ban", "hello", "hi"} and "tro ly ai" not in norm(answer_text):
         errors.append("greeting_must_identify_assistant_as_ai")
-    # Cả Full Core lẫn Dynamic đều phải giữ cách xưng hô thống nhất khi nói
-    # chuyện với người dân. Nếu model dùng "bạn", Full Core sẽ đi qua fallback
-    # đã được kiểm chứng thay vì phát nguyên văn câu trả lời đó.
     if re.search(r"(?i)\bbạn\s+(?:có|cần|đã|nên|muốn|hãy|vui lòng)\b", answer_text):
         errors.append("second_person_must_be_anh_chi")
-    source_blob = "\n".join(str(x.get("text") or "") for x in retrieved_units)
+    source_blob = _source_blob(retrieved_units)
     if _is_overbroad_negative(answer_text) and _has_exception_structure(source_blob) and not _acknowledges_exception(answer_text):
         errors.append("Câu trả lời loại trừ tuyệt đối trong khi nguồn có ngoại lệ.")
     if _has_residence_source(retrieved_units):
@@ -227,8 +252,6 @@ def verify(draft, retrieved_units, question=""):
         if risky:
             errors.append("Giấy tờ/cách gọi đăng ký xe không được nguồn hỗ trợ: " + ", ".join(risky))
 
-    # Khi provider dùng text mode, pháp luật vẫn phải được kiểm chứng trực tiếp
-    # trên câu trả lời, không chỉ dựa vào danh sách legal_claims có cấu trúc.
     direct_answer_check = verify_dynamic_text(answer_text, retrieved_units, question=question)
     for error in direct_answer_check["errors"]:
         if error not in errors:
@@ -245,10 +268,8 @@ def verify_dynamic_text(answer, retrieved_units, question=""):
     unsupported = sorted(x for x in cited_articles if x not in allowed_articles)
     if unsupported:
         errors.append("unsupported_articles:" + ",".join(unsupported))
-    source_blob = "\n".join(str(x.get("text") or "") for x in retrieved_units)
+    source_blob = _source_blob(retrieved_units)
     allowed_numbers = _numbers(source_blob) | _numbers(question) | _numbers(HOTLINE)
-    # Chỉ chặn số liệu có ý nghĩa pháp lý/thủ tục. Các chỉ mục kiểu "Bước 1"
-    # hoặc "2. ..." là cấu trúc hội thoại, không phải một khẳng định số liệu.
     unsupported_numbers = sorted(
         (_numbers(answer) - _instruction_step_numbers(answer)) - allowed_numbers
     )
@@ -262,8 +283,6 @@ def verify_dynamic_text(answer, retrieved_units, question=""):
         errors.append("premature_fraud_offence_label")
     if _impersonates_officer(answer):
         errors.append("assistant_must_not_impersonate_officer")
-    # Giữ nhất quán cách xưng hô đã công bố của trợ lý. Nếu model lạc sang
-    # "bạn", nhánh Dynamic sẽ dùng câu fallback đã bám nguồn và xưng "anh/chị".
     if re.search(r"(?i)\bbạn\s+(?:có|cần|đã|nên|muốn|hãy|vui lòng)\b", answer):
         errors.append("second_person_must_be_anh_chi")
     answer_norm = norm(answer)
