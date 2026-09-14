@@ -18,13 +18,9 @@ def norm(text):
     value = re.sub(r"[^a-z0-9\s]", " ", value)
     value = re.sub(r"\s+", " ", value).strip()
     replacements = (
-        ("vne id", "vneid"),
-        ("vnied", "vneid"),
-        ("vned", "vneid"),
-        ("cccd", "can cuoc"),
-        ("dang ki", "dang ky"),
-        ("tam chu", "tam tru"),
-        ("thuong chu", "thuong tru"),
+        ("vne id", "vneid"), ("vnied", "vneid"), ("vned", "vneid"),
+        ("cccd", "can cuoc"), ("dang ki", "dang ky"),
+        ("tam chu", "tam tru"), ("thuong chu", "thuong tru"),
         ("li lich", "ly lich"),
     )
     for old, new in replacements:
@@ -45,21 +41,25 @@ def source_index_for_question(question):
     if not q:
         return None
 
-    # Residence sources 1-11. Use semantic conjunctions where citizens can put
-    # the same words in many different orders.
+    # Residence sources 1-11. Specific semantic intents always precede generic
+    # occurrences of "tạm trú/thường trú".
     if _all(q, "xoa", "thuong tru"):
         return 2
     if _all(q, "tam tru", "gia han") or _all(q, "tam tru", "het han") or _has(q, "keo dai tam tru"):
         return 4
-    if _has(q, "tach ho", "tach khau"):
+    if _has(q, "tach ho", "tach khau", "tach khoi ho", "tach ra khoi ho") or (_all(q, "tach", "ho") and not _has(q, "ho chieu")):
         return 5
     if _all(q, "dieu chinh", "cu tru") or _all(q, "sua", "thong tin", "cu tru"):
         return 6
-    if _all(q, "khai bao", "thong tin", "cu tru"):
+    if _all(q, "khai bao", "thong tin", "cu tru") or (
+        "khai bao" in q
+        and _has(q, "chua du dieu kien", "khong du dieu kien")
+        and _has(q, "thuong tru", "tam tru", "cu tru")
+    ):
         return 7
     if _all(q, "xac nhan", "cu tru"):
         return 8
-    if _all(q, "xoa", "tam tru"):
+    if _all(q, "xoa", "tam tru") or (_has(q, "khong con o", "khong con sinh song") and "tam tru" in q) or _has(q, "tam tru cu") and "khong con" in q:
         return 9
     if _has(q, "tam vang"):
         return 10
@@ -70,7 +70,6 @@ def source_index_for_question(question):
     if _has(q, "dang ky tam tru", "tam tru"):
         return 3
 
-    # Other artifact source groups.
     if _has(q, "dang ky xe", "quan ly phuong tien", "bien so", "sang ten xe", "thu hoi dang ky xe", "xe may", "xe mo to", "xe gan may", "xe o to"):
         return 12
     if _has(q, "ho chieu", "xuat nhap canh", "passport", "thi thuc", "visa"):
