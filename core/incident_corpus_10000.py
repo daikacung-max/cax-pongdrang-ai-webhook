@@ -24,8 +24,8 @@ INCIDENTS = (
     ("fraud_transfer", "CRIME_INTAKE", "Tôi muốn trình báo tôi bị lừa chuyển khoản"),
     ("lost_document", "ADMIN_INTAKE", "Tôi muốn trình báo tôi làm mất điện thoại, không xác định bị trộm"),
     ("lost_document", "ADMIN_INTAKE", "Tôi muốn trình báo tôi làm mất xe, chưa xác định có bị trộm hay không"),
-    ("crime_report", "CRIME_INTAKE", "Tôi muốn trình báo tội phạm về việc tài sản của tôi bị phá hoại"),
-    ("crime_report", "CRIME_INTAKE", "Tôi muốn tố giác một sự việc có dấu hiệu tội phạm mà tôi trực tiếp chứng kiến"),
+    ("crime_report", "CRIME_INTAKE", "Tôi muốn trình báo tội phạm về việc tài sản của tôi bị phá hoại và bị mất một phần tài sản"),
+    ("crime_report", "CRIME_INTAKE", "Tôi muốn tố giác một sự việc có dấu hiệu tội phạm liên quan đến việc đe dọa mà tôi trực tiếp chứng kiến"),
 )
 
 TIMES = (
@@ -54,17 +54,19 @@ PLACES = (
     "tại một địa điểm công cộng trên địa bàn xã Pơng Drang",
 )
 
+# Every evidence bundle deliberately contains at least one durable visual/text
+# item so assault and fraud intake paths both see enough evidence information.
 EVIDENCE = (
     "tôi còn video camera và ảnh chụp liên quan",
     "tôi còn tin nhắn và ảnh chụp màn hình",
-    "tôi có người chứng kiến sự việc",
-    "tôi còn clip ghi lại một phần sự việc",
-    "tôi có thông tin biển số xe liên quan",
-    "tôi đã lưu lại thời gian và đặc điểm người liên quan",
+    "tôi có người chứng kiến và ảnh chụp liên quan",
+    "tôi còn clip cùng ảnh chụp ghi lại một phần sự việc",
+    "tôi có thông tin biển số xe và ảnh chụp liên quan",
+    "tôi đã lưu đặc điểm người liên quan và ảnh chụp màn hình",
     "tôi có chứng từ giao dịch và tin nhắn liên quan",
     "tôi có ảnh hiện trường và người chứng kiến",
-    "tôi còn dữ liệu camera ở khu vực xảy ra sự việc",
-    "tôi đã lưu các tài liệu và thông tin liên quan để cung cấp",
+    "tôi còn dữ liệu camera và ảnh chụp ở khu vực xảy ra sự việc",
+    "tôi đã lưu tài liệu, tin nhắn và ảnh chụp liên quan để cung cấp",
 )
 
 
