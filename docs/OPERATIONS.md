@@ -35,12 +35,12 @@ Không commit giá trị bí mật vào GitHub.
 - `ZALO_WEBHOOK_ENABLED=true`
 - `ZALO_APP_ID`
 - `ZALO_OA_SECRET_KEY` — secret dùng xác thực webhook.
-- `ZALO_APP_SECRET_KEY` — OAuth secret; nếu bỏ trống thì runtime dùng `ZALO_OA_SECRET_KEY` làm compatibility fallback.
+- `ZALO_APP_SECRET_KEY` — App secret dùng riêng cho OAuth v4; phải cấu hình rõ, không suy đoán từ webhook secret.
 - `ZALO_OA_ACCESS_TOKEN` — tùy chọn nếu đã có access token.
 - `ZALO_OA_REFRESH_TOKEN` — khuyến nghị để runtime có thể tự làm mới token.
 - `ZALO_REPLY_MODE=auto|direct|dynamic`
 
-Ở `auto`, production tự bật Direct Reply khi có access token hoặc khi đủ bộ credential để refresh.
+Ở `auto`, production tự bật Direct Reply khi có access token hoặc khi đủ bộ App ID + App secret + refresh token để refresh.
 
 ## Vòng đời OA token
 
