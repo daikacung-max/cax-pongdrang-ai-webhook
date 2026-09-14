@@ -80,4 +80,12 @@ def grounded_dynamic_fallback(question, retrieved_units):
                 "kể từ khi nhận đủ hồ sơ hợp lệ."
             )
 
+    article_134 = any(str(x.get("article") or "") == "134" for x in (retrieved_units or []))
+    if article_134 and any(x in q for x in ["camera", "video", "clip", "ghi hinh"]):
+        return (
+            "Đoạn camera/video là chứng cứ quan trọng đối với việc xác minh sự việc. Anh/chị nên giữ nguyên file gốc, không chỉnh sửa, sao lưu thêm một bản và ghi lại "
+            "thời gian, địa điểm, người biết sự việc; khi trình báo thì cung cấp bản sao theo hướng dẫn và giữ bản gốc để đối chiếu. Việc xem xét trách nhiệm theo Điều 134 "
+            "Bộ luật Hình sự còn phải dựa trên toàn bộ diễn biến, thương tích và các tình tiết được xác minh, nên chưa thể kết luận chỉ từ video."
+        )
+
     return legacy_grounded_fallback(question, retrieved_units)
