@@ -1,11 +1,4 @@
-"""Real AI Core preview for the internal demo console.
-
-Unlike ``core.demo`` (deterministic acceptance preview), this adapter calls the
-same Full AI Core used by the real API. A stable demo session id becomes a
-conversation id, so the model receives previous turns and can converse
-naturally. Demo-prefixed identities are blocked from creating intake cases in
-``core.cases``.
-"""
+"""Real AI Core preview backed by the user's Notebook artifact."""
 
 import re
 
@@ -13,6 +6,7 @@ from flask import Blueprint, jsonify, request
 
 from config import ENABLE_DEMO_CONSOLE
 from core import db
+from core.artifact_core import artifact_public_metadata
 from core.notebook_manifest import (
     NOTEBOOK_SOURCE_COUNT,
     NOTEBOOK_TITLE,
@@ -43,7 +37,8 @@ def notebook_sources():
         "title": NOTEBOOK_TITLE,
         "source_count": NOTEBOOK_SOURCE_COUNT,
         "sources": source_catalog(),
-        "note": "Danh mục 19 nguồn được mirror từ file Gemini Notebook; nội dung trả lời chỉ dùng các document hiện hành đã nạp và kiểm chứng.",
+        "artifact": artifact_public_metadata(),
+        "core_rule": "Tác phẩm người dùng là Core; nguồn ngoài chỉ là lớp cập nhật/kiểm chứng và không được thay thế Core.",
     }), 200
 
 
@@ -66,20 +61,19 @@ def ai_chat():
     notebook_sources_used = used_sources_for_unit_ids(unit_ids)
     return jsonify({
         "answer": result.get("answer") or "",
-        "mode": "full_ai_core",
+        "mode": "artifact_full_ai_core",
+        "core_origin": "user_supplied_work",
         "memory": True,
         "verified": bool(meta.get("verified")),
         "path": meta.get("path"),
         "model": meta.get("model"),
         "provider": meta.get("provider"),
-        # Keep internal unit ids for diagnostics only; the UI primarily renders
-        # the user-facing Notebook source titles below.
         "sources": unit_ids,
         "notebook_sources": notebook_sources_used,
         "notebook_source_count": len(notebook_sources_used),
         "fallback": str(meta.get("path") or "").endswith("fallback"),
         "handoff_status": ((meta.get("intake") or {}).get("handoff_status") or "not_requested"),
-        "note": "Full AI Core thật, có lịch sử theo phiên và trả lời bám nguồn Notebook hiện hành; phiên demo không tạo hồ sơ nghiệp vụ.",
+        "note": "AI dùng tác phẩm Notebook do người dùng cung cấp làm Core; nguồn hiện hành bên ngoài chỉ kiểm chứng/cập nhật. Phiên demo không tạo hồ sơ nghiệp vụ thật.",
     }), 200
 
 
