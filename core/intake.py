@@ -16,16 +16,24 @@ def _norm(text):
     return text.replace("vne id", "vneid").replace("vnied", "vneid").replace("vned", "vneid")
 
 
-# `source_ready=False` có nghĩa AI chỉ được ghi nhận nhu cầu và hướng dẫn chuyển
-# cán bộ; không được tự tư vấn chi tiết thủ tục khi kho nguồn chưa được duyệt.
+def _contains_phrase(text, phrase):
+    """Match a whole word/phrase, never a substring inside another word.
+
+    Example: advice marker ``hoi`` must not match ``thoi`` in ``thoi gian``.
+    """
+    phrase = _norm(phrase)
+    if not phrase:
+        return False
+    pattern = r"(?<![a-z0-9])" + re.escape(phrase).replace(r"\ ", r"\s+") + r"(?![a-z0-9])"
+    return re.search(pattern, str(text or "")) is not None
+
+
 PROCEDURES = (
     {
         "code": "identity_card_under14",
         "name": "Cấp thẻ căn cước cho người dưới 14 tuổi",
         "queue": "ADMIN_IDENTITY",
         "source_ready": True,
-        # Không đưa "căn cước"/"CCCD" vào đây: chúng quá rộng và sẽ lấn các
-        # tình huống như mất thẻ, cấp lại hoặc đổi thẻ của người lớn.
         "keywords": ("duoi 14", "tre em", "con toi", "be nha toi"),
         "fields": (
             ("age_group", "người cần làm căn cước hiện dưới 06 tuổi hay từ đủ 06 đến dưới 14 tuổi", ("duoi 6", "6 tuoi", "duoi 14", "13 tuoi", "12 tuoi", "11 tuoi", "10 tuoi", "9 tuoi", "8 tuoi", "7 tuoi")),
@@ -130,53 +138,43 @@ PROCEDURES = (
 
 
 def _conversation_text(question, history):
-    user_turns = [
-        str(item.get("content") or "")
-        for item in (history or [])
-        if item.get("role") == "user"
-    ]
+    user_turns = [str(item.get("content") or "") for item in (history or []) if item.get("role") == "user"]
     return _norm(" ".join((user_turns + [str(question or "")])[-5:]))
 
 
 def _requests_intake(question, text):
-    """Chỉ mở luồng hồ sơ khi người dân thể hiện ý định tiếp nhận rõ ràng.
-
-    Việc hỏi "thủ tục là gì" hoặc "cần những gì" luôn là tư vấn, dù hệ thống
-    đã nhận diện đúng nhóm nghiệp vụ. Không suy diễn nhu cầu chuyển cán bộ.
-    """
+    """Only explicit citizen intent opens intake; information questions stay advice-only."""
     current = _norm(question)
-    if any(marker in current for marker in ("la gi", "nhu the nao", "can gi", "thu tuc", "hoi", "huong dan")):
-        return False
+    advice_markers = ("la gi", "nhu the nao", "can gi", "thu tuc", "hoi", "huong dan")
     explicit_markers = (
         "toi muon nop ho so", "muon nop ho so", "nop ho so", "gui ho so",
         "tao ho so", "tiep nhan ho so", "can can bo xu ly", "chuyen can bo",
         "toi muon dang ky", "cho toi dang ky", "toi muon trinh bao",
         "can trinh bao", "toi muon to giac", "can to giac", "yeu cau tiep nhan",
+        "can cong an tiep nhan", "cong an tiep nhan trinh bao",
     )
-    return any(marker in text for marker in explicit_markers)
+    explicit = any(_contains_phrase(text, marker) for marker in explicit_markers)
+    # Explicit submission/reporting intent wins even if the same message also
+    # asks for guidance, e.g. "Tôi muốn trình báo... hướng dẫn tôi nộp thế nào".
+    if explicit:
+        return True
+    if any(_contains_phrase(current, marker) for marker in advice_markers):
+        return False
+    return False
 
 
 def assess(question, history):
     """Trả metadata không chứa nội dung hay giá trị dữ liệu của người dân."""
     text = _conversation_text(question, history)
-    matches = [
-        item for item in PROCEDURES
-        if any(keyword in text for keyword in item["keywords"])
-    ]
+    matches = [item for item in PROCEDURES if any(keyword in text for keyword in item["keywords"])]
     if not matches:
         return {
-            "procedure_code": "unclassified",
-            "source_ready": False,
-            "conversation_mode": "advice_only",
-            "handoff_status": "not_requested",
-            "handoff_queue": None,
-            "missing_field_ids": [],
-            "next_question": None,
+            "procedure_code": "unclassified", "source_ready": False,
+            "conversation_mode": "advice_only", "handoff_status": "not_requested",
+            "handoff_queue": None, "missing_field_ids": [], "next_question": None,
         }
 
     by_code = {item["code"]: item for item in matches}
-    # Tin báo sự việc luôn ưu tiên hơn thủ tục có cùng tên tài sản (ví dụ mất xe
-    # không phải là yêu cầu đăng ký xe). Những nhánh cụ thể vẫn ưu tiên tiếp.
     if "identity_card_reissue" in by_code:
         chosen = by_code["identity_card_reissue"]
     elif any(x in text for x in ("bi trom", "bi de doa", "de doa")) and "crime_report" in by_code:
@@ -184,7 +182,6 @@ def assess(question, history):
     elif any(x in text for x in ("mat dien thoai", "mat xe", "mat tai san")) and "lost_document" in by_code:
         chosen = by_code["lost_document"]
     else:
-        # Ưu tiên nhóm cụ thể hơn nhóm tố giác chung khi cùng xuất hiện trong mạch chat.
         chosen = max(matches, key=lambda item: (len(item["keywords"]), item["source_ready"]))
     missing = [field for field in chosen["fields"] if not any(cue in text for cue in field[2])]
     intake_requested = _requests_intake(question, text)
