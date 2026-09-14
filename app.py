@@ -91,8 +91,10 @@ def _official_zalo_signature(data, raw_body):
     """
     if not _app_core.ZALO_WEBHOOK_SIGNATURE_REQUIRED:
         return True
+
     secret = str(_app_core.ZALO_OA_SECRET_KEY or "").strip()
     if not secret:
+        _app_core.app.logger.warning("zalo_webhook signature_reject reason=missing_secret")
         return False
 
     incoming_app_id = str((data or {}).get("app_id") or "").strip()
@@ -101,16 +103,21 @@ def _official_zalo_signature(data, raw_body):
     if supplied.lower().startswith("mac="):
         supplied = supplied[4:].strip()
     if not incoming_app_id or not timestamp or not supplied:
+        _app_core.app.logger.warning("zalo_webhook signature_reject reason=missing_signed_fields")
         return False
 
     signed_value = f"{incoming_app_id}{raw_body}{timestamp}{secret}".encode("utf-8")
     expected = hashlib.sha256(signed_value).hexdigest()
     valid = hmac.compare_digest(supplied.lower(), expected)
+    if not valid:
+        _app_core.app.logger.warning("zalo_webhook signature_reject reason=digest_mismatch")
+        return False
+
     configured_app_id = str(_app_core.ZALO_APP_ID or "").strip()
-    if valid and configured_app_id and not hmac.compare_digest(incoming_app_id, configured_app_id):
+    if configured_app_id and not hmac.compare_digest(incoming_app_id, configured_app_id):
         # Safe operational signal only. Never log either identifier or the secret.
         _app_core.app.logger.warning("zalo_webhook signature_valid config_app_id_drift=true")
-    return valid
+    return True
 
 
 # Replace the stricter legacy validator at runtime. The route in app_core looks
