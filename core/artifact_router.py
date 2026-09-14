@@ -17,19 +17,27 @@ def norm(text):
     value = value.replace("đ", "d")
     value = re.sub(r"[^a-z0-9\s]", " ", value)
     value = re.sub(r"\s+", " ", value).strip()
-    return (
-        value.replace("vne id", "vneid")
-        .replace("vnied", "vneid")
-        .replace("vned", "vneid")
-        .replace("cccd", "can cuoc")
-        .replace("tam chu", "tam tru")
-        .replace("thuong chu", "thuong tru")
-        .replace("ly lich", "ly lich")
+    replacements = (
+        ("vne id", "vneid"),
+        ("vnied", "vneid"),
+        ("vned", "vneid"),
+        ("cccd", "can cuoc"),
+        ("dang ki", "dang ky"),
+        ("tam chu", "tam tru"),
+        ("thuong chu", "thuong tru"),
+        ("li lich", "ly lich"),
     )
+    for old, new in replacements:
+        value = value.replace(old, new)
+    return value
 
 
 def _has(q, *parts):
     return any(part in q for part in parts)
+
+
+def _all(q, *parts):
+    return all(part in q for part in parts)
 
 
 def source_index_for_question(question):
@@ -37,21 +45,23 @@ def source_index_for_question(question):
     if not q:
         return None
 
-    if _has(q, "xoa dang ky thuong tru", "xoa thuong tru"):
+    # Residence sources 1-11. Use semantic conjunctions where citizens can put
+    # the same words in many different orders.
+    if _all(q, "xoa", "thuong tru"):
         return 2
-    if _has(q, "gia han tam tru", "keo dai tam tru"):
+    if _all(q, "tam tru", "gia han") or _all(q, "tam tru", "het han") or _has(q, "keo dai tam tru"):
         return 4
     if _has(q, "tach ho", "tach khau"):
         return 5
-    if _has(q, "dieu chinh thong tin cu tru", "dieu chinh tt ve ct", "sua thong tin cu tru"):
+    if _all(q, "dieu chinh", "cu tru") or _all(q, "sua", "thong tin", "cu tru"):
         return 6
-    if _has(q, "khai bao thong tin ve cu tru", "khai bao tt ve ct", "khai bao cu tru"):
+    if _all(q, "khai bao", "thong tin", "cu tru"):
         return 7
-    if _has(q, "xac nhan thong tin cu tru", "xac nhan cu tru", "xac nhan tt ve ct"):
+    if _all(q, "xac nhan", "cu tru"):
         return 8
-    if _has(q, "xoa dang ky tam tru", "xoa tam tru"):
+    if _all(q, "xoa", "tam tru"):
         return 9
-    if _has(q, "khai bao tam vang", "tam vang"):
+    if _has(q, "tam vang"):
         return 10
     if _has(q, "thong bao luu tru", "khai bao luu tru", "luu tru qua dem"):
         return 11
@@ -60,13 +70,14 @@ def source_index_for_question(question):
     if _has(q, "dang ky tam tru", "tam tru"):
         return 3
 
+    # Other artifact source groups.
     if _has(q, "dang ky xe", "quan ly phuong tien", "bien so", "sang ten xe", "thu hoi dang ky xe", "xe may", "xe mo to", "xe gan may", "xe o to"):
         return 12
     if _has(q, "ho chieu", "xuat nhap canh", "passport", "thi thuc", "visa"):
         return 13
     if _has(q, "nganh nghe", "an ninh trat tu", "giay chung nhan du dieu kien", "cam do", "kinh doanh co dieu kien"):
         return 14
-    if _has(q, "vneid", "dinh danh dien tu", "tai khoan dinh danh", "xac thuc dien tu", "dinh danh muc 1", "dinh danh muc 2", "muc do 01", "muc do 02"):
+    if _has(q, "vneid", "dinh danh dien tu", "tai khoan dinh danh", "xac thuc dien tu", "dinh danh muc 1", "dinh danh muc 2", "muc do 01", "muc do 02", "muc 1", "muc 2"):
         return 15
     if _has(q, "can cuoc", "the can cuoc", "can cuoc cong dan", "du lieu can cuoc"):
         return 16
