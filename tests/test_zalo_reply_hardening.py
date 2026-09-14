@@ -1,8 +1,10 @@
 import unittest
 from unittest.mock import patch
 
+import app as runtime
 from adapters.zalo import PendingZaloMessages
 from adapters.zalo_oa_api import ZaloOAClient, _split_text
+from core.llm import LLMError
 
 
 class FakeResponse:
@@ -57,6 +59,17 @@ class ZaloReplyHardeningTests(unittest.TestCase):
         self.assertEqual(len(session.calls), len(chunks))
         self.assertTrue(all(call["headers"]["access_token"] == "token" for call in session.calls))
         self.assertTrue(all(call["json"]["recipient"]["user_id"] == "user-1" for call in session.calls))
+
+    def test_ai_failure_still_sends_safe_notice_through_oa(self):
+        with patch.object(runtime, "ZALO_DIRECT_REPLY_ENABLED", True), \
+             patch.object(runtime.core, "chat", side_effect=LLMError("provider unavailable")), \
+             patch.object(runtime.zalo_oa_client, "send_text", return_value=True) as send_text:
+            self.assertTrue(runtime._direct_zalo_reply("user-1", "Xin hỗ trợ", "trace-1"))
+
+        sent = send_text.call_args.args[1]
+        self.assertIn("Trợ lý AI tạm thời", sent)
+        self.assertIn("02623509777", sent)
+        self.assertNotIn("provider unavailable", sent)
 
 
 if __name__ == "__main__":
