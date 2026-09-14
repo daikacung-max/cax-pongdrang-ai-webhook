@@ -5,6 +5,8 @@ mounted, ``app`` is aliased to that runtime module so legacy imports/patches and
 production routes always reference the same state.
 """
 
+import hashlib
+import hmac
 import os
 import sys
 
@@ -77,6 +79,44 @@ def _verify_dynamic_with_source_guard(answer, retrieved_units, question=""):
 
 _service_module.verify = _verify_with_source_guard
 _service_module.verify_dynamic_text = _verify_dynamic_with_source_guard
+
+
+def _official_zalo_signature(data, raw_body):
+    """Validate Zalo's documented SHA-256 webhook signature.
+
+    The app_id participating in the signature is the app_id carried by the
+    signed webhook payload itself. A stale/mistyped local ZALO_APP_ID must not
+    reject an otherwise cryptographically valid event. The OA secret remains
+    mandatory, so accepting app-id drift does not bypass signature security.
+    """
+    if not _app_core.ZALO_WEBHOOK_SIGNATURE_REQUIRED:
+        return True
+    secret = str(_app_core.ZALO_OA_SECRET_KEY or "").strip()
+    if not secret:
+        return False
+
+    incoming_app_id = str((data or {}).get("app_id") or "").strip()
+    timestamp = str((data or {}).get("timestamp") or "").strip()
+    supplied = str(_app_core.request.headers.get("X-ZEvent-Signature") or "").strip()
+    if supplied.lower().startswith("mac="):
+        supplied = supplied[4:].strip()
+    if not incoming_app_id or not timestamp or not supplied:
+        return False
+
+    signed_value = f"{incoming_app_id}{raw_body}{timestamp}{secret}".encode("utf-8")
+    expected = hashlib.sha256(signed_value).hexdigest()
+    valid = hmac.compare_digest(supplied.lower(), expected)
+    configured_app_id = str(_app_core.ZALO_APP_ID or "").strip()
+    if valid and configured_app_id and not hmac.compare_digest(incoming_app_id, configured_app_id):
+        # Safe operational signal only. Never log either identifier or the secret.
+        _app_core.app.logger.warning("zalo_webhook signature_valid config_app_id_drift=true")
+    return valid
+
+
+# Replace the stricter legacy validator at runtime. The route in app_core looks
+# up this module-global function on every request, so production and tests share
+# the same behavior.
+_app_core._valid_zalo_webhook_signature = _official_zalo_signature
 
 if "vbee_tts" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(vbee_blueprint)
