@@ -27,6 +27,7 @@ from config import (
 from core.artifact_planner import enrich_plan as enrich_artifact_plan
 from core.current_knowledge import ensure_current_knowledge
 from core.current_fallback import grounded_dynamic_fallback as current_grounded_fallback
+from core.llm import LLMError, LLMTimeout
 from core.notebook_current_sources import ensure_notebook_current_sources
 from core.notebook_retrieval import retrieve as notebook_retrieve
 from core.source_guard import merge_verification
@@ -89,13 +90,7 @@ _service_module.verify_dynamic_text = _verify_dynamic_with_source_guard
 
 
 def _official_zalo_signature(data, raw_body):
-    """Validate Zalo's documented SHA-256 webhook signature.
-
-    The app_id participating in the signature is the app_id carried by the
-    signed webhook payload itself. A stale/mistyped local ZALO_APP_ID must not
-    reject an otherwise cryptographically valid event. The OA secret remains
-    mandatory, so accepting app-id drift does not bypass signature security.
-    """
+    """Validate Zalo's documented SHA-256 webhook signature."""
     if not _app_core.ZALO_WEBHOOK_SIGNATURE_REQUIRED:
         return True
 
@@ -137,6 +132,34 @@ _app_core.zalo_oa_client = ZaloOAClient(
     app_id=ZALO_APP_ID,
     app_secret=ZALO_APP_SECRET_KEY,
 )
+
+
+def _resilient_direct_zalo_reply(user_id, text, trace_id):
+    """Reply through OA and never turn a transient AI failure into silence.
+
+    If the model/provider times out, OA still receives a short safe operational
+    notice with the one approved hotline. OA transport errors are intentionally
+    re-raised because pretending a message was delivered would be worse than a
+    visible delivery failure in telemetry.
+    """
+    if not _app_core.ZALO_DIRECT_REPLY_ENABLED:
+        return False
+    try:
+        result = _app_core.core.chat(user_id, text, dynamic=True, trace_id=trace_id)
+        result.pop("_telemetry", None)
+        answer = result["answer"]
+    except (LLMError, LLMTimeout):
+        _app_core.app.logger.warning("zalo_direct_reply ai_fallback=true")
+        answer = (
+            f"Trợ lý AI tạm thời chưa hoàn tất được phần phân tích. "
+            f"Anh/chị có thể gửi lại tin nhắn hoặc liên hệ trực ban "
+            f"{_app_core.UNIT_NAME} qua số {_app_core.HOTLINE}."
+        )
+    _app_core.zalo_oa_client.send_text(user_id, answer)
+    return True
+
+
+_app_core._direct_zalo_reply = _resilient_direct_zalo_reply
 
 if "vbee_tts" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(vbee_blueprint)
