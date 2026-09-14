@@ -56,10 +56,10 @@ ZALO_WEBHOOK_SIGNATURE_REQUIRED = bool(
 )
 ZALO_APP_ID = os.getenv("ZALO_APP_ID", "").strip()
 ZALO_OA_SECRET_KEY = os.getenv("ZALO_OA_SECRET_KEY", "").strip()
-# OAuth secret can be configured separately. Existing deployments may use the
-# same application secret for webhook/OAuth, so the current OA secret is a safe
-# compatibility fallback without ever exposing either value.
-ZALO_APP_SECRET_KEY = os.getenv("ZALO_APP_SECRET_KEY", ZALO_OA_SECRET_KEY).strip()
+# OAuth App secret and OA webhook secret have different roles. Requiring the
+# explicit OAuth secret prevents a false-ready state caused by guessing they are
+# interchangeable.
+ZALO_APP_SECRET_KEY = os.getenv("ZALO_APP_SECRET_KEY", "").strip()
 ZALO_OA_ACCESS_TOKEN = os.getenv("ZALO_OA_ACCESS_TOKEN", "").strip()
 ZALO_OA_REFRESH_TOKEN = os.getenv("ZALO_OA_REFRESH_TOKEN", "").strip()
 ZALO_OAUTH_REFRESH_READY = bool(
