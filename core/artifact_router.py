@@ -53,7 +53,6 @@ def source_index_for_question(question):
             or (_all(q, "du lieu", "cu tru") and _has(q, "thay doi", "cap nhat"))
             or (_all(q, "thong tin", "cu tru") and _has(q, "thay doi", "cap nhat"))):
         return 6
-    # Tạm vắng and lưu trú are narrower than generic "khai báo ... cư trú".
     if _has(q, "tam vang"):
         return 10
     if (_has(q, "thong bao luu tru", "khai bao luu tru", "luu tru qua dem")
@@ -76,14 +75,15 @@ def source_index_for_question(question):
     if _has(q, "dang ky tam tru", "tam tru"):
         return 3
 
+    # The procedural subject outranks the channel used to perform it. Thus
+    # "đăng ký xe bằng VNeID" remains vehicle registration, and "làm căn cước
+    # bằng VNeID" remains citizen identity card rather than source #15.
     if _has(q, "dang ky xe", "quan ly phuong tien", "bien so", "sang ten xe", "thu hoi dang ky xe", "xe may", "xe mo to", "xe gan may", "xe o to"):
         return 12
     if _has(q, "ho chieu", "xuat nhap canh", "passport", "thi thuc", "visa"):
         return 13
     if _has(q, "nganh nghe", "an ninh trat tu", "giay chung nhan du dieu kien", "cam do", "kinh doanh co dieu kien"):
         return 14
-    if _has(q, "vneid", "dinh danh dien tu", "tai khoan dinh danh", "xac thuc dien tu", "dinh danh muc 1", "dinh danh muc 2", "muc do 01", "muc do 02", "muc 1", "muc 2"):
-        return 15
     if _has(q, "can cuoc", "the can cuoc", "can cuoc cong dan", "du lieu can cuoc"):
         return 16
     if _has(q, "vu khi", "vat lieu no", "cong cu ho tro", "ccht", "phao", "giay phep su dung cong cu"):
@@ -92,6 +92,8 @@ def source_index_for_question(question):
         return 18
     if _has(q, "giay phep lai xe", "gplx", "sat hach lai xe", "sat hach", "cap lai bang lai", "doi bang lai"):
         return 19
+    if _has(q, "vneid", "dinh danh dien tu", "tai khoan dinh danh", "xac thuc dien tu", "dinh danh muc 1", "dinh danh muc 2", "muc do 01", "muc do 02", "muc 1", "muc 2"):
+        return 15
     return None
 
 
