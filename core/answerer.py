@@ -66,7 +66,10 @@ LEGAL_SYSTEM = """
 - Với mỗi legal_claim, evidence_quote phải là đoạn nguyên văn ngắn chép trực tiếp từ đúng SOURCE_UNIT_ID.
 - Không được biến quy tắc có nhiều nhánh thành một điều kiện duy nhất. Nếu nguồn có 'hoặc', 'nhưng thuộc', 'trừ trường hợp' hay ngoại lệ liên quan thì phải phản ánh đầy đủ.
 - Không nói 'không cấu thành', 'không thuộc', 'chắc chắn không bị xử lý' nếu nguồn còn nhánh/ngoại lệ chưa được loại trừ.
-- Với thủ tục hành chính, tuyệt đối không tự sáng tác tên biểu mẫu, giấy tờ, bản sao, cơ quan/phòng nghiệp vụ hay loại kết quả nếu nguồn không nêu.
+- Với thủ tục hành chính, tuyệt đối không tự sáng tác tên biểu mẫu, giấy tờ, bản sao, cơ quan/phòng nghiệp vụ, địa chỉ cụ thể, số nhà, giờ làm việc, nơi phát biểu mẫu, lệ phí, thời hạn, loại kết quả hoặc ví dụ dữ liệu tích hợp nếu nguồn không nêu.
+- Không tự thêm ví dụ như tài khoản ngân hàng, mã số thuế, hồ sơ y tế, bảo hiểm, giấy phép lái xe hoặc địa chỉ trụ sở nếu SOURCE không liệt kê chính ví dụ đó.
+- Không được hiển thị SOURCE_UNIT_ID, tên biến, ID nội bộ hoặc chuỗi như VNEID_2026:level2 cho người dân.
+- Chỉ nêu đúng phần người dân hỏi. Với TTHC thông thường ưu tiên 3-7 câu ngắn; không biến một câu hỏi đơn giản thành danh sách dài nếu nguồn không đòi hỏi.
 - Nếu nguồn nói cơ quan nhà nước phải khai thác dữ liệu/VNeID và không yêu cầu nộp lại giấy tờ đã có dữ liệu thì phải phản ánh đúng nguyên tắc này.
 - Nếu dữ kiện mới làm thay đổi đánh giá pháp lý, nói rõ ý nghĩa của dữ kiện mới theo nguồn, nhưng không kết luận thay cơ quan có thẩm quyền.
 """
@@ -123,8 +126,8 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None,
                 messages=build_messages(question, history, legal_context=legal_context, repair_note=repair_note, intake_hint=intake_hint),
                 reasoning_effort=GROQ_CORE_REASONING_EFFORT,
                 timeout=CORE_TIMEOUT_SECONDS,
-                temperature=0.08 if legal_context else 0.35,
-                max_completion_tokens=1600,
+                temperature=0.05 if legal_context else 0.35,
+                max_completion_tokens=1200 if legal_context else 1600,
                 safety_identifier=safety_identifier,
             ),
             "legal_claims": [],
@@ -139,8 +142,8 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None,
         schema=ANSWER_SCHEMA,
         reasoning_effort=(DYNAMIC_REASONING_EFFORT if dynamic else (GROQ_CORE_REASONING_EFFORT if is_groq_oss else CORE_REASONING_EFFORT)),
         timeout=(DYNAMIC_TIMEOUT_SECONDS if dynamic else CORE_TIMEOUT_SECONDS),
-        temperature=0.08 if legal_context else 0.45,
-        max_completion_tokens=360 if dynamic else (1600 if is_groq_oss else 1100),
+        temperature=0.05 if legal_context else 0.45,
+        max_completion_tokens=360 if dynamic else (1200 if is_groq_oss else 1100),
         safety_identifier=safety_identifier,
     )
 
@@ -158,8 +161,8 @@ Không dùng lời mở đầu/kết thúc rập khuôn và không tái sử d�
 Không kết luận một người có tội chỉ từ lời kể một phía.
 Tên đơn vị duy nhất: {UNIT_NAME}. Số liên hệ duy nhất: {HOTLINE}.
 Nếu có SOURCE bên dưới, mọi chi tiết pháp luật và thủ tục hành chính phải bám SOURCE. HISTORY chỉ là trí nhớ tình tiết, không phải nguồn pháp luật.
-Không tự thêm tên giấy tờ, biểu mẫu, cơ quan/phòng nghiệp vụ, lệ phí, thời hạn hoặc loại kết quả nếu SOURCE không nêu cho đúng trường hợp.
-Nếu chưa đủ căn cứ, nói rõ phần nào còn thiếu. Không dùng Markdown.
+Không tự thêm tên giấy tờ, biểu mẫu, cơ quan/phòng nghiệp vụ, địa chỉ, giờ làm việc, ví dụ tích hợp, lệ phí, thời hạn hoặc loại kết quả nếu SOURCE không nêu cho đúng trường hợp.
+Không hiển thị ID nguồn nội bộ cho người dân. Nếu chưa đủ căn cứ, nói rõ phần nào còn thiếu. Không dùng Markdown.
 """
     if legal_context:
         system += "\nSOURCE:\n" + legal_context
@@ -175,7 +178,7 @@ Nếu chưa đủ căn cứ, nói rõ phần nào còn thiếu. Không dùng Mar
         messages=messages,
         reasoning_effort=DYNAMIC_REASONING_EFFORT,
         timeout=DYNAMIC_TIMEOUT_SECONDS,
-        temperature=0.08 if legal_context else 0.35,
+        temperature=0.05 if legal_context else 0.35,
         max_completion_tokens=220,
         safety_identifier=safety_identifier,
     )
