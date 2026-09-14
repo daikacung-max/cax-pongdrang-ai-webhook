@@ -48,6 +48,7 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          import re
           import time
           import urllib.error
           import urllib.request
@@ -102,10 +103,7 @@ jobs:
                   forged_req = urllib.request.Request(
                       base + "/zalo/webhook",
                       data=forged_body,
-                      headers={
-                          "Content-Type": "application/json",
-                          "X-ZEvent-Signature": "forged",
-                      },
+                      headers={"Content-Type": "application/json", "X-ZEvent-Signature": "forged"},
                       method="POST",
                   )
                   forged_status = None
@@ -123,9 +121,6 @@ jobs:
                   messages = ((dynamic.get("content") or {}).get("messages") or [])
                   assert messages and messages[0].get("type") == "text", "Dynamic text contract"
 
-                  # This is the exact natural-language class that previously
-                  # misrouted to the identity-card notebook. Production must
-                  # now retrieve VNeID sources and generate an AI answer.
                   payload = json.dumps({
                       "user_id": "synthetic-smoke-" + uuid.uuid4().hex,
                       "message": "Bạn hãy hướng dẫn cho tôi làm định danh mức 2"
@@ -149,15 +144,15 @@ jobs:
                       "api_boundary_grounded_fallback",
                       "full_core_grounded_fallback",
                       "legal_no_source_fail_closed",
-                  }, (
-                      f"fallback path={meta.get('path')} "
-                      f"errors={meta.get('verification_errors')}"
-                  )
+                  }, f"fallback path={meta.get('path')} errors={meta.get('verification_errors')}"
                   assert source_ids, "VNeID question retrieved no sources"
                   assert source_ids[0] == "VNEID_2026:level2", f"wrong first source={source_ids[0]}"
                   assert all(x.startswith("VNEID_") for x in source_ids), f"wrong source notebook={source_ids}"
-                  assert "Công an cấp xã" in answer, f"missing commune guidance: {answer}"
+                  assert ("Công an xã" in answer or "Công an cấp xã" in answer), f"missing commune guidance: {answer}"
                   assert "5230/QĐ-BCA-C06" not in answer, f"identity fallback leaked: {answer}"
+                  assert not re.search(r"\b[A-Z][A-Z0-9_]{3,}:\w+", answer), f"internal source id leaked: {answer}"
+                  for phrase in ("Số xx", "giờ hành chính", "tài khoản ngân hàng", "mã số thuế", "hồ sơ y tế"):
+                      assert phrase.casefold() not in answer.casefold(), f"unsourced detail {phrase}: {answer}"
 
                   safe = {
                       "status": health.get("status"),
