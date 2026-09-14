@@ -15,6 +15,7 @@ from adapters.readiness import blueprint as readiness_blueprint
 from adapters.self_test import blueprint as self_test_blueprint
 from adapters.demo_ai import blueprint as demo_ai_blueprint
 from config import LOCAL_BIND_HOST
+from core.artifact_planner import enrich_plan as enrich_artifact_plan
 from core.current_knowledge import ensure_current_knowledge
 from core.current_fallback import grounded_dynamic_fallback as current_grounded_fallback
 from core.notebook_current_sources import ensure_notebook_current_sources
@@ -22,8 +23,6 @@ from core.notebook_retrieval import retrieve as notebook_retrieve
 from core.source_guard import merge_verification
 
 
-# app_core first loads the long-lived verified snapshots. The current overlay is
-# always applied *after* them so superseded TTHC remain auditable but inactive.
 _original_ensure_legal_db = _app_core.ensure_legal_db
 
 
@@ -34,25 +33,34 @@ def _ensure_legal_db_with_current_sources():
 
 
 _app_core.ensure_legal_db = _ensure_legal_db_with_current_sources
-# app_core already initialized once during import, therefore apply the overlays
-# immediately for this process as well.
 ensure_current_knowledge()
 ensure_notebook_current_sources()
 
-# Notebook-style routing extends the normal retriever with the exact source
-# groups mirrored from the uploaded Gemini Notebook. Existing domains still use
-# the legacy retriever underneath.
+# Artifact-first planner: an input that belongs to one of the 19 sources can no
+# longer be silently reclassified outside the user's work by an LLM planner.
+_original_service_plan = _service_module.plan
+
+
+def _artifact_first_plan(question, history, dynamic=False, safety_identifier=None):
+    base = _original_service_plan(
+        question,
+        history,
+        dynamic=dynamic,
+        safety_identifier=safety_identifier,
+    )
+    return enrich_artifact_plan(question, base)
+
+
+_service_module.plan = _artifact_first_plan
+
+# Artifact-first retrieval. Current official documents are only support/update
+# data behind the selected artifact source.
 _service_module.retrieve = notebook_retrieve
 
-# Dynamic and API-boundary fallbacks must use the same current-source overlay.
-# This prevents a provider timeout from resurrecting superseded TTHC guidance.
+# Dynamic and API-boundary fallbacks must use the current verification layer.
 _service_module.grounded_dynamic_fallback = current_grounded_fallback
 _app_core.grounded_dynamic_fallback = current_grounded_fallback
 
-# Add a second grounding gate around model output. The normal verifier handles
-# legal claims/numbers; this guard catches operational details the model may
-# improvise (physical addresses, office hours, invented integration examples,
-# or internal source IDs) even when the core legal claim itself is correct.
 _original_service_verify = _service_module.verify
 _original_service_verify_dynamic = _service_module.verify_dynamic_text
 
@@ -79,9 +87,6 @@ if "ai_core_self_test" not in _app_core.app.blueprints:
 if "ai_core_demo_ai" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(demo_ai_blueprint)
 
-# One module state only. This preserves ``from app import app`` and helpers such
-# as split_zalo_messages while ensuring patch("app.X") changes the exact globals
-# used by Flask route functions defined in app_core.
 sys.modules[__name__] = _app_core
 
 
