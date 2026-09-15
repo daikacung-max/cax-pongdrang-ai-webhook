@@ -18,6 +18,7 @@ from config import (
     ZALO_DIRECT_REPLY_ENABLED,
     ZALO_REPLY_MODE,
 )
+from core.zalo_jobs import persistence_ready as zalo_dispatch_persistence_ready
 from core.zalo_token_store import persistence_ready as zalo_token_persistence_ready
 
 
@@ -30,12 +31,14 @@ def _state():
     provider_ready = bool(GROQ_API_KEY or OPENAI_API_KEY)
     direct_reply_ready = bool(ZALO_OA_ACCESS_TOKEN or ZALO_OAUTH_REFRESH_READY)
     token_persistence = bool(zalo_token_persistence_ready())
+    dispatch_persistence = bool(zalo_dispatch_persistence_ready())
     history_persistence = bool(DATABASE_URL and HISTORY_HMAC_SECRET)
     end_to_end_reply_ready = bool(
         ZALO_WEBHOOK_ENABLED
         and signature_secret_ready
         and ZALO_DIRECT_REPLY_ENABLED
         and direct_reply_ready
+        and dispatch_persistence
     )
     return {
         "production_mode": bool(PRODUCTION_MODE),
@@ -57,6 +60,7 @@ def _state():
         "zalo_refresh_token_present": bool(ZALO_OA_REFRESH_TOKEN),
         "zalo_oauth_refresh_ready": bool(ZALO_OAUTH_REFRESH_READY),
         "zalo_token_persistence_ready": token_persistence,
+        "zalo_dispatch_persistence_ready": dispatch_persistence,
         "zalo_end_to_end_reply_ready": end_to_end_reply_ready,
     }
 
@@ -69,11 +73,7 @@ def readiness():
 
 @blueprint.get("/health/go-live")
 def go_live():
-    """Fail closed until all conditions for official public operation are met.
-
-    This endpoint is intentionally stricter than /health/readiness. A healthy
-    pilot must not be mistaken for an officially launch-ready public service.
-    """
+    """Fail closed until all conditions for official public operation are met."""
     state = _state()
     checks = {
         "production_mode": state["production_mode"],
@@ -82,12 +82,9 @@ def go_live():
         "zalo_webhook": state["zalo_webhook_enabled"],
         "zalo_signature": state["zalo_signature_required"] and state["zalo_signature_ready"],
         "zalo_direct_reply": state["zalo_direct_reply_enabled"] and state["zalo_direct_reply_ready"],
-        # Access tokens are short lived. Official direct-reply operation needs
-        # refresh credentials and durable encrypted rotation across restarts.
         "zalo_oauth_refresh": state["zalo_oauth_refresh_ready"],
         "zalo_refresh_persistence": state["zalo_token_persistence_ready"],
-        # The public test console is a pre-production surface and should be
-        # disabled before the OA is opened for official operation.
+        "zalo_durable_dispatch": state["zalo_dispatch_persistence_ready"],
         "public_demo_disabled": not state["demo_console_enabled"],
     }
     blockers = [name for name, ok in checks.items() if not ok]
