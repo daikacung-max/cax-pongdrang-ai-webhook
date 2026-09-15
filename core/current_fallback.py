@@ -82,34 +82,42 @@ def grounded_dynamic_fallback(question, retrieved_units):
                 "Đăng ký thường trú thực hiện tại Công an cấp xã hoặc trực tuyến, thời hạn giải quyết 07 ngày làm việc. Hồ sơ phụ thuộc loại chỗ ở và điều kiện cụ thể; "
                 "thông tin, giấy tờ đã khai thác được từ cơ sở dữ liệu hoặc VNeID thì không yêu cầu nộp lại. Anh/chị đăng ký vào nhà của mình, nhà người thân hay nhà thuê/mượn/ở nhờ?"
             )
-        # IMPORTANT: Vietnamese 'thuê' becomes 'thue' after accent folding, which
-        # can collide with the word 'thuế'. Once retrieval has already bounded
-        # the turn to temporary residence, rental/boarding language must remain
-        # inside that residence context and must never fall through to tax.
         rental_followup = any(x in q for x in [
             "o thue", "nha thue", "thue nha", "thue tro", "o tro", "phong tro",
             "o nho", "nha tro", "cho thue",
         ])
         temporary_context = _has_unit(retrieved_units, "RESIDENCE_CURRENT_2026:temporary")
         if "tam tru" in q or (temporary_context and rental_followup):
+            if temporary_context and rental_followup:
+                return (
+                    "Với trường hợp anh/chị ở thuê/ở trọ, thủ tục đang trao đổi vẫn là đăng ký tạm trú. "
+                    "Nguồn cư trú hiện hành xác nhận thủ tục thực hiện tại Công an cấp xã hoặc trực tuyến và được giải quyết trong 03 ngày làm việc khi hồ sơ hợp lệ. "
+                    "Thành phần hồ sơ phụ thuộc trường hợp chỗ ở cụ thể; thông tin, giấy tờ đã khai thác được từ cơ sở dữ liệu hoặc VNeID thì không yêu cầu nộp lại. "
+                    "Nguồn đang dùng chưa liệt kê riêng từng loại giấy tờ cho nhà thuê, nên tôi không tự bổ sung giấy tờ chưa được nguồn xác nhận."
+                )
             return (
-                "Trường hợp anh/chị đang ở thuê/ở trọ và đăng ký tạm trú, hồ sơ được xác định theo đúng trường hợp chỗ ở cụ thể. "
-                "Theo nguồn cư trú hiện hành mà hệ thống đang có, đăng ký tạm trú thực hiện tại Công an cấp xã hoặc trực tuyến, thời hạn giải quyết 03 ngày làm việc khi hồ sơ hợp lệ; "
-                "những thông tin, giấy tờ đã khai thác được từ cơ sở dữ liệu hoặc VNeID thì không yêu cầu nộp lại. "
-                "Tôi sẽ tiếp tục hướng dẫn trong đúng thủ tục đăng ký tạm trú, không chuyển sang lĩnh vực thuế/hóa đơn."
+                "Đăng ký tạm trú thực hiện tại Công an cấp xã hoặc trực tuyến, thời hạn giải quyết 03 ngày làm việc khi hồ sơ hợp lệ. "
+                "Thành phần hồ sơ phụ thuộc trường hợp cụ thể; thông tin, giấy tờ đã được khai thác từ cơ sở dữ liệu hoặc VNeID thì không yêu cầu nộp lại."
             )
 
     if _has(retrieved_units, "VEHICLE_CURRENT_2026"):
-        if any(x in q for x in ["mua xe moi", "dang ky xe", "lan dau", "bien so", "dkx10", "xe may moi"]):
+        first_registration = any(x in q for x in ["mua xe moi", "lan dau", "xe may moi", "xe moi"])
+        if first_registration:
             form_note = (
                 "Giấy khai đăng ký xe mẫu ĐKX10 là thành phần hồ sơ đăng ký lần đầu theo nguồn thủ tục hiện hành. "
                 if "dkx10" in q else ""
             )
             return (
                 form_note
-                + "Cơ quan đăng ký xe hiện được tổ chức ở cấp tỉnh và cấp xã theo phân cấp. Với thủ tục đăng ký lần đầu xe sản xuất, lắp ráp trong nước, "
-                "chủ xe kê khai qua Cổng dịch vụ công hoặc VNeID; thời hạn cấp chứng nhận đăng ký xe và cấp mới biển số không quá 02 ngày làm việc "
+                + "Nếu anh/chị đang đăng ký lần đầu xe được sản xuất, lắp ráp trong nước, chủ xe kê khai qua Cổng dịch vụ công hoặc VNeID; "
+                "cơ quan đăng ký xe được tổ chức ở cấp tỉnh và cấp xã theo phân cấp. Thời hạn cấp chứng nhận đăng ký xe và cấp mới biển số không quá 02 ngày làm việc "
                 "kể từ khi nhận đủ hồ sơ hợp lệ."
+            )
+        if any(x in q for x in ["dang ky xe", "bien so", "xe may", "xe mo to", "xe gan may"]):
+            return (
+                "Anh/chị có thể làm thủ tục đăng ký xe tại cơ quan đăng ký xe cấp tỉnh hoặc cấp xã theo phân cấp. "
+                "Cách thực hiện và hồ sơ phụ thuộc loại thủ tục cụ thể. Anh/chị cho biết đây là xe mới đăng ký lần đầu hay trường hợp sang tên/cấp đổi để tôi hướng dẫn đúng nguồn, "
+                "không áp dụng nhầm quy trình của xe đăng ký lần đầu."
             )
 
     article_134 = any(str(x.get("article") or "") == "134" for x in (retrieved_units or []))
