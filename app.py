@@ -1,9 +1,4 @@
-"""Stable WSGI entrypoint for CAX PƠNG DRANG AI CORE.
-
-The implementation lives in :mod:`app_core`. After optional integrations are
-mounted, ``app`` is aliased to that runtime module so legacy imports/patches and
-production routes always reference the same state.
-"""
+"""Stable WSGI entrypoint for CAX PƠNG DRANG AI CORE."""
 
 import hashlib
 import hmac
@@ -33,6 +28,12 @@ from core.notebook_retrieval import retrieve as notebook_retrieve
 from core.privacy import delete_zalo_subject_data
 from core.production_security import register_production_security
 from core.source_guard import merge_verification
+from core.zalo_jobs import (
+    delete_for_user as delete_zalo_jobs_for_user,
+    enqueue as enqueue_zalo_reply,
+    persistence_ready as zalo_dispatch_persistence_ready,
+    start_worker as start_zalo_worker,
+)
 from core.zalo_token_store import (
     load_refresh_token,
     persistence_ready as zalo_token_persistence_ready,
@@ -53,8 +54,6 @@ _app_core.ensure_legal_db = _ensure_legal_db_with_current_sources
 ensure_current_knowledge()
 ensure_notebook_current_sources()
 
-# Artifact-first planner: an input that belongs to one of the 19 sources can no
-# longer be silently reclassified outside the user's work by an LLM planner.
 _original_service_plan = _service_module.plan
 
 
@@ -128,37 +127,66 @@ _app_core._valid_zalo_webhook_signature = _official_zalo_signature
 _original_zalo_webhook = _app_core.app.view_functions.get("zalo_webhook")
 
 
-def _privacy_aware_zalo_webhook():
-    if _app_core.request.method != "POST":
-        return _original_zalo_webhook()
-    if not _app_core.ZALO_WEBHOOK_ENABLED:
+def _hardened_zalo_webhook():
+    """Handle privacy and durable direct-reply dispatch before legacy routing."""
+    if _app_core.request.method != "POST" or not _app_core.ZALO_WEBHOOK_ENABLED:
         return _original_zalo_webhook()
 
     raw_body = _app_core.request.get_data(cache=True, as_text=True)
     data = _app_core.request.get_json(silent=True) or {}
     event_name = str(data.get("event_name") or "").strip()
-    if event_name != "user_withdraw":
-        return _original_zalo_webhook()
 
-    if not _app_core._valid_zalo_webhook_signature(data, raw_body):
-        _app_core._log_zalo_webhook("rejected_signature", event_name)
-        return _app_core.jsonify({"success": False}), 401
+    if event_name == "user_withdraw":
+        if not _app_core._valid_zalo_webhook_signature(data, raw_body):
+            _app_core._log_zalo_webhook("rejected_signature", event_name)
+            return _app_core.jsonify({"success": False}), 401
+        for field in ("user_id", "user_id_by_app"):
+            value = str(data.get(field) or "").strip()
+            if value:
+                _app_core.pending.purge_user(value)
+                delete_zalo_jobs_for_user(value)
+        delete_zalo_subject_data(data)
+        _app_core._log_zalo_webhook("subject_data_deleted", event_name)
+        return _app_core.jsonify({"success": True}), 200
 
-    for field in ("user_id", "user_id_by_app"):
-        value = str(data.get(field) or "").strip()
-        if value:
-            _app_core.pending.purge_user(value)
-    delete_zalo_subject_data(data)
-    _app_core._log_zalo_webhook("subject_data_deleted", event_name)
-    return _app_core.jsonify({"success": True}), 200
+    # Official direct-reply mode uses an encrypted Postgres queue. The webhook
+    # is acknowledged only after the durable insert succeeds; AI/OA work happens
+    # outside the request. A restart therefore cannot silently lose an already
+    # acknowledged citizen message.
+    if (
+        event_name == "user_send_text"
+        and _app_core.ZALO_DIRECT_REPLY_ENABLED
+        and zalo_dispatch_persistence_ready()
+    ):
+        if not _app_core._valid_zalo_webhook_signature(data, raw_body):
+            _app_core._log_zalo_webhook("rejected_signature", event_name)
+            return _app_core.jsonify({"success": False}), 401
+        sender = data.get("sender") or {}
+        message = data.get("message") or {}
+        user_id = str(sender.get("id") or "").strip()
+        text = str(message.get("text") or "").strip()
+        msg_id = str(message.get("msg_id") or "").strip()
+        if not user_id or not text:
+            _app_core._log_zalo_webhook("ignored_empty", event_name)
+            return _app_core.jsonify({"success": True}), 200
+        event_key = msg_id or hashlib.sha256(raw_body.encode("utf-8")).hexdigest()
+        try:
+            queued = enqueue_zalo_reply(event_key, user_id, text)
+        except Exception as exc:
+            _app_core.app.logger.error("zalo_dispatch enqueue_failed type=%s", type(exc).__name__)
+            queued = False
+        if not queued:
+            _app_core._log_zalo_webhook("queue_unavailable", event_name)
+            return _app_core.jsonify({"success": False}), 503
+        _app_core._log_zalo_webhook("queued", event_name)
+        return _app_core.jsonify({"success": True}), 200
+
+    return _original_zalo_webhook()
 
 
 if _original_zalo_webhook is not None:
-    _app_core.app.view_functions["zalo_webhook"] = _privacy_aware_zalo_webhook
+    _app_core.app.view_functions["zalo_webhook"] = _hardened_zalo_webhook
 
-# A rotated refresh token must survive worker/deploy restarts. When managed
-# Postgres + a Fernet key are configured, seed from durable storage and fail
-# closed if a newly rotated token cannot be persisted.
 _durable_token_store = zalo_token_persistence_ready()
 _runtime_refresh_token = load_refresh_token(ZALO_OA_REFRESH_TOKEN)
 _app_core.zalo_oa_client = ZaloOAClient(
@@ -190,6 +218,14 @@ def _resilient_direct_zalo_reply(user_id, text, trace_id):
 
 
 _app_core._direct_zalo_reply = _resilient_direct_zalo_reply
+
+if _app_core.ZALO_DIRECT_REPLY_ENABLED and zalo_dispatch_persistence_ready():
+    start_zalo_worker(
+        lambda user_id, text: _resilient_direct_zalo_reply(
+            user_id, text, _app_core.new_trace_id()
+        ),
+        logger=_app_core.app.logger,
+    )
 
 if "vbee_tts" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(vbee_blueprint)
