@@ -93,8 +93,33 @@ def _bounded_legacy(plan, question, source_index):
     return _pack(source_index, question)
 
 
+def _source_index_from_plan(plan):
+    """Recover the artifact boundary for elliptical follow-ups.
+
+    The planner already receives recent conversation history and places the
+    contextual user turns in search_queries. If the current message is only
+    "ở thuê", "ở trọ", "cái đó mất bao lâu"... it may contain no standalone
+    procedure keyword. We therefore inherit the source from the planner's
+    contextual queries instead of dropping back to an unrelated legacy domain.
+    """
+    try:
+        explicit = int((plan or {}).get("artifact_source_index") or 0)
+    except (TypeError, ValueError):
+        explicit = 0
+    if 1 <= explicit <= len(SOURCES):
+        return explicit
+
+    for query in (plan or {}).get("search_queries") or []:
+        idx = source_index_for_question(query)
+        if idx is not None:
+            return idx
+    return None
+
+
 def retrieve(plan, question):
-    source_index = source_index_for_question(question)
+    # Current message wins when it explicitly names a procedure. For short
+    # follow-ups, inherit the artifact boundary already established by context.
+    source_index = source_index_for_question(question) or _source_index_from_plan(plan)
     if source_index is None:
         # Out-of-artifact questions may still use safety/intake legal sources,
         # but they are not presented as part of the 19-source work.
