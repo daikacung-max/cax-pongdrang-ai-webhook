@@ -44,7 +44,6 @@ def _allowed(bucket, limit, window_seconds=60):
         if len(q) >= int(limit):
             return False
         q.append(now)
-        # Opportunistic cleanup keeps the in-memory limiter bounded.
         if len(_hits) > 5000:
             stale = [k for k, values in _hits.items() if not values or values[-1] < cutoff]
             for old in stale[:1000]:
@@ -66,21 +65,23 @@ def register_production_security(app):
     app.extensions["cax_production_security"] = True
 
     app.config["MAX_CONTENT_LENGTH"] = _MAX_REQUEST_BYTES
-    # Render terminates TLS at one trusted reverse proxy hop.
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     @app.before_request
     def _production_request_guard():
         path = request.path or ""
 
+        # Enforce the limit before a view function decides whether to parse the
+        # body. This closes endpoints that could otherwise accept a large body
+        # without touching request.data/request.json.
+        content_length = request.content_length
+        if content_length is not None and content_length > _MAX_REQUEST_BYTES:
+            return jsonify({"error": "Yêu cầu vượt quá kích thước cho phép."}), 413
+
         if PRODUCTION_MODE and path.startswith("/debug/") and not _ENABLE_DEBUG_ENDPOINTS:
             return jsonify({"error": "Not found"}), 404
 
         if path == "/api/chat" and PRODUCTION_MODE:
-            # The production user path is Zalo OA. Keeping /api/chat open would
-            # let an arbitrary caller choose another conversation user_id and
-            # consume model quota. Production therefore requires a dedicated
-            # bearer token; if none is configured, the endpoint is not exposed.
             if not _API_CHAT_TOKEN:
                 return jsonify({"error": "Not found"}), 404
             supplied = _bearer_token()
