@@ -30,6 +30,7 @@ from core.current_fallback import grounded_dynamic_fallback as current_grounded_
 from core.llm import LLMError, LLMTimeout
 from core.notebook_current_sources import ensure_notebook_current_sources
 from core.notebook_retrieval import retrieve as notebook_retrieve
+from core.production_security import register_production_security
 from core.source_guard import merge_verification
 
 
@@ -169,6 +170,10 @@ if "ai_core_self_test" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(self_test_blueprint)
 if "ai_core_demo_ai" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(demo_ai_blueprint)
+
+# Apply HTTP hardening only after all routes/blueprints are mounted so the guard
+# covers the complete production attack surface.
+register_production_security(_app_core.app)
 
 sys.modules[__name__] = _app_core
 
