@@ -1,6 +1,6 @@
 import unittest
 
-from adapters.zalo_oa_api import ZaloOAClient
+from adapters.zalo_oa_api import ZaloOAClient, ZaloOAReplyError
 
 
 class _Response:
@@ -47,6 +47,32 @@ class ZaloTokenRefreshTests(unittest.TestCase):
         self.assertEqual(client.refresh_token, "rotated-refresh")
         self.assertIn("/v4/oa/access_token", session.calls[0][0])
         self.assertEqual(session.calls[1][1]["headers"]["access_token"], "new-access")
+
+    def test_rotated_refresh_token_is_persisted_before_becoming_runtime_state(self):
+        saved = []
+        session = _Session([
+            _Response(200, {"access_token": "new-access", "refresh_token": "rotated-refresh"}),
+            _Response(200, {"error": 0}),
+        ])
+        client = ZaloOAClient(
+            "", refresh_token="old-refresh", app_id="app", app_secret="secret",
+            session=session, persist_refresh_token=lambda value: saved.append(value) or True,
+        )
+        self.assertTrue(client.send_text("u", "x"))
+        self.assertEqual(saved, ["rotated-refresh"])
+        self.assertEqual(client.refresh_token, "rotated-refresh")
+
+    def test_rotated_refresh_token_persistence_failure_fails_closed(self):
+        session = _Session([
+            _Response(200, {"access_token": "new-access", "refresh_token": "rotated-refresh"}),
+        ])
+        client = ZaloOAClient(
+            "", refresh_token="old-refresh", app_id="app", app_secret="secret",
+            session=session, persist_refresh_token=lambda value: False,
+        )
+        with self.assertRaises(ZaloOAReplyError):
+            client.send_text("u", "x")
+        self.assertEqual(client.refresh_token, "old-refresh")
 
     def test_refreshes_and_retries_once_on_expired_access_token(self):
         session = _Session([
