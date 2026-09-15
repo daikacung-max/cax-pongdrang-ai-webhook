@@ -57,6 +57,24 @@ class NotebookMirrorTests(unittest.TestCase):
         self.assertTrue(labels)
         self.assertEqual(labels[0]["title"], "9. Xóa ĐK tạm trú.pdf")
 
+    def test_short_rental_followup_inherits_temporary_residence_boundary(self):
+        plan = {
+            "is_legal": True,
+            "search_queries": [
+                "Tôi muốn đăng ký cư trú tại xã Pơng Drang | tạm trú | ở thuê",
+                "Đăng ký tạm trú Công an cấp xã",
+            ],
+        }
+        for followup in ("ở thuê", "nhà thuê", "tôi thuê trọ", "ở trọ", "ở nhờ"):
+            with self.subTest(followup=followup):
+                units = retrieve(plan, followup)
+                self.assertTrue(units)
+                self.assertEqual(units[0]["id"], "RESIDENCE_CURRENT_2026:temporary")
+                self.assertTrue(all(str(x.get("document_id") or "").startswith("RESIDENCE_") for x in units))
+                labels = used_sources_for_unit_ids([x["id"] for x in units])
+                self.assertTrue(labels)
+                self.assertEqual(labels[0]["title"], "3. ĐK tạm trú.pdf")
+
     def test_user_facing_source_label_hides_internal_unit_id(self):
         labels = used_sources_for_unit_ids(["CRIMINAL_RECORD_CURRENT_2026:citizen"])
         self.assertEqual(len(labels), 1)
