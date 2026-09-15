@@ -18,7 +18,7 @@ import os
 import re
 from datetime import datetime, timezone
 from io import BytesIO
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from cryptography.fernet import Fernet, InvalidToken
 from docx import Document
@@ -63,7 +63,11 @@ def encode_payload(payload: dict) -> str:
 
 def decode_payload(token: str) -> dict:
     try:
-        raw = _fernet().decrypt(str(token or "").encode("ascii"), ttl=FORM_LINK_TTL_SECONDS)
+        # Tokens are URL-quoted in download links. Flask decodes path segments
+        # before route handling, but callers/tests may pass the literal encoded
+        # segment. Accept both representations without weakening Fernet checks.
+        decoded_token = unquote(str(token or "").strip())
+        raw = _fernet().decrypt(decoded_token.encode("ascii"), ttl=FORM_LINK_TTL_SECONDS)
         return json.loads(raw.decode("utf-8"))
     except (InvalidToken, ValueError, UnicodeError, json.JSONDecodeError) as exc:
         raise ValueError("invalid_or_expired_form_link") from exc
@@ -101,8 +105,6 @@ def _active_form(history) -> str:
         if form_type in ("ct01", "report"):
             return form_type
 
-    # Backward compatibility for conversations created before form metadata
-    # was stored consistently.
     n = _norm(latest.get("content") or "")
     if "vui long gui cac dong sau" in n and "ct01" in n:
         return "ct01"
@@ -181,9 +183,6 @@ def _continue_active_form(question: str, active: str) -> bool:
         "dien tiep", "lam tiep", "xuat luon", "tao luon file",
     )):
         return True
-    # A bare salutation, a narrative sentence, or a new legal/TTHC topic must
-    # not be swallowed by an unfinished form. The citizen can resume the form
-    # later by saying "tiếp tục đơn" or naming the form again.
     return False
 
 
@@ -266,7 +265,6 @@ def _download_url(form_type: str, fields: dict) -> str:
 
 
 def handle_form_request(user_id: str, question: str, history=None):
-    """Return a deterministic form-assistant result or None when not applicable."""
     form_type = detect_form_type(question, history=history)
     if not form_type:
         return None
