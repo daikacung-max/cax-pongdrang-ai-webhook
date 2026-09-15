@@ -3,6 +3,10 @@
 The module is intentionally opt-in. Ordinary legal/TTHC questions continue
 through AI Core unchanged; this path activates only when a citizen explicitly
 asks to print, fill, draft or export a form/document.
+
+A form is a temporary task inside a wider conversation, not a sticky chatbot
+mode. Short structured field replies may continue the form, while a clear new
+topic immediately returns control to AI Core.
 """
 
 from __future__ import annotations
@@ -82,16 +86,24 @@ def _collect_user_text(history, question: str) -> str:
     return "\n".join(chunks)
 
 
-def _latest_assistant(history) -> str:
+def _latest_assistant_item(history):
     for item in reversed(history or []):
         if item.get("role") == "assistant":
-            return str(item.get("content") or "")
-    return ""
+            return item
+    return {}
 
 
 def _active_form(history) -> str:
-    latest = _latest_assistant(history)
-    n = _norm(latest)
+    latest = _latest_assistant_item(history)
+    meta = latest.get("meta") or {}
+    if meta.get("path") == "citizen_form_assistant" and not meta.get("form_ready"):
+        form_type = str(meta.get("form_type") or "").strip()
+        if form_type in ("ct01", "report"):
+            return form_type
+
+    # Backward compatibility for conversations created before form metadata
+    # was stored consistently.
+    n = _norm(latest.get("content") or "")
     if "vui long gui cac dong sau" in n and "ct01" in n:
         return "ct01"
     if "vui long gui cac dong sau" in n and "don trinh bao" in n:
@@ -103,10 +115,39 @@ def _active_form(history) -> str:
     return ""
 
 
-def detect_form_type(question: str, history=None) -> str:
-    active = _active_form(history or [])
-    if active:
-        return active
+_FORM_FIELD_LABELS = {
+    "ho ten", "ho va ten", "ho chu dem va ten", "ngay sinh", "ngay thang nam sinh",
+    "gioi tinh", "cccd", "so cccd", "so dinh danh ca nhan", "ddcn", "so dien thoai",
+    "dien thoai", "sdt", "noi thuong tru", "thuong tru", "noi tam tru", "tam tru",
+    "noi o hien tai", "cho o hien tai", "dia chi hien tai", "nghe nghiep",
+    "nghe nghiep noi lam viec", "chu ho", "ho ten chu ho", "quan he voi chu ho",
+    "noi dung de nghi", "de nghi", "noi dung dang ky", "dia chi", "noi o", "noi cu tru",
+    "thoi gian xay ra", "thoi gian", "ngay gio xay ra", "dia diem xay ra", "dia diem",
+    "noi dung su viec", "su viec", "noi dung trinh bao", "tai lieu chung cu", "chung cu",
+    "tai lieu kem theo", "yeu cau",
+}
+
+
+def _looks_like_form_field_reply(question: str) -> bool:
+    for line in str(question or "").splitlines():
+        if ":" not in line:
+            continue
+        label, value = line.split(":", 1)
+        if _norm(label) in _FORM_FIELD_LABELS and value.strip():
+            return True
+    return False
+
+
+def _is_form_capability_question(question: str) -> bool:
+    n = _norm(question)
+    asks_file = any(x in n for x in (
+        "xuat file", "tao file", "tai file", "file word", "file docx", "co file khong",
+        "co xuat duoc file", "xuat duoc khong", "in duoc khong",
+    ))
+    return asks_file and any(x in n for x in ("co", "duoc", "khong", "the nao", "lam sao"))
+
+
+def _explicit_form_type(question: str) -> str:
     n = _norm(question)
     explicit_action = any(x in n for x in (
         "mau", "bieu mau", "in giup", "in cho", "dien mau", "xuat file",
@@ -114,13 +155,46 @@ def detect_form_type(question: str, history=None) -> str:
     ))
     if not explicit_action:
         return ""
-    if any(x in n for x in ("don trinh bao", "don to giac", "bao mat", "soan don", "viet don trinh bao")):
+    if any(x in n for x in (
+        "don trinh bao", "don to giac", "soan don trinh bao", "viet don trinh bao",
+        "lap don trinh bao",
+    )):
         return "report"
     if any(x in n for x in (
         "ct01", "cu tru", "thuong tru", "tam tru", "thay doi thong tin cu tru",
         "dang ky cu tru",
     )):
         return "ct01"
+    return ""
+
+
+def _continue_active_form(question: str, active: str) -> bool:
+    n = _norm(question)
+    if any(x in n for x in ("huy bieu mau", "huy don", "khong lam nua", "dung lai")):
+        return True
+    if _looks_like_form_field_reply(question):
+        return True
+    if _is_form_capability_question(question):
+        return True
+    if any(x in n for x in (
+        "tiep tuc don", "tiep tuc mau", "don nay", "mau nay", "bieu mau nay",
+        "dien tiep", "lam tiep", "xuat luon", "tao luon file",
+    )):
+        return True
+    # A bare salutation, a narrative sentence, or a new legal/TTHC topic must
+    # not be swallowed by an unfinished form. The citizen can resume the form
+    # later by saying "tiếp tục đơn" or naming the form again.
+    return False
+
+
+def detect_form_type(question: str, history=None) -> str:
+    explicit = _explicit_form_type(question)
+    if explicit:
+        return explicit
+
+    active = _active_form(history or [])
+    if active and _continue_active_form(question, active):
+        return active
     return ""
 
 
@@ -200,7 +274,7 @@ def handle_form_request(user_id: str, question: str, history=None):
     n = _norm(question)
     if any(x in n for x in ("huy bieu mau", "huy don", "khong lam nua", "dung lai")):
         return {
-            "answer": "Đã dừng phần hỗ trợ biểu mẫu. Các nội dung tư vấn khác vẫn hoạt động bình thường.",
+            "answer": "Đã dừng phần hỗ trợ biểu mẫu. Anh/chị có thể chuyển sang hỏi nội dung khác bất kỳ lúc nào.",
             "form_type": form_type,
             "ready": False,
         }
@@ -208,12 +282,25 @@ def handle_form_request(user_id: str, question: str, history=None):
     combined = _collect_user_text(history or [], question)
     if form_type == "ct01":
         fields = _ct01_fields(combined)
+        if _is_form_capability_question(question):
+            missing = _missing(fields, tuple(CT01_LABELS))
+            if missing:
+                labels = ", ".join(CT01_LABELS[k] for k in missing)
+                return {
+                    "answer": (
+                        "Có. Khi đủ thông tin, tôi có thể xuất file Word CT01 để anh/chị tải về, kiểm tra và in. "
+                        "Hiện còn thiếu: " + labels + ". Anh/chị có thể gửi từng mục hoặc gửi nhiều dòng cùng lúc."
+                    ),
+                    "form_type": "ct01",
+                    "ready": False,
+                    "missing": missing,
+                }
         if _blank_requested(question):
             url = _download_url("ct01", {})
             return {
                 "answer": (
                     "Tôi đã tạo bản CT01 trống để anh/chị tải về, in và tự điền: " + url +
-                    "\nBiểu mẫu cư trú hiện hành cần được kiểm tra lại thông tin trước khi ký/nộp."
+                    "\nBiểu mẫu cần được kiểm tra lại thông tin trước khi ký/nộp."
                 ),
                 "form_type": "ct01",
                 "ready": True,
@@ -227,7 +314,7 @@ def handle_form_request(user_id: str, question: str, history=None):
                 "answer": (
                     "Tôi đang hỗ trợ điền CT01 (Tờ khai thay đổi thông tin cư trú). "
                     "Tôi không tự điền thay các thông tin anh/chị chưa cung cấp.\n"
-                    "Vui lòng gửi các dòng sau, có thể chép nguyên mẫu và điền sau dấu hai chấm:\n" + labels
+                    "Anh/chị có thể gửi một hoặc nhiều mục sau:\n" + labels
                 ),
                 "form_type": "ct01",
                 "ready": False,
@@ -245,6 +332,20 @@ def handle_form_request(user_id: str, question: str, history=None):
         }
 
     fields = _report_fields(combined)
+    if _is_form_capability_question(question):
+        missing = _missing(fields, tuple(REPORT_LABELS))
+        if missing:
+            labels = ", ".join(REPORT_LABELS[k] for k in missing)
+            return {
+                "answer": (
+                    "Có. Sau khi anh/chị cung cấp đủ nội dung cần thiết, tôi sẽ tạo file Word Đơn trình báo để tải về, đọc lại và ký. "
+                    "Hiện còn thiếu: " + labels + ". Anh/chị có thể gửi từng mục hoặc nhiều dòng cùng lúc."
+                ),
+                "form_type": "report",
+                "ready": False,
+                "missing": missing,
+            }
+
     required = tuple(REPORT_LABELS)
     missing = _missing(fields, required)
     if missing:
@@ -252,9 +353,10 @@ def handle_form_request(user_id: str, question: str, history=None):
         return {
             "answer": (
                 "Tôi đang hỗ trợ soạn Đơn trình báo gửi " + UNIT_NAME + ". "
-                "Tôi sẽ chỉ dùng dữ liệu anh/chị cung cấp, không tự suy đoán diễn biến vụ việc.\n"
-                "Vui lòng gửi các dòng sau:\n" + labels +
-                "\nNếu có, anh/chị có thể bổ sung: Ngày sinh, Số điện thoại, Thời gian xảy ra, Địa điểm xảy ra, Tài liệu chứng cứ."
+                "Tôi chỉ dùng dữ liệu anh/chị cung cấp, không tự suy đoán diễn biến vụ việc.\n"
+                "Anh/chị có thể gửi một hoặc nhiều mục sau:\n" + labels +
+                "\nNếu có, có thể bổ sung: Ngày sinh, Số điện thoại, Thời gian xảy ra, Địa điểm xảy ra, Tài liệu chứng cứ. "
+                "Nếu muốn chuyển sang nội dung khác, anh/chị cứ hỏi bình thường; hệ thống sẽ tự rời chế độ soạn đơn."
             ),
             "form_type": "report",
             "ready": False,
