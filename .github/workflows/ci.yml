@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Verify production health, real Notebook demo, provider, Zalo boundary, and VNeID routing
+      - name: Verify production health, security boundary, real Notebook demo, provider, Zalo boundary, and VNeID routing
         shell: bash
         run: |
           python - <<'PY'
@@ -73,12 +73,26 @@ jobs:
               with urllib.request.urlopen(req, timeout=timeout) as r:
                   return json.load(r)
 
+          def expect_http(path, expected, method="GET", payload=None, timeout=8):
+              data = None
+              headers = {}
+              if payload is not None:
+                  data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+                  headers["Content-Type"] = "application/json"
+              req = urllib.request.Request(base + path, data=data, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=timeout) as r:
+                      status = r.status
+              except urllib.error.HTTPError as exc:
+                  status = exc.code
+              assert status == expected, f"{path} status={status}, expected={expected}"
+              return status
+
           last_error = None
           for attempt in range(1, 7):
               try:
                   health = get_json("/health", 6)
                   readiness = get_json("/health/readiness", 6)
-                  article = get_json("/debug/article/134", 6)
                   with urllib.request.urlopen(base + "/demo", timeout=8) as r:
                       demo_html = r.read().decode("utf-8", errors="replace")
                   notebook = get_json("/demo/api/notebook-sources", 8)
@@ -90,8 +104,15 @@ jobs:
                   assert health.get("demo_console_enabled") is True, "demo console disabled"
                   assert readiness.get("production_mode") is True, "production mode"
                   assert readiness.get("model_routing_mode") == "auto", "model routing"
-                  assert article.get("found") is True, "article 134 missing"
-                  assert str(article.get("article")) == "134", "article mismatch"
+
+                  # Production-only internal surfaces must not be public.
+                  debug_status = expect_http("/debug/article/134", 404)
+                  api_chat_status = expect_http(
+                      "/api/chat",
+                      404,
+                      method="POST",
+                      payload={"user_id": "synthetic", "message": "xin chao"},
+                  )
 
                   assert "HÀNH CHÍNH CÔNG - CÔNG AN XÃ PƠNG DRANG" in demo_html, "Notebook demo title missing"
                   assert int(notebook.get("source_count") or 0) == 19, f"Notebook source_count={notebook.get('source_count')}"
@@ -147,21 +168,24 @@ jobs:
                   assert messages and messages[0].get("type") == "text", "Dynamic text contract"
 
                   question = "Bạn hãy hướng dẫn cho tôi làm định danh mức 2"
-                  chat = post_json("/api/chat", {
-                      "user_id": "synthetic-smoke-" + uuid.uuid4().hex,
+                  demo_session = str(uuid.uuid4())
+                  demo_chat = post_json("/demo/api/ai-chat", {
+                      "session_id": demo_session,
                       "message": question,
                   })
-                  answer = str(chat.get("answer") or "").strip()
-                  meta = chat.get("meta") or {}
-                  source_ids = [str(x) for x in (meta.get("retrieved_unit_ids") or [])]
-                  assert answer, "empty answer"
-                  assert meta.get("model") == expected_core, f"chat model={meta.get('model')}"
-                  assert meta.get("provider") == expected_provider, f"chat provider={meta.get('provider')}"
-                  assert meta.get("path") not in {
+                  answer = str(demo_chat.get("answer") or "").strip()
+                  source_ids = [str(x) for x in (demo_chat.get("sources") or [])]
+                  assert demo_chat.get("mode") == "full_ai_core", "demo is not Full Core"
+                  assert demo_chat.get("artifact_backed") is True, "demo lost Artifact Core"
+                  assert demo_chat.get("memory") is True, "demo memory flag"
+                  assert answer, "demo empty answer"
+                  assert demo_chat.get("model") == expected_core, f"demo model={demo_chat.get('model')}"
+                  assert demo_chat.get("provider") == expected_provider, f"demo provider={demo_chat.get('provider')}"
+                  assert demo_chat.get("path") not in {
                       "api_boundary_grounded_fallback",
                       "full_core_grounded_fallback",
                       "legal_no_source_fail_closed",
-                  }, f"fallback path={meta.get('path')} errors={meta.get('verification_errors')}"
+                  }, f"fallback path={demo_chat.get('path')}"
                   assert source_ids, "VNeID question retrieved no sources"
                   assert source_ids[0] == "VNEID_2026:level2", f"wrong first source={source_ids[0]}"
                   assert all(x.startswith("VNEID_") for x in source_ids), f"wrong source notebook={source_ids}"
@@ -171,20 +195,6 @@ jobs:
                   for phrase in ("Số xx", "giờ hành chính", "tài khoản ngân hàng", "mã số thuế", "hồ sơ y tế"):
                       assert phrase.casefold() not in answer.casefold(), f"unsourced detail {phrase}: {answer}"
 
-                  # Exercise the exact API used by the visible Notebook-like demo,
-                  # then confirm that its conversation turn is persisted.
-                  demo_session = str(uuid.uuid4())
-                  demo_chat = post_json("/demo/api/ai-chat", {
-                      "session_id": demo_session,
-                      "message": question,
-                  })
-                  assert demo_chat.get("mode") == "full_ai_core", "demo is not Full Core"
-                  assert demo_chat.get("artifact_backed") is True, "demo lost Artifact Core"
-                  assert demo_chat.get("memory") is True, "demo memory flag"
-                  assert str(demo_chat.get("answer") or "").strip(), "demo empty answer"
-                  assert demo_chat.get("model") == expected_core, f"demo model={demo_chat.get('model')}"
-                  assert demo_chat.get("provider") == expected_provider, f"demo provider={demo_chat.get('provider')}"
-                  assert demo_chat.get("notebook_sources"), "demo reported no Notebook source"
                   demo_history = get_json(
                       "/demo/api/ai-history?session_id=" + urllib.parse.quote(demo_session),
                       8,
@@ -203,6 +213,8 @@ jobs:
                       "notebook_source_count": notebook.get("source_count"),
                       "demo_live_chat": True,
                       "demo_memory": True,
+                      "debug_surface_closed": debug_status == 404,
+                      "public_api_chat_closed": api_chat_status == 404,
                       "core_answer_model": health.get("core_answer_model"),
                       "dynamic_answer_model": health.get("dynamic_answer_model"),
                       "core_answer_provider": health.get("core_answer_provider"),
@@ -220,9 +232,8 @@ jobs:
                       "zalo_direct_reply_ready": readiness.get("zalo_direct_reply_ready"),
                       "zalo_oauth_refresh_ready": readiness.get("zalo_oauth_refresh_ready"),
                       "zalo_end_to_end_reply_ready": readiness.get("zalo_end_to_end_reply_ready"),
-                      "article_134_title": article.get("title"),
-                      "full_core_live_path": meta.get("path"),
-                      "full_core_verified": meta.get("verified"),
+                      "full_core_live_path": demo_chat.get("path"),
+                      "full_core_verified": demo_chat.get("verified"),
                       "vneid_level2_first_source": source_ids[0],
                       "vneid_level2_source_count": len(source_ids),
                   }
