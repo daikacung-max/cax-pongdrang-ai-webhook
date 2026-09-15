@@ -28,7 +28,8 @@ class GoLiveGateTests(unittest.TestCase):
              patch.object(readiness, "ZALO_OA_ACCESS_TOKEN", ""), \
              patch.object(readiness, "ZALO_OA_REFRESH_TOKEN", ""), \
              patch.object(readiness, "ZALO_OAUTH_REFRESH_READY", False), \
-             patch.object(readiness, "zalo_token_persistence_ready", return_value=False):
+             patch.object(readiness, "zalo_token_persistence_ready", return_value=False), \
+             patch.object(readiness, "zalo_dispatch_persistence_ready", return_value=False):
             response = client.get("/health/go-live")
         self.assertEqual(response.status_code, 503)
         body = response.get_json()
@@ -37,6 +38,7 @@ class GoLiveGateTests(unittest.TestCase):
         self.assertIn("zalo_direct_reply", body["blockers"])
         self.assertIn("zalo_oauth_refresh", body["blockers"])
         self.assertIn("zalo_refresh_persistence", body["blockers"])
+        self.assertIn("zalo_durable_dispatch", body["blockers"])
         self.assertIn("public_demo_disabled", body["blockers"])
 
     def test_go_live_is_ready_only_when_every_gate_is_green(self):
@@ -55,7 +57,8 @@ class GoLiveGateTests(unittest.TestCase):
              patch.object(readiness, "ZALO_OA_ACCESS_TOKEN", "access"), \
              patch.object(readiness, "ZALO_OA_REFRESH_TOKEN", "refresh"), \
              patch.object(readiness, "ZALO_OAUTH_REFRESH_READY", True), \
-             patch.object(readiness, "zalo_token_persistence_ready", return_value=True):
+             patch.object(readiness, "zalo_token_persistence_ready", return_value=True), \
+             patch.object(readiness, "zalo_dispatch_persistence_ready", return_value=True):
             response = client.get("/health/go-live")
         self.assertEqual(response.status_code, 200)
         body = response.get_json()
