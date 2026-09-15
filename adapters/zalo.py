@@ -40,6 +40,14 @@ class PendingZaloMessages:
             self._purge_locked()
             return self._claim_locked(msg_id)
 
+    def release_claim(self, msg_id=""):
+        """Cho phép nền tảng gửi lại một event nếu dispatch chưa được nhận."""
+        msg_id = str(msg_id or "").strip()
+        if not msg_id:
+            return
+        with self._condition:
+            self._seen.pop(msg_id, None)
+
     def push(self, user_id, text, msg_id=""):
         with self._condition:
             self._purge_locked()
@@ -57,6 +65,26 @@ class PendingZaloMessages:
                 self._queue.popleft()
             self._condition.notify_all()
             return True
+
+    def purge_user(self, user_id):
+        """Loại bỏ mọi tin chưa xử lý của một người dùng đã rút quyền dữ liệu."""
+        user_id = str(user_id or "").strip()
+        if not user_id:
+            return 0
+        with self._condition:
+            self._purge_locked()
+            kept = deque()
+            removed = 0
+            for item in self._queue:
+                if str(item.get("user_id") or "") == user_id:
+                    removed += 1
+                    msg_id = str(item.get("msg_id") or "").strip()
+                    if msg_id:
+                        self._seen.pop(msg_id, None)
+                else:
+                    kept.append(item)
+            self._queue = kept
+            return removed
 
     def _take_locked(self, user_id=None):
         self._purge_locked()
