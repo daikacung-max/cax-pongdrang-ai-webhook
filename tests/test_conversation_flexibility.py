@@ -2,6 +2,8 @@ import unittest
 
 from adapters.demo_ai import _active_notebook_source
 from core.form_documents import detect_form_type, handle_form_request
+from core.planner import _contextual_question, quick_plan
+from core.source_guard import source_grounding_errors
 
 
 class ConversationFlexibilityTests(unittest.TestCase):
@@ -62,6 +64,41 @@ class ConversationFlexibilityTests(unittest.TestCase):
         ])
         self.assertEqual(len(sources), 1)
         self.assertEqual(sources[0]["title"], "3. ĐK tạm trú.pdf")
+
+    def test_clear_new_topic_overrides_stale_history(self):
+        history = [
+            {"role": "user", "content": "Tôi muốn đăng ký tạm trú"},
+            {"role": "assistant", "content": "Anh/chị đang ở nhà mình hay ở thuê?"},
+        ]
+        contextual = _contextual_question("Tôi muốn đăng ký xe mô tô cần làm gì", history)
+        self.assertEqual(contextual, "Tôi muốn đăng ký xe mô tô cần làm gì")
+
+    def test_short_elliptical_reply_inherits_history(self):
+        history = [{"role": "user", "content": "Tôi muốn đăng ký tạm trú"}]
+        contextual = _contextual_question("ở thuê", history)
+        self.assertIn("đăng ký tạm trú", contextual)
+        self.assertIn("ở thuê", contextual)
+
+    def test_gambling_is_deterministically_legal_topic(self):
+        plan = quick_plan("Tôi biết một người cá độ bóng đá")
+        self.assertTrue(plan["is_legal"])
+        self.assertTrue(any("cá cược" in q or "đánh bạc" in q for q in plan["search_queries"]))
+
+    def test_procedure_code_must_exist_in_source(self):
+        units = [{
+            "document_title": "Nguồn tạm trú",
+            "document_number": "116/2026/TT-BCA",
+            "document_issuer": "Bộ Công an",
+            "article": "",
+            "title": "Đăng ký tạm trú",
+            "text": "Đăng ký tạm trú tại Công an cấp xã; thời hạn 03 ngày làm việc.",
+        }]
+        errors = source_grounding_errors(
+            "Nộp trực tuyến theo mã thủ tục 1.004194 và nhận kết quả qua email.",
+            units,
+        )
+        self.assertTrue(any(x.startswith("unsupported_procedure_code:") for x in errors))
+        self.assertIn("unsupported_procedural_detail:email", errors)
 
 
 if __name__ == "__main__":
