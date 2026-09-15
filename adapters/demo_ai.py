@@ -29,6 +29,20 @@ def _demo_user(session_id):
     return "demo-ai:" + session_id
 
 
+def _active_notebook_source(unit_ids):
+    """A routed artifact turn belongs to one Notebook source boundary.
+
+    Some procedures share the same current-law support document. Showing every
+    support-document mapping made temporary residence falsely display source #1
+    as well. The first retrieved unit is the router's priority unit and therefore
+    represents the active artifact source for the turn.
+    """
+    ids = list(unit_ids or [])
+    if not ids:
+        return []
+    return used_sources_for_unit_ids(ids[:1])
+
+
 @blueprint.route("/demo/api/notebook-sources", methods=["GET"])
 def notebook_sources():
     if not ENABLE_DEMO_CONSOLE:
@@ -58,7 +72,7 @@ def ai_chat():
     result.pop("_telemetry", None)
     meta = result.get("meta") or {}
     unit_ids = list(meta.get("retrieved_unit_ids") or [])
-    notebook_sources_used = used_sources_for_unit_ids(unit_ids)
+    notebook_sources_used = _active_notebook_source(unit_ids)
     return jsonify({
         "answer": result.get("answer") or "",
         "mode": "full_ai_core",
@@ -73,6 +87,9 @@ def ai_chat():
         "notebook_sources": notebook_sources_used,
         "notebook_source_count": len(notebook_sources_used),
         "fallback": str(meta.get("path") or "").endswith("fallback"),
+        "download_url": meta.get("download_url"),
+        "form_type": meta.get("form_type"),
+        "form_ready": bool(meta.get("form_ready")),
         "handoff_status": ((meta.get("intake") or {}).get("handoff_status") or "not_requested"),
         "note": "AI dùng tác phẩm Notebook do người dùng cung cấp làm Core; nguồn hiện hành bên ngoài chỉ kiểm chứng/cập nhật. Phiên demo không tạo hồ sơ nghiệp vụ thật.",
     }), 200
