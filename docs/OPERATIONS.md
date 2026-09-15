@@ -4,79 +4,106 @@
 
 Tác phẩm do tác giả cung cấp là **Artifact Core**. Danh mục 19 nguồn, tiêu đề, tóm tắt, câu hỏi gợi ý và quy luật hội thoại được giữ tại `core/artifact_core.py`. Nguồn pháp luật/TTHC hiện hành chỉ đóng vai trò cập nhật và kiểm chứng phía sau biên nguồn đã chọn, không được thay thế hoặc đổi tên Artifact Core.
 
-Luồng sản phẩm:
+Luồng production chính thức:
 
-`Zalo OA → webhook đã xác thực → Artifact planner → nguồn Artifact Core → retrieval nguồn hỗ trợ hiện hành → model → verifier + source guard → OA reply`
+`Zalo OA → webhook đã xác thực → ghi job mã hóa vào Postgres → ACK webhook → worker → Artifact planner → Artifact Core → nguồn hiện hành → model → verifier + source guard → OA reply`
 
-Demo `/demo` sử dụng cùng `core.chat` và cùng Artifact Core với production, không phải chatbot mô phỏng riêng.
+Webhook không phải chờ model trả lời. Tuy nhiên hệ thống chỉ ACK sau khi job đã được ghi bền. Nhờ đó deploy/restart không làm mất bản tin đã được xác nhận nhận thành công.
 
-## Kiểm tra sức khỏe
+## Ba mức health
 
-- `/health`: trạng thái AI Core, model/provider và cơ sở dữ liệu.
-- `/health/readiness`: trạng thái sẵn sàng vận hành, chỉ trả boolean/trạng thái, không lộ credential.
+- `/health`: process/AI Core đang chạy.
+- `/health/readiness`: các thành phần và credential đã được cấu hình đến đâu, không lộ giá trị bí mật.
+- `/health/go-live`: **cổng khai trương fail-closed**. Chỉ trả HTTP `200` và `ready_for_official_operation=true` khi toàn bộ điều kiện chính thức đều xanh; nếu còn thiếu trả HTTP `503` cùng tên blocker.
 
-Các cờ Zalo quan trọng:
+Điều kiện go-live bắt buộc:
 
-- `zalo_webhook_enabled`: webhook đang bật.
-- `zalo_signature_required`: production buộc kiểm chữ ký.
-- `zalo_signature_secret_ready`: có secret để xác thực webhook.
-- `zalo_direct_reply_enabled`: hệ thống được phép gửi trực tiếp qua OA API.
-- `zalo_access_token_present`: có access token được cấu hình.
-- `zalo_refresh_token_present`: có refresh token được cấu hình.
-- `zalo_oauth_refresh_ready`: đủ App ID + App secret + refresh token để tự làm mới access token.
-- `zalo_end_to_end_reply_ready`: chỉ `true` khi luồng nhận webhook và gửi phản hồi trực tiếp đã đủ điều kiện cấu hình.
+- production mode;
+- có LLM provider;
+- lịch sử hội thoại lưu bền bằng Postgres + HMAC key;
+- Zalo webhook bật và bắt buộc kiểm chữ ký;
+- Direct Reply có credential;
+- OAuth refresh sẵn sàng;
+- refresh token xoay được mã hóa và lưu bền;
+- hàng đợi Direct Reply mã hóa/lưu bền;
+- demo công khai đã tắt.
 
-Không coi tích hợp Zalo hoàn tất chỉ vì `/api/chat` hoặc demo hoạt động. Chỉ `zalo_end_to_end_reply_ready=true` cộng với thử nghiệm tin nhắn OA thật mới là bằng chứng end-to-end.
+Không lấy `/health=200` làm căn cứ khai trương.
 
-## Biến môi trường Zalo
+## Bề mặt HTTP production
 
-Không commit giá trị bí mật vào GitHub.
+- `/debug/*` mặc định đóng trong production.
+- `/api/chat` không mở công khai. Nếu cần tích hợp nội bộ phải có `API_CHAT_TOKEN` và Bearer token đúng.
+- request body có giới hạn kích thước.
+- demo có rate-limit trong giai đoạn thử nghiệm và phải tắt trước go-live.
+- response có `nosniff`, chống iframe, referrer policy, permissions policy, HSTS và `no-store` cho các API nhạy cảm.
+
+## Zalo webhook và OAuth
+
+Biến cấu hình quan trọng:
 
 - `ZALO_WEBHOOK_ENABLED=true`
 - `ZALO_APP_ID`
-- `ZALO_OA_SECRET_KEY` — secret dùng xác thực webhook.
-- `ZALO_APP_SECRET_KEY` — App secret dùng riêng cho OAuth v4; phải cấu hình rõ, không suy đoán từ webhook secret.
-- `ZALO_OA_ACCESS_TOKEN` — tùy chọn nếu đã có access token.
-- `ZALO_OA_REFRESH_TOKEN` — khuyến nghị để runtime có thể tự làm mới token.
+- `ZALO_OA_SECRET_KEY`: secret xác thực webhook.
+- `ZALO_APP_SECRET_KEY`: App secret riêng cho OAuth v4.
+- `ZALO_OA_ACCESS_TOKEN`: access token seed nếu có.
+- `ZALO_OA_REFRESH_TOKEN`: refresh token seed.
+- `ZALO_TOKEN_ENCRYPTION_KEY`: Fernet key riêng để mã hóa refresh token và payload hàng đợi trong Postgres.
 - `ZALO_REPLY_MODE=auto|direct|dynamic`
 
-Ở `auto`, production tự bật Direct Reply khi có access token hoặc khi đủ bộ App ID + App secret + refresh token để refresh.
+OA client dùng header `access_token`; refresh qua OAuth v4. Runtime xử lý cả HTTP `401/403` và OA JSON `error=-124`, retry tối đa một lần sau refresh. Refresh token mới chỉ được đưa vào runtime sau khi ghi bền thành công; nếu persistence lỗi thì fail-closed.
 
-## Vòng đời OA token
+## Durable Direct Reply
 
-OA client sử dụng header `access_token` theo OA OpenAPI. Khi token không có hoặc hết hiệu lực, runtime có thể đổi refresh token qua OAuth v4. Runtime xử lý cả:
+Trong chế độ Direct Reply chính thức:
 
-- HTTP `401/403`;
-- OA JSON `error=-124` dù HTTP vẫn là `200`.
+1. webhook hợp lệ được kiểm chữ ký;
+2. `user_send_text` được mã hóa và ghi vào bảng `zalo_reply_jobs`;
+3. chỉ sau khi ghi thành công mới ACK `200`;
+4. worker lấy job bằng row lock, giải mã trong RAM, chạy AI và gửi OA;
+5. gửi thành công thì xóa job ngay;
+6. lỗi tạm thời retry có giới hạn; không retry vô tận;
+7. nhiều worker/instance vẫn tránh lấy cùng một job nhờ `FOR UPDATE SKIP LOCKED`.
 
-Chỉ retry một lần sau refresh để tránh vòng lặp. Lỗi quota/quyền nghiệp vụ khác fail-closed.
+Không ghi UID, nội dung tin nhắn hay token vào log.
 
-Refresh token mới trả về được giữ trong bộ nhớ tiến trình. Vì credential Zalo là dữ liệu tài khoản ngoài repository, sau khi OA thực tế được cấp quyền cần quản trị credential theo chính sách bí mật của môi trường triển khai.
+## Quyền dữ liệu
 
-## Webhook signature
+Webhook `user_withdraw` có chữ ký hợp lệ được xử lý riêng. Hệ thống:
 
-Production fail-closed. Chữ ký được tính từ `app_id` trong payload đã ký + raw JSON body + timestamp + OA secret. Một `ZALO_APP_ID` local cũ không được làm hỏng một webhook có digest hợp lệ, nhưng runtime sẽ ghi cảnh báo an toàn `config_app_id_drift=true` để vận hành biết cần đồng bộ cấu hình.
+- xóa tin pending;
+- xóa job Direct Reply chưa xử lý của người đó;
+- xóa lịch sử hội thoại;
+- xóa liên kết hồ sơ tiếp nhận tối thiểu;
+- không ghi nội dung/UID vào log xóa.
 
-Log chẩn đoán không chứa UID, nội dung tin nhắn hay secret. Các nguyên nhân có thể thấy:
-
-- `missing_secret`
-- `missing_signed_fields`
-- `digest_mismatch`
-- `config_app_id_drift=true`
+Việc xóa sử dụng cùng khóa HMAC conversation key đang dùng trong history/cases, không tạo thêm bản sao định danh thô.
 
 ## Chống im lặng khi AI lỗi
 
-Khi Direct Reply đã sẵn sàng nhưng model/provider tạm lỗi, runtime vẫn cố gửi một thông báo an toàn qua OA, chỉ dùng tên đơn vị và số trực ban được phê duyệt `02623509777`. Nếu chính OA transport thất bại, lỗi được giữ fail-closed và ghi telemetry thay vì giả vờ đã gửi thành công.
+Nếu model/provider tạm lỗi nhưng OA còn hoạt động, runtime gửi thông báo an toàn với tên **Công an xã Pơng Drang, tỉnh Đắk Lắk** và duy nhất số trực ban **02623509777**. Nếu OA transport thất bại thì job được retry theo chính sách hàng đợi, không giả vờ đã gửi thành công.
 
 ## Acceptance suite
 
 Mỗi thay đổi production phải vượt:
 
-- 100.000 câu routing khác nhau;
+- 100.000 câu routing;
 - 10.000 câu retrieval kiểm biên Artifact Core;
 - 10.000 tình huống người dân trình báo;
 - 10.000 câu audit nguồn/ngữ nghĩa pháp lý;
-- regression tests về verifier, source guard, memory, intake, VNeID và Zalo;
-- production smoke gọi `/demo`, `/demo/api/ai-chat`, `/demo/api/ai-history`, `/api/chat`, `/health/readiness` và Zalo security boundary.
+- regression tests về verifier, source guard, memory, intake, privacy, HTTP security, OAuth refresh, durable dispatch và Zalo signature;
+- production smoke kiểm demo thật trong giai đoạn pre-production;
+- workflow `Official Go-Live Gate` kiểm `/health/go-live` trên production sau mỗi push `main`.
 
-CI không được hạ tiêu chuẩn để lấy số PASS. Nếu test đỏ, sửa nguyên nhân ở code hoặc sửa mock cũ khi mock không còn phản ánh API chính thức.
+CI không được hạ tiêu chuẩn để lấy PASS.
+
+## Hạ tầng chính thức
+
+Không khai trương trên cấu hình chỉ phù hợp thử nghiệm. Trước ngày hoạt động chính thức phải bảo đảm:
+
+- Postgres không còn là database thử nghiệm có ngày hết hạn;
+- web service có tài nguyên/SLA phù hợp, không dựa vào free single-instance nếu yêu cầu phục vụ liên tục;
+- Render health check được cấu hình tới endpoint health phù hợp;
+- `ENABLE_DEMO_CONSOLE=false`;
+- `/health/go-live` trả `200`;
+- gửi một tin nhắn Zalo OA thật và nhìn thấy phản hồi trên thiết bị thật.
