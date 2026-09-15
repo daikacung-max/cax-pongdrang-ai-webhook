@@ -31,6 +31,7 @@ def _fix_common_typos(text):
         "dinh danh muc do 2": "dinh danh dien tu muc do 2",
         "dinh danh muc 02": "dinh danh dien tu muc do 02",
         "tai khoan muc 2": "tai khoan dinh danh muc do 2",
+        "on ao": "on ao", "ca do bong da": "ca do bong da",
     }.items():
         q = q.replace(old, new)
     return q
@@ -50,24 +51,58 @@ SEARCH_VOCAB = [
     (["vay khong tra", "muon khong tra"], "lạm dụng tín nhiệm chiếm đoạt tài sản"),
     (["doa giet", "de doa giet"], "đe dọa giết người"),
     (["dap pha", "huy hoai"], "hủy hoại cố ý làm hư hỏng tài sản"),
-    (["gay roi"], "gây rối trật tự công cộng"), (["ma tuy"], "ma túy"),
+    (["gay roi"], "gây rối trật tự công cộng"),
+    (["ca do", "ca cuoc", "danh bac", "co bac"], "đánh bạc trái phép cá cược trái phép"),
+    (["ma tuy"], "ma túy"),
     (["tam tru", "dang ky tam tru", "ho so tam tru"], "Đăng ký tạm trú Công an cấp xã 03 ngày làm việc nguyên tắc hồ sơ dữ liệu VNeID"),
     (["thuong tru", "dang ky thuong tru", "ho khau thuong tru", "nhap khau"], "Đăng ký thường trú Công an cấp xã 07 ngày làm việc thành phần hồ sơ phụ thuộc trường hợp chỗ ở"),
     (["xac nhan cu tru", "xac nhan thong tin cu tru"], "xác nhận thông tin cư trú Công an cấp xã"),
     (["vneid", "dinh danh dien tu", "tai khoan dinh danh", "dinh danh muc 2", "dinh danh muc do 2", "tai khoan muc 2", "muc do 1", "muc do 01", "muc do 2", "muc do 02"], "Cấp tài khoản định danh điện tử VNeID mức độ 01 mức độ 02 Công an xã căn cước số điện thoại chính chủ"),
     (["dang ky xe", "xe mo to", "xe may", "xe gan may", "bien so xe", "mua xe moi", "dkx10"], "Đăng ký lần đầu xe mô tô xe gắn máy Giấy khai đăng ký xe ĐKX10 giấy tờ chủ xe giấy tờ của xe"),
     (["tre em", "duoi 14", "con toi", "be nha toi", "dua con", "nguoi dai dien"], "Cấp thẻ căn cước cho người dưới 14 tuổi thực hiện tại Công an cấp xã"),
-    (["to giac", "tin bao toi pham", "trinh bao toi pham"], "Hướng dẫn tố giác báo tin về tội phạm Công an cấp xã"),
+    (["to giac", "tin bao toi pham", "trinh bao toi pham", "trinh bao"], "Hướng dẫn tố giác báo tin về tội phạm Công an cấp xã"),
     (["karaoke", "hat karaoke", "loa keo", "tieng on", "on ao", "on nhieu"], "Nghị định 282/2025/NĐ-CP Điều 9 tiếng ồn karaoke bảo đảm sự yên tĩnh chung"),
 ]
 
-LEGAL_HINTS = ["luat", "bo luat", "dieu ", "xu phat", "toi pham", "cong an", "tam tru", "thuong tru", "cu tru", "dang ky xe", "sang ten", "chuyen nhuong", "thu hoi", "can cuoc", "to giac", "thuong tich", "bi thuong", "bi danh", "nguoi khac danh", "hanh hung", "camera", "dung dao", "hung khi", "bi lua", "chuyen tien", "chuyen khoan", "trom", "ma tuy", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid", "dinh danh dien tu", "tai khoan dinh danh", "dinh danh muc 2", "dinh danh muc do 2", "xe mo to", "xe may", "xe gan may", "bien so xe", "dkx10", "ho khau", "nhap khau", "ho chieu", "khieu nai", "to cao", "dieu tra", "luat su", "dat dai", "ly hon", "thua ke", "vay tien", "lao dong", "bao hiem xa hoi", "khai sinh", "khai tu", "ket hon", "ho tich", "tieng on", "karaoke", "pccc", "co bac", "bao luc gia dinh", "xam hai tre em", "vu khi", "phao", "phat giao thong", "giay phep lai xe"]
+LEGAL_HINTS = ["luat", "bo luat", "dieu ", "xu phat", "toi pham", "cong an", "tam tru", "thuong tru", "cu tru", "dang ky xe", "sang ten", "chuyen nhuong", "thu hoi", "can cuoc", "to giac", "trinh bao", "thuong tich", "bi thuong", "bi danh", "nguoi khac danh", "hanh hung", "camera", "dung dao", "hung khi", "bi lua", "chuyen tien", "chuyen khoan", "trom", "ma tuy", "ca do", "ca cuoc", "danh bac", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid", "dinh danh dien tu", "tai khoan dinh danh", "dinh danh muc 2", "dinh danh muc do 2", "xe mo to", "xe may", "xe gan may", "bien so xe", "dkx10", "ho khau", "nhap khau", "ho chieu", "khieu nai", "to cao", "dieu tra", "luat su", "dat dai", "ly hon", "thua ke", "vay tien", "lao dong", "bao hiem xa hoi", "khai sinh", "khai tu", "ket hon", "ho tich", "tieng on", "karaoke", "pccc", "co bac", "bao luc gia dinh", "xam hai tre em", "vu khi", "phao", "phat giao thong", "giay phep lai xe"]
 OBVIOUS_NONLEGAL = {"xin chao", "chao", "chao anh chi", "hello", "hi", "cam on", "cam on anh chi", "ok", "okay"}
 
 
+def _has_explicit_current_topic(question):
+    q = _norm(question)
+    if not q:
+        return False
+    for phrases, _ in SEARCH_VOCAB:
+        if any(p in q for p in phrases):
+            return True
+    return any(x in q for x in (
+        "so truc ban", "so dien thoai", "lien he cong an", "goi cong an",
+        "xuat file", "tao file", "mau ct01", "don trinh bao",
+    ))
+
+
+def _looks_elliptical(question):
+    q = _norm(question)
+    words = q.split()
+    if len(words) <= 5:
+        return True
+    return any(x in q for x in (
+        "nguoi do", "vu do", "cai do", "the thi", "vay thi", "con cai nay",
+        "con viec nay", "gio thi sao", "bao lau", "mat bao lau", "can gi",
+        "o thue", "o tro", "o nho", "nha thue", "duoc khong",
+    ))
+
+
 def _contextual_question(question, history):
+    current = str(question or "").strip()
+    if not current:
+        return current
+    # A clear current topic overrides stale history. Only genuinely elliptical
+    # follow-ups inherit recent user turns.
+    if _has_explicit_current_topic(current) or not _looks_elliptical(current):
+        return current
     turns = [str(x.get("content") or "").strip() for x in history if x.get("role") == "user" and str(x.get("content") or "").strip()]
-    return " | ".join((turns + [str(question or "").strip()])[-max(1, RETRIEVAL_HISTORY_USER_TURNS):])
+    return " | ".join((turns + [current])[-max(1, RETRIEVAL_HISTORY_USER_TURNS):])
 
 
 def quick_plan(question):
@@ -108,7 +143,7 @@ def plan(question, history, dynamic=False, safety_identifier=None):
     baseline = quick_plan(contextual)
     if dynamic or _norm(contextual) in OBVIOUS_NONLEGAL:
         return baseline
-    system = """Bạn là bộ lập kế hoạch truy xuất nguồn cho CAX PƠNG DRANG AI CORE. Không trả lời người dân, không kết luận tội danh, không tự viết nội dung pháp luật. Chỉ hiểu mạch hội thoại, xác định có cần nguồn pháp luật/TTHC hay không và tạo tối đa 4 truy vấn ngắn. Chỉ ghi explicit_references khi người dân đã nêu rõ số Điều. Đánh dấu complex khi phải kết hợp nhiều nhánh, văn bản hoặc ngoại lệ."""
+    system = """Bạn là bộ lập kế hoạch truy xuất nguồn cho CAX PƠNG DRANG AI CORE. Không trả lời người dân, không kết luận tội danh, không tự viết nội dung pháp luật. Tin nhắn hiện tại có chủ đề mới rõ ràng thì chủ đề hiện tại phải thắng lịch sử; chỉ dùng lịch sử khi câu hiện tại là câu nối/rút gọn. Xác định có cần nguồn pháp luật/TTHC hay không và tạo tối đa 4 truy vấn ngắn. Chỉ ghi explicit_references khi người dân đã nêu rõ số Điều. Đánh dấu complex khi phải kết hợp nhiều nhánh, văn bản hoặc ngoại lệ."""
     try:
         candidate = chat_structured(model=PLANNER_MODEL, messages=[{"role": "system", "content": system}, {"role": "user", "content": "Ngữ cảnh:\n" + contextual}], schema_name="legal_search_plan", schema=PLAN_SCHEMA, reasoning_effort="low", timeout=min(CORE_TIMEOUT_SECONDS, 4.0), temperature=0.0, max_completion_tokens=320, safety_identifier=safety_identifier)
         return _sanitize_plan(candidate, baseline, contextual)
