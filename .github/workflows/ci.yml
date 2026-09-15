@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Verify production health, security boundary, real Notebook demo, provider, Zalo boundary, and VNeID routing
+      - name: Verify production health, security boundary, real Notebook demo, provider, Zalo boundary, and conversation flexibility
         shell: bash
         run: |
           python - <<'PY'
@@ -61,7 +61,7 @@ jobs:
               with urllib.request.urlopen(base + path, timeout=timeout) as r:
                   return json.load(r)
 
-          def post_json(path, payload, timeout=20, headers=None):
+          def post_json(path, payload, timeout=25, headers=None):
               req_headers = {"Content-Type": "application/json"}
               req_headers.update(headers or {})
               req = urllib.request.Request(
@@ -88,6 +88,12 @@ jobs:
               assert status == expected, f"{path} status={status}, expected={expected}"
               return status
 
+          def demo_turn(session_id, message):
+              return post_json("/demo/api/ai-chat", {
+                  "session_id": session_id,
+                  "message": message,
+              })
+
           last_error = None
           for attempt in range(1, 7):
               try:
@@ -105,7 +111,6 @@ jobs:
                   assert readiness.get("production_mode") is True, "production mode"
                   assert readiness.get("model_routing_mode") == "auto", "model routing"
 
-                  # Production-only internal surfaces must not be public.
                   debug_status = expect_http("/debug/article/134", 404)
                   api_chat_status = expect_http(
                       "/api/chat",
@@ -115,6 +120,8 @@ jobs:
                   )
 
                   assert "HÀNH CHÍNH CÔNG - CÔNG AN XÃ PƠNG DRANG" in demo_html, "Notebook demo title missing"
+                  assert 'id="message"' in demo_html and 'id="send-button"' in demo_html, "chat composer missing"
+                  assert "⬇ Tải file Word" in demo_html, "download UI missing"
                   assert int(notebook.get("source_count") or 0) == 19, f"Notebook source_count={notebook.get('source_count')}"
                   source_titles = [str(x.get("title") or "") for x in (notebook.get("sources") or [])]
                   assert len(source_titles) == 19, f"Notebook sources={len(source_titles)}"
@@ -167,12 +174,10 @@ jobs:
                   messages = ((dynamic.get("content") or {}).get("messages") or [])
                   assert messages and messages[0].get("type") == "text", "Dynamic text contract"
 
+                  # Full Core live source-grounding smoke.
                   question = "Bạn hãy hướng dẫn cho tôi làm định danh mức 2"
                   demo_session = str(uuid.uuid4())
-                  demo_chat = post_json("/demo/api/ai-chat", {
-                      "session_id": demo_session,
-                      "message": question,
-                  })
+                  demo_chat = demo_turn(demo_session, question)
                   answer = str(demo_chat.get("answer") or "").strip()
                   source_ids = [str(x) for x in (demo_chat.get("sources") or [])]
                   assert demo_chat.get("mode") == "full_ai_core", "demo is not Full Core"
@@ -204,6 +209,54 @@ jobs:
                   assert demo_messages[-2].get("role") == "user", "demo user turn not stored"
                   assert demo_messages[-1].get("role") == "assistant", "demo assistant turn not stored"
 
+                  # Regression 1: an unfinished report form must not imprison later topics.
+                  form_session = str(uuid.uuid4())
+                  report_start = demo_turn(form_session, "Tôi muốn làm đơn trình báo")
+                  assert report_start.get("path") == "citizen_form_assistant", report_start
+                  report_capability = demo_turn(form_session, "Bạn có xuất file được không")
+                  assert report_capability.get("path") == "citizen_form_assistant", report_capability
+                  assert "file word" in str(report_capability.get("answer") or "").casefold(), report_capability
+                  gambling = demo_turn(form_session, "Tôi có biết một người chơi cá độ bóng đá")
+                  gambling_answer = str(gambling.get("answer") or "")
+                  assert gambling.get("path") != "citizen_form_assistant", gambling
+                  assert "vui lòng gửi các dòng sau" not in gambling_answer.casefold(), gambling_answer
+                  assert "tôi đang hỗ trợ soạn đơn trình báo" not in gambling_answer.casefold(), gambling_answer
+                  interjection = demo_turn(form_session, "Bạn ơi, tôi nói này")
+                  interjection_answer = str(interjection.get("answer") or "")
+                  assert interjection.get("path") != "citizen_form_assistant", interjection
+                  assert "vui lòng gửi các dòng sau" not in interjection_answer.casefold(), interjection_answer
+
+                  # Regression 2: short residence follow-ups inherit context, but remain source #3.
+                  residence_session = str(uuid.uuid4())
+                  demo_turn(residence_session, "Tôi muốn đăng ký cư trú tại xã Pơng Drang thì cần những hồ sơ gì")
+                  demo_turn(residence_session, "tạm trú")
+                  rental = demo_turn(residence_session, "ở thuê")
+                  rental_answer = str(rental.get("answer") or "")
+                  rental_titles = [str(x.get("title") or "") for x in (rental.get("notebook_sources") or [])]
+                  assert rental_titles == ["3. ĐK tạm trú.pdf"], f"rental sources={rental_titles}"
+                  assert "thuế" not in rental_answer.casefold(), rental_answer
+                  assert "hóa đơn" not in rental_answer.casefold(), rental_answer
+
+                  # Regression 3: blank CT01 creates a working DOCX link.
+                  ct_session = str(uuid.uuid4())
+                  ct = demo_turn(ct_session, "Cho tôi in mẫu CT01 trống")
+                  assert ct.get("path") == "citizen_form_assistant", ct
+                  assert ct.get("form_ready") is True, ct
+                  download_url = str(ct.get("download_url") or "")
+                  assert download_url.startswith(base + "/forms/download/"), download_url
+                  with urllib.request.urlopen(download_url, timeout=10) as r:
+                      docx_bytes = r.read(4)
+                      assert r.status == 200, f"form download status={r.status}"
+                  assert docx_bytes[:2] == b"PK", "download is not DOCX/ZIP"
+
+                  # Regression 4: an explicit noise report is an intake request, not a severity quiz.
+                  noise_session = str(uuid.uuid4())
+                  noise = demo_turn(
+                      noise_session,
+                      "Nhà ông A hát karaoke to quá, làm tôi học bài không được, tôi muốn báo công an",
+                  )
+                  assert noise.get("handoff_status") == "ready_for_officer", noise
+
                   safe = {
                       "status": health.get("status"),
                       "mode": health.get("mode"),
@@ -213,6 +266,10 @@ jobs:
                       "notebook_source_count": notebook.get("source_count"),
                       "demo_live_chat": True,
                       "demo_memory": True,
+                      "conversation_topic_switch": True,
+                      "residence_followup_source_3": True,
+                      "form_docx_download": True,
+                      "noise_report_intake": True,
                       "debug_surface_closed": debug_status == 404,
                       "public_api_chat_closed": api_chat_status == 404,
                       "core_answer_model": health.get("core_answer_model"),
