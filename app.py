@@ -30,6 +30,7 @@ from core.current_fallback import grounded_dynamic_fallback as current_grounded_
 from core.llm import LLMError, LLMTimeout
 from core.notebook_current_sources import ensure_notebook_current_sources
 from core.notebook_retrieval import retrieve as notebook_retrieve
+from core.privacy import delete_zalo_subject_data
 from core.production_security import register_production_security
 from core.source_guard import merge_verification
 
@@ -123,6 +124,41 @@ def _official_zalo_signature(data, raw_body):
 
 
 _app_core._valid_zalo_webhook_signature = _official_zalo_signature
+
+# Signed Zalo withdrawal events are not ordinary chat messages. Zalo instructs
+# partners to delete the corresponding subject data, so handle that event before
+# app_core's generic "ignored_event" branch.
+_original_zalo_webhook = _app_core.app.view_functions.get("zalo_webhook")
+
+
+def _privacy_aware_zalo_webhook():
+    if _app_core.request.method != "POST":
+        return _original_zalo_webhook()
+    if not _app_core.ZALO_WEBHOOK_ENABLED:
+        return _original_zalo_webhook()
+
+    raw_body = _app_core.request.get_data(cache=True, as_text=True)
+    data = _app_core.request.get_json(silent=True) or {}
+    event_name = str(data.get("event_name") or "").strip()
+    if event_name != "user_withdraw":
+        return _original_zalo_webhook()
+
+    if not _app_core._valid_zalo_webhook_signature(data, raw_body):
+        _app_core._log_zalo_webhook("rejected_signature", event_name)
+        return _app_core.jsonify({"success": False}), 401
+
+    # Purge transient queue state first, then persistent conversation/case data.
+    for field in ("user_id", "user_id_by_app"):
+        value = str(data.get(field) or "").strip()
+        if value:
+            _app_core.pending.purge_user(value)
+    delete_zalo_subject_data(data)
+    _app_core._log_zalo_webhook("subject_data_deleted", event_name)
+    return _app_core.jsonify({"success": True}), 200
+
+
+if _original_zalo_webhook is not None:
+    _app_core.app.view_functions["zalo_webhook"] = _privacy_aware_zalo_webhook
 
 # Runtime OA client supports both a pre-provisioned access token and OAuth v4
 # refresh credentials. This lets direct reply recover automatically when an
