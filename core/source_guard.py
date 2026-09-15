@@ -21,9 +21,9 @@ def _source_blob(units):
 def source_grounding_errors(answer, units):
     """Bắt chi tiết thủ tục do model tự thêm nhưng không có trong source.
 
-    Đây là lớp hậu kiểm bổ sung cho verifier. Nó không khóa cách diễn đạt tự
-    nhiên, chỉ chặn các loại chi tiết có rủi ro cao như địa chỉ, giờ làm việc,
-    ví dụ tích hợp và mã source nội bộ.
+    Lớp này cố ý không khóa cách diễn đạt tự nhiên. Nó chỉ fail-closed với các
+    dữ kiện hành chính có vẻ hợp lý nhưng dễ bị model tự bịa: giấy tờ, mã thủ
+    tục, cách nhận kết quả, kênh nộp, địa chỉ, giờ làm việc và ví dụ tích hợp.
     """
     if not units:
         return []
@@ -48,6 +48,24 @@ def source_grounding_errors(answer, units):
     for phrase in ("gio hanh chinh", "co san tai quay", "co san tai noi tiep nhan"):
         if phrase in a and phrase not in source:
             errors.append("unsupported_procedural_detail:" + phrase)
+
+    # Những chi tiết dưới đây thường nghe hợp lý nhưng chỉ được phép xuất hiện
+    # khi chính source của lượt hiện tại có chúng.
+    high_risk_details = (
+        "hop dong thue", "giay chung nhan quyen so huu", "ban sao",
+        "anh scan", "file scan", "giay to goc", "cmnd", "cccd", "ho chieu",
+        "tin nhan", "email", "tu dong lay du lieu", "ma thu tuc",
+        "dich vu buu chinh", "buu chinh cong ich",
+    )
+    for phrase in high_risk_details:
+        if phrase in a and phrase not in source:
+            errors.append("unsupported_procedural_detail:" + phrase)
+
+    # Mã thủ tục dạng 1.012575, 1.004194... phải xuất hiện nguyên vẹn trong
+    # source, không cho model đoán từ trí nhớ.
+    for code in sorted(set(re.findall(r"\b\d+\.\d{4,8}\b", a))):
+        if code not in source:
+            errors.append("unsupported_procedure_code:" + code)
 
     # Ví dụ loại dữ liệu tích hợp chỉ được nêu khi nguồn đã liệt kê chính ví dụ đó.
     for phrase in ("tai khoan ngan hang", "ma so thue", "ho so y te", "bao hiem y te", "giay phep lai xe"):
