@@ -33,6 +33,11 @@ from core.notebook_retrieval import retrieve as notebook_retrieve
 from core.privacy import delete_zalo_subject_data
 from core.production_security import register_production_security
 from core.source_guard import merge_verification
+from core.zalo_token_store import (
+    load_refresh_token,
+    persistence_ready as zalo_token_persistence_ready,
+    save_refresh_token,
+)
 
 
 _original_ensure_legal_db = _app_core.ensure_legal_db
@@ -64,12 +69,7 @@ def _artifact_first_plan(question, history, dynamic=False, safety_identifier=Non
 
 
 _service_module.plan = _artifact_first_plan
-
-# Artifact-first retrieval. Current official documents are only support/update
-# data behind the selected artifact source.
 _service_module.retrieve = notebook_retrieve
-
-# Dynamic and API-boundary fallbacks must use the current verification layer.
 _service_module.grounded_dynamic_fallback = current_grounded_fallback
 _app_core.grounded_dynamic_fallback = current_grounded_fallback
 
@@ -125,9 +125,6 @@ def _official_zalo_signature(data, raw_body):
 
 _app_core._valid_zalo_webhook_signature = _official_zalo_signature
 
-# Signed Zalo withdrawal events are not ordinary chat messages. Zalo instructs
-# partners to delete the corresponding subject data, so handle that event before
-# app_core's generic "ignored_event" branch.
 _original_zalo_webhook = _app_core.app.view_functions.get("zalo_webhook")
 
 
@@ -147,7 +144,6 @@ def _privacy_aware_zalo_webhook():
         _app_core._log_zalo_webhook("rejected_signature", event_name)
         return _app_core.jsonify({"success": False}), 401
 
-    # Purge transient queue state first, then persistent conversation/case data.
     for field in ("user_id", "user_id_by_app"):
         value = str(data.get(field) or "").strip()
         if value:
@@ -160,25 +156,22 @@ def _privacy_aware_zalo_webhook():
 if _original_zalo_webhook is not None:
     _app_core.app.view_functions["zalo_webhook"] = _privacy_aware_zalo_webhook
 
-# Runtime OA client supports both a pre-provisioned access token and OAuth v4
-# refresh credentials. This lets direct reply recover automatically when an
-# access token expires without changing the AI Core path.
+# A rotated refresh token must survive worker/deploy restarts. When managed
+# Postgres + a Fernet key are configured, seed from durable storage and fail
+# closed if a newly rotated token cannot be persisted.
+_durable_token_store = zalo_token_persistence_ready()
+_runtime_refresh_token = load_refresh_token(ZALO_OA_REFRESH_TOKEN)
 _app_core.zalo_oa_client = ZaloOAClient(
     ZALO_OA_ACCESS_TOKEN,
-    refresh_token=ZALO_OA_REFRESH_TOKEN,
+    refresh_token=_runtime_refresh_token,
     app_id=ZALO_APP_ID,
     app_secret=ZALO_APP_SECRET_KEY,
+    persist_refresh_token=save_refresh_token if _durable_token_store else None,
 )
 
 
 def _resilient_direct_zalo_reply(user_id, text, trace_id):
-    """Reply through OA and never turn a transient AI failure into silence.
-
-    If the model/provider times out, OA still receives a short safe operational
-    notice with the one approved hotline. OA transport errors are intentionally
-    re-raised because pretending a message was delivered would be worse than a
-    visible delivery failure in telemetry.
-    """
+    """Reply through OA and never turn a transient AI failure into silence."""
     if not _app_core.ZALO_DIRECT_REPLY_ENABLED:
         return False
     try:
@@ -207,8 +200,6 @@ if "ai_core_self_test" not in _app_core.app.blueprints:
 if "ai_core_demo_ai" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(demo_ai_blueprint)
 
-# Apply HTTP hardening only after all routes/blueprints are mounted so the guard
-# covers the complete production attack surface.
 register_production_security(_app_core.app)
 
 sys.modules[__name__] = _app_core
