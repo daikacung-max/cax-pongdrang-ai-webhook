@@ -45,6 +45,57 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual(result["conversation_mode"], "intake_requested")
         self.assertEqual(result["handoff_status"], "ready_for_officer")
 
+    def test_noise_report_does_not_require_citizen_to_grade_severity(self):
+        result = assess(
+            "Nhà ông A hát karaoke to quá, làm tôi học bài không được, tôi muốn báo công an",
+            [],
+        )
+        self.assertEqual(result["procedure_code"], "noise_report")
+        self.assertEqual(result["conversation_mode"], "intake_requested")
+        self.assertNotIn("severity", result["missing_field_ids"])
+        hint = prompt_hint(result).lower()
+        self.assertNotIn("nghiêm trọng", hint)
+        self.assertIn("không bắt", hint)
+
+    def test_gambling_topic_does_not_inherit_old_report_request(self):
+        history = [
+            {"role": "user", "content": "Tôi muốn trình báo bị đe dọa"},
+            {
+                "role": "assistant",
+                "content": "Sự việc xảy ra khi nào và ở đâu?",
+                "meta": {
+                    "intake": {
+                        "procedure_code": "crime_report",
+                        "conversation_mode": "intake_requested",
+                        "handoff_status": "needs_information",
+                    }
+                },
+            },
+        ]
+        result = assess("Tôi có biết một người chơi cá độ bóng đá", history)
+        self.assertEqual(result["procedure_code"], "gambling_report")
+        self.assertEqual(result["conversation_mode"], "advice_only")
+        self.assertEqual(result["handoff_status"], "not_requested")
+
+    def test_same_intake_can_continue_with_short_answer(self):
+        history = [
+            {"role": "user", "content": "Tôi muốn nộp hồ sơ đăng ký tạm trú"},
+            {
+                "role": "assistant",
+                "content": "Chỗ ở của anh/chị là nhà của mình, ở cùng người thân hay đi thuê?",
+                "meta": {
+                    "intake": {
+                        "procedure_code": "residence",
+                        "conversation_mode": "intake_requested",
+                        "handoff_status": "needs_information",
+                    }
+                },
+            },
+        ]
+        result = assess("ở thuê", history)
+        self.assertEqual(result["procedure_code"], "residence")
+        self.assertEqual(result["conversation_mode"], "intake_requested")
+
 
 if __name__ == "__main__":
     unittest.main()
