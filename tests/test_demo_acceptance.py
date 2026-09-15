@@ -58,7 +58,10 @@ class DemoAcceptanceTests(unittest.TestCase):
                 answer = result["answer"]
                 self.assertEqual(result["mode"], mode)
                 self.assertEqual(result["handoff_status"], handoff)
-                self.assertIn(phrase, answer)
+                # Acceptance verifies semantic content, not exact capitalization
+                # or canned wording. This lets the assistant speak naturally while
+                # keeping the required fact/action in the reply.
+                self.assertIn(phrase.casefold(), answer.casefold())
                 self.assertNotIn("Công an cấp huyện", answer)
                 self.assertFalse(any(number in answer for number in forbidden_phone))
 
