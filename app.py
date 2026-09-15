@@ -11,6 +11,7 @@ from adapters.vbee_tts import blueprint as vbee_blueprint
 from adapters.readiness import blueprint as readiness_blueprint
 from adapters.self_test import blueprint as self_test_blueprint
 from adapters.demo_ai import blueprint as demo_ai_blueprint
+from adapters.forms import blueprint as citizen_forms_blueprint
 from adapters.zalo_oa_api import ZaloOAClient
 from config import (
     LOCAL_BIND_HOST,
@@ -19,9 +20,11 @@ from config import (
     ZALO_OA_ACCESS_TOKEN,
     ZALO_OA_REFRESH_TOKEN,
 )
+from core import db as _form_db
 from core.artifact_planner import enrich_plan as enrich_artifact_plan
 from core.current_knowledge import ensure_current_knowledge
 from core.current_fallback import grounded_dynamic_fallback as current_grounded_fallback
+from core.form_documents import handle_form_request
 from core.llm import LLMError, LLMTimeout
 from core.notebook_current_sources import ensure_notebook_current_sources
 from core.notebook_retrieval import retrieve as notebook_retrieve
@@ -89,6 +92,44 @@ def _verify_dynamic_with_source_guard(answer, retrieved_units, question=""):
 _service_module.verify = _verify_with_source_guard
 _service_module.verify_dynamic_text = _verify_dynamic_with_source_guard
 
+# Form/document generation is strictly opt-in. If the citizen is not explicitly
+# asking to print/fill/export a form, the original AI Core call is untouched.
+_original_core_chat = _app_core.core.chat
+
+
+def _chat_with_citizen_forms(user_id, question, dynamic=False, trace_id=None):
+    history = _form_db.get_history(str(user_id or ""), limit=20)
+    try:
+        form_result = handle_form_request(user_id, question, history=history)
+    except RuntimeError:
+        form_result = None
+    if not form_result:
+        return _original_core_chat(user_id, question, dynamic=dynamic, trace_id=trace_id)
+
+    answer = str(form_result.get("answer") or "").strip()
+    meta = {
+        "legal": False,
+        "retrieved_unit_ids": [],
+        "verified": True,
+        "repaired": False,
+        "verification_errors": [],
+        "dynamic": bool(dynamic),
+        "path": "citizen_form_assistant",
+        "form_type": form_result.get("form_type"),
+        "form_ready": bool(form_result.get("ready")),
+        "download_url": form_result.get("download_url"),
+        "model": "deterministic-form-engine",
+        "provider": "local",
+        "intake": {"handoff_status": "not_requested"},
+        "handoff": None,
+    }
+    _form_db.add_message(user_id, "user", str(question or ""), meta={"path": "citizen_form_assistant"})
+    _form_db.add_message(user_id, "assistant", answer, meta=meta)
+    return {"answer": answer, "meta": meta, "handoff": None, "_telemetry": {}}
+
+
+_app_core.core.chat = _chat_with_citizen_forms
+
 
 def _official_zalo_signature(data, raw_body):
     """Validate Zalo's documented SHA-256 webhook signature."""
@@ -149,10 +190,6 @@ def _hardened_zalo_webhook():
         _app_core._log_zalo_webhook("subject_data_deleted", event_name)
         return _app_core.jsonify({"success": True}), 200
 
-    # Official direct-reply mode uses an encrypted Postgres queue. The webhook
-    # is acknowledged only after the durable insert succeeds; AI/OA work happens
-    # outside the request. A restart therefore cannot silently lose an already
-    # acknowledged citizen message.
     if (
         event_name == "user_send_text"
         and _app_core.ZALO_DIRECT_REPLY_ENABLED
@@ -235,6 +272,8 @@ if "ai_core_self_test" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(self_test_blueprint)
 if "ai_core_demo_ai" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(demo_ai_blueprint)
+if "citizen_forms" not in _app_core.app.blueprints:
+    _app_core.app.register_blueprint(citizen_forms_blueprint)
 
 register_production_security(_app_core.app)
 
