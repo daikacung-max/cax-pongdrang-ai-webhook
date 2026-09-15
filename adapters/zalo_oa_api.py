@@ -1,4 +1,4 @@
-"""Fail-closed Zalo OA customer-service client with in-process token refresh."""
+"""Fail-closed Zalo OA customer-service client with durable-capable token refresh."""
 
 import threading
 import requests
@@ -49,11 +49,11 @@ def _split_text(text, max_chars=1800, max_messages=4):
 
 
 class ZaloOAClient:
-    """Gửi tin Tư vấn OA và tự làm mới access token khi có refresh token.
+    """Gửi tin OA và tự làm mới access token khi có refresh token.
 
-    OA OpenAPI dùng header ``access_token``. OAuth v4 dùng
-    ``/v4/oa/access_token`` để đổi refresh token lấy access token mới. Token mới
-    chỉ được giữ trong bộ nhớ tiến trình và không bao giờ được ghi vào log.
+    ``persist_refresh_token`` is optional. Production can inject an encrypted
+    durable store so a rotated refresh token survives a process restart; tests
+    and local development may keep the default in-memory behaviour.
     """
 
     endpoint = "https://openapi.zalo.me/v3.0/oa/message/cs"
@@ -67,12 +67,14 @@ class ZaloOAClient:
         app_id="",
         app_secret="",
         session=requests,
+        persist_refresh_token=None,
     ):
         self.access_token = str(access_token or "").strip()
         self.refresh_token = str(refresh_token or "").strip()
         self.app_id = str(app_id or "").strip()
         self.app_secret = str(app_secret or "").strip()
         self.session = session
+        self.persist_refresh_token = persist_refresh_token
         self._token_lock = threading.Lock()
 
     @property
@@ -112,6 +114,15 @@ class ZaloOAClient:
             self.access_token = access_token
             rotated_refresh = str(body.get("refresh_token") or "").strip()
             if rotated_refresh:
+                if self.persist_refresh_token is not None:
+                    try:
+                        persisted = bool(self.persist_refresh_token(rotated_refresh))
+                    except Exception as exc:
+                        # Once Zalo has rotated the token, silently losing the new
+                        # value can strand production after restart. Fail closed.
+                        raise ZaloOAReplyError("OA rotated refresh token could not be persisted") from exc
+                    if not persisted:
+                        raise ZaloOAReplyError("OA rotated refresh token could not be persisted")
                 self.refresh_token = rotated_refresh
             return self.access_token
 
@@ -149,9 +160,6 @@ class ZaloOAClient:
             raise ZaloOAReplyError("OA reply request was rejected")
 
         body = self._json_body(response)
-        # Zalo OA thường phản hồi lỗi nghiệp vụ trong JSON dù HTTP vẫn là 200.
-        # -124 là access token không hợp lệ. Refresh đúng một lần rồi retry để
-        # tránh vòng lặp vô hạn; quota/quyền gửi và lỗi khác vẫn fail-closed.
         if body.get("error") in self.INVALID_ACCESS_TOKEN_ERRORS and self.refresh_ready:
             self._refresh_access_token(timeout=max(timeout, 3.0))
             response = self._post_message(user_id, text, timeout)
