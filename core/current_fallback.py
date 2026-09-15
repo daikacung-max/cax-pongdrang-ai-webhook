@@ -14,6 +14,10 @@ def _has(units, document_id):
     return any(str(x.get("document_id") or "") == document_id for x in (units or []))
 
 
+def _has_unit(units, unit_id):
+    return any(str(x.get("id") or "") == unit_id for x in (units or []))
+
+
 def _citizen_norm(question):
     q = norm(question)
     q = q.replace("dang ki", "dang ky")
@@ -48,7 +52,7 @@ def grounded_dynamic_fallback(question, retrieved_units):
         if under14_language:
             return (
                 "Theo Quyết định 5230/QĐ-BCA-C06, người từ đủ 06 đến dưới 14 tuổi làm căn cước trực tiếp tại Công an cấp xã cùng người đại diện hợp pháp. "
-                "Người dưới 06 tuổi có thể được người đại diện hợp pháp nộp hồ sơ trực tuyến toàn trình qua Cổng dịch vụ công quốc gia hoặc VNeID; "
+                "Người dưới 06 tuổi có thể được người đại diện hợp pháp nộp trực tuyến toàn trình qua Cổng dịch vụ công quốc gia hoặc VNeID; "
                 "thời hạn giải quyết chung không quá 07 ngày làm việc."
             )
         if any(x in q for x in ["14 tuoi", "tu du 14"]):
@@ -78,10 +82,21 @@ def grounded_dynamic_fallback(question, retrieved_units):
                 "Đăng ký thường trú thực hiện tại Công an cấp xã hoặc trực tuyến, thời hạn giải quyết 07 ngày làm việc. Hồ sơ phụ thuộc loại chỗ ở và điều kiện cụ thể; "
                 "thông tin, giấy tờ đã khai thác được từ cơ sở dữ liệu hoặc VNeID thì không yêu cầu nộp lại. Anh/chị đăng ký vào nhà của mình, nhà người thân hay nhà thuê/mượn/ở nhờ?"
             )
-        if "tam tru" in q:
+        # IMPORTANT: Vietnamese 'thuê' becomes 'thue' after accent folding, which
+        # can collide with the word 'thuế'. Once retrieval has already bounded
+        # the turn to temporary residence, rental/boarding language must remain
+        # inside that residence context and must never fall through to tax.
+        rental_followup = any(x in q for x in [
+            "o thue", "nha thue", "thue nha", "thue tro", "o tro", "phong tro",
+            "o nho", "nha tro", "cho thue",
+        ])
+        temporary_context = _has_unit(retrieved_units, "RESIDENCE_CURRENT_2026:temporary")
+        if "tam tru" in q or (temporary_context and rental_followup):
             return (
-                "Đăng ký tạm trú thực hiện tại Công an cấp xã hoặc trực tuyến, thời hạn giải quyết 03 ngày làm việc khi hồ sơ hợp lệ. "
-                "Thông tin, giấy tờ đã được khai thác từ cơ sở dữ liệu hoặc VNeID thì không yêu cầu nộp lại."
+                "Trường hợp anh/chị đang ở thuê/ở trọ và đăng ký tạm trú, hồ sơ được xác định theo đúng trường hợp chỗ ở cụ thể. "
+                "Theo nguồn cư trú hiện hành mà hệ thống đang có, đăng ký tạm trú thực hiện tại Công an cấp xã hoặc trực tuyến, thời hạn giải quyết 03 ngày làm việc khi hồ sơ hợp lệ; "
+                "những thông tin, giấy tờ đã khai thác được từ cơ sở dữ liệu hoặc VNeID thì không yêu cầu nộp lại. "
+                "Tôi sẽ tiếp tục hướng dẫn trong đúng thủ tục đăng ký tạm trú, không chuyển sang lĩnh vực thuế/hóa đơn."
             )
 
     if _has(retrieved_units, "VEHICLE_CURRENT_2026"):
