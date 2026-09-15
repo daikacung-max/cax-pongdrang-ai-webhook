@@ -53,9 +53,9 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual(result["procedure_code"], "noise_report")
         self.assertEqual(result["conversation_mode"], "intake_requested")
         self.assertNotIn("severity", result["missing_field_ids"])
-        hint = prompt_hint(result).lower()
-        self.assertNotIn("nghiêm trọng", hint)
-        self.assertIn("không bắt", hint)
+        self.assertEqual(result["handoff_status"], "ready_for_officer")
+        self.assertIsNone(result["next_question"])
+        self.assertEqual(prompt_hint(result), "")
 
     def test_gambling_topic_does_not_inherit_old_report_request(self):
         history = [
