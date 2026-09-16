@@ -113,6 +113,8 @@ def _detect_domain_in_text(text):
         return "incident_report", ["BLHS_2025", "BLTTHS_104_VBHN_2025", "CRIME_REPORT_GUIDANCE_2025"]
     if any(x in q for x in ["lua dao chuyen khoan", "bi lua", "nguoi lua dao", "chuyen khoan", "chuyen tien", "bi scam", "scam chuyen khoan"]):
         return "fraud_transfer", ["FRAUD_TRANSFER_GUIDANCE_2026"]
+    if any(x in q for x in ["ca do", "ca cuoc", "danh bac", "co bac", "danh bai", "choi bai an tien", "danh bai an tien"]):
+        return "gambling_report", ["BLHS_2025", "BLTTHS_104_VBHN_2025", "CRIME_REPORT_GUIDANCE_2025"]
 
     if any(x in q for x in ["sang ten", "chuyen nhuong", "thu hoi"]) and any(x in q for x in ["xe", "dang ky xe", "bien so"]):
         return "vehicle_transfer", ["VEHICLE_CURRENT_2026", "VEHICLE_TRANSFER_LOCAL_2026"]
@@ -174,6 +176,8 @@ def _priority_unit_ids(domain, question):
         return ["CITIZEN_ID_5230_COMMUNE_2026:scope", "CITIZEN_ID_5230_COMMUNE_2026:other_commune_procedures"]
     if domain == "crime_report":
         return ["CRIME_REPORT_GUIDANCE_2025:channels", "CRIME_REPORT_GUIDANCE_2025:rights", "CRIME_REPORT_GUIDANCE_2025:local_intake", "BLTTHS_104_VBHN_2025:article:145", "BLTTHS_104_VBHN_2025:article:146"]
+    if domain == "gambling_report":
+        return ["BLHS_2025:article:321", "CRIME_REPORT_GUIDANCE_2025:channels", "BLTTHS_104_VBHN_2025:article:145", "BLTTHS_104_VBHN_2025:article:146"]
     if domain == "noise_karaoke":
         return ["NOISE_KARAOKE_282_2025:quiet_places", "NOISE_KARAOKE_282_2025:other_noise", "NOISE_KARAOKE_282_2025:public_propaganda"]
     if domain == "fraud_transfer":

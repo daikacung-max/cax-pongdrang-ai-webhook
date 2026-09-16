@@ -46,6 +46,26 @@ class DynamicServiceTests(unittest.TestCase):
             for unit_id in result["meta"]["retrieved_unit_ids"]
         ))
 
+    def test_playing_cards_for_money_routes_to_gambling_source_and_safe_action(self):
+        user_id = "service-test-" + uuid.uuid4().hex
+        with patch(
+            "core.service.answer_dynamic_text",
+            return_value="Anh/chị cho biết thêm tình huống cụ thể.",
+        ):
+            result = core.chat(
+                user_id,
+                "Bạn tôi biết người này đang chơi đánh bài ăn tiền",
+                dynamic=True,
+            )
+
+        self.assertEqual(result["_telemetry"]["fallback_reason"], "weak_answer")
+        self.assertTrue(any(
+            unit_id == "BLHS_2025:article:321"
+            for unit_id in result["meta"]["retrieved_unit_ids"]
+        ))
+        self.assertIn("đánh bài ăn tiền", result["answer"].lower())
+        self.assertIn("không thể kết luận", result["answer"].lower())
+
     def test_full_core_provider_error_returns_grounded_fallback(self):
         user_id = "service-test-" + uuid.uuid4().hex
         with patch("core.service.generate_answer", side_effect=LLMError("provider rejected")):

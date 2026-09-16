@@ -71,7 +71,7 @@ TOPIC_CLARIFICATIONS = (
      "Anh/chị đang hỏi về xây dựng: cho biết đang hỏi về giấy phép, trật tự xây dựng, lấn chiếm hay tranh chấp công trình. Tôi sẽ giúp xác định đúng nhóm việc và thông tin cần chuẩn bị."),
     (("phong chay", "chua chay", "pccc"),
      "Nếu đang có cháy, khói hoặc nguy cơ trực tiếp, ưu tiên rời khu vực nguy hiểm và gọi lực lượng cứu hỏa/cơ quan chức năng ngay. Nếu anh/chị đang hỏi về điều kiện PCCC của cơ sở hoặc nhà ở, cho tôi biết loại hình để tôi hướng dẫn theo đúng tình huống."),
-    (("co bac", "danh bac", "ca do", "ca cuoc"),
+    (("co bac", "danh bac", "danh bai", "choi bai an tien", "danh bai an tien", "ca do", "ca cuoc"),
      _public_safety_reply(
          "gambling",
          "Với nhóm người đang đánh bạc/cá cược, anh/chị nên báo vị trí đang xảy ra, thời điểm, số người ước tính và đặc điểm nhận biết nếu quan sát được an toàn. Không cần tự tiếp cận để xác minh hay thu giữ đồ vật. Nếu anh/chị muốn, tôi có thể giúp soạn ngay nội dung tin báo thật ngắn để anh/chị gọi hoặc nhắn cho Công an xã."

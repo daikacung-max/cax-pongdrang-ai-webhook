@@ -57,6 +57,11 @@ def _dynamic_answer_is_weak(question, answer, legal_units):
     ) and "tam tru" not in a:
         return True
 
+    if any(term in q for term in ("danh bac", "danh bai", "choi bai an tien", "ca do", "ca cuoc")) and any(
+        str(unit.get("article") or "") == "321" for unit in legal_units
+    ) and not any(term in a for term in ("danh bac", "danh bai", "ca do", "ca cuoc")):
+        return True
+
     if any(str(x.get("article") or "") == "134" for x in legal_units):
         # Dữ kiện mới ở chuỗi hành hung phải được nhắc đúng; nếu không, dùng câu
         # fallback đã bám nguồn thay vì hỏi lại một thông tin vừa được người dân nêu.

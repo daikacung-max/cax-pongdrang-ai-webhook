@@ -322,6 +322,17 @@ def grounded_dynamic_fallback(question, retrieved_units):
 
     q = norm(question)
 
+    if any(str(unit.get("article") or "") == "321" for unit in retrieved_units) and any(
+        term in q for term in ("danh bac", "danh bai", "choi bai an tien", "ca do", "ca cuoc")
+    ):
+        return (
+            "Thông tin về việc đánh bài ăn tiền là nội dung có thể phản ánh để cơ quan Công an kiểm tra. "
+            "Điều 321 Bộ luật Hình sự quy định về hành vi đánh bạc trái phép được thua bằng tiền hoặc hiện vật; "
+            "việc có vi phạm và xử lý theo căn cứ nào phải do cơ quan có thẩm quyền xác minh, nên tôi không thể kết luận về một người cụ thể chỉ từ thông tin ban đầu. "
+            "Anh/chị nên cung cấp địa điểm, thời gian đang diễn ra, số người, cách thức chơi và hình ảnh/video nếu có thể ghi nhận an toàn; "
+            "không tự đối đầu, can thiệp hoặc thu giữ đồ vật. Công an cấp xã có trách nhiệm tiếp nhận tin báo, kể cả khi thông tin ban đầu chưa đầy đủ."
+        )
+
     if any(unit.get("document_id") == "NOISE_KARAOKE_282_2025" for unit in retrieved_units):
         return (
             "Việc hát karaoke gây ảnh hưởng không nên được hiểu là chỉ sau một mốc giờ cố định mới cần xử lý. "
@@ -458,7 +469,12 @@ def grounded_dynamic_fallback(question, retrieved_units):
         )
     if article and title:
         return f"Nội dung anh/chị hỏi có liên quan đến Điều {article} Bộ luật Hình sự, {title}. Cần đối chiếu đầy đủ điều kiện của điều luật với diễn biến thực tế trước khi kết luận."
-    return "Nguồn phù hợp đã được tìm thấy nhưng dữ kiện hiện có chưa đủ để kết luận chi tiết. Anh/chị có thể bổ sung tình huống cụ thể để tôi phân tích tiếp theo đúng nguồn."
+    return (
+        "Tôi đã xác định được nhóm việc anh/chị đang hỏi và có thể hỗ trợ tiếp ngay. "
+        "Để tránh áp dụng nhầm quy định, anh/chị cho biết mục tiêu chính là cần làm thủ tục, muốn phản ánh/trình báo, "
+        "hay cần giải thích quyền và nghĩa vụ; kèm thời điểm, địa điểm hoặc giấy tờ/sự việc liên quan nếu có. "
+        "Tôi sẽ trả lời theo tình huống cụ thể, không yêu cầu anh/chị tự xác định điều luật hoặc mức xử lý."
+    )
 
 
 def enforce_phone_policy(text):

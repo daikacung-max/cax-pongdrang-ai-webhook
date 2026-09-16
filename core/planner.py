@@ -52,7 +52,7 @@ SEARCH_VOCAB = [
     (["doa giet", "de doa giet"], "đe dọa giết người"),
     (["dap pha", "huy hoai"], "hủy hoại cố ý làm hư hỏng tài sản"),
     (["gay roi"], "gây rối trật tự công cộng"),
-    (["ca do", "ca cuoc", "danh bac", "co bac"], "đánh bạc trái phép cá cược trái phép"),
+    (["ca do", "ca cuoc", "danh bac", "co bac", "danh bai", "choi bai an tien", "danh bai an tien"], "đánh bạc trái phép cá cược trái phép Điều 321 Bộ luật Hình sự"),
     (["ma tuy"], "ma túy"),
     (["tam tru", "dang ky tam tru", "ho so tam tru"], "Đăng ký tạm trú Công an cấp xã 03 ngày làm việc nguyên tắc hồ sơ dữ liệu VNeID"),
     (["thuong tru", "dang ky thuong tru", "ho khau thuong tru", "nhap khau"], "Đăng ký thường trú Công an cấp xã 07 ngày làm việc thành phần hồ sơ phụ thuộc trường hợp chỗ ở"),
@@ -64,7 +64,7 @@ SEARCH_VOCAB = [
     (["karaoke", "hat karaoke", "loa keo", "tieng on", "on ao", "on nhieu"], "Nghị định 282/2025/NĐ-CP Điều 9 tiếng ồn karaoke bảo đảm sự yên tĩnh chung"),
 ]
 
-LEGAL_HINTS = ["luat", "bo luat", "dieu ", "xu phat", "toi pham", "cong an", "tam tru", "thuong tru", "cu tru", "dang ky xe", "sang ten", "chuyen nhuong", "thu hoi", "can cuoc", "to giac", "trinh bao", "thuong tich", "bi thuong", "bi danh", "nguoi khac danh", "hanh hung", "camera", "dung dao", "hung khi", "bi lua", "chuyen tien", "chuyen khoan", "trom", "ma tuy", "ca do", "ca cuoc", "danh bac", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid", "dinh danh dien tu", "tai khoan dinh danh", "dinh danh muc 2", "dinh danh muc do 2", "xe mo to", "xe may", "xe gan may", "bien so xe", "dkx10", "ho khau", "nhap khau", "ho chieu", "khieu nai", "to cao", "dieu tra", "luat su", "dat dai", "ly hon", "thua ke", "vay tien", "lao dong", "bao hiem xa hoi", "khai sinh", "khai tu", "ket hon", "ho tich", "tieng on", "karaoke", "pccc", "co bac", "bao luc gia dinh", "xam hai tre em", "vu khi", "phao", "phat giao thong", "giay phep lai xe"]
+LEGAL_HINTS = ["luat", "bo luat", "dieu ", "xu phat", "toi pham", "cong an", "tam tru", "thuong tru", "cu tru", "dang ky xe", "sang ten", "chuyen nhuong", "thu hoi", "can cuoc", "to giac", "trinh bao", "thuong tich", "bi thuong", "bi danh", "nguoi khac danh", "hanh hung", "camera", "dung dao", "hung khi", "bi lua", "chuyen tien", "chuyen khoan", "trom", "ma tuy", "ca do", "ca cuoc", "danh bac", "danh bai", "choi bai an tien", "khoi to", "tham quyen", "truy cuu", "thu tuc", "ho so", "vneid", "dinh danh dien tu", "tai khoan dinh danh", "dinh danh muc 2", "dinh danh muc do 2", "xe mo to", "xe may", "xe gan may", "bien so xe", "dkx10", "ho khau", "nhap khau", "ho chieu", "khieu nai", "to cao", "dieu tra", "luat su", "dat dai", "ly hon", "thua ke", "vay tien", "lao dong", "bao hiem xa hoi", "khai sinh", "khai tu", "ket hon", "ho tich", "tieng on", "karaoke", "pccc", "co bac", "bao luc gia dinh", "xam hai tre em", "vu khi", "phao", "phat giao thong", "giay phep lai xe"]
 OBVIOUS_NONLEGAL = {"xin chao", "chao", "chao anh chi", "hello", "hi", "cam on", "cam on anh chi", "ok", "okay"}
 
 
