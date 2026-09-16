@@ -47,6 +47,17 @@ def _fernet() -> Fernet:
     secret = (
         os.getenv("FORM_LINK_SECRET", "").strip()
         or str(HISTORY_HMAC_SECRET or "").strip()
+        # Render services provision DATABASE_URL for the durable history store.
+        # Use it only as a last-resort instance-bound key so a missing optional
+        # form secret cannot silently bypass the form engine. Never fall back to
+        # a public or source-controlled constant.
+        or os.getenv("DATABASE_URL", "").strip()
+        # Older Render services may not yet have the Blueprint-managed history
+        # variables. Provider keys are already protected runtime secrets, so
+        # they keep the opt-in form path functional until the dedicated secret
+        # is provisioned; rotating the provider key invalidates old form links.
+        or os.getenv("GROQ_API_KEY", "").strip()
+        or os.getenv("OPENAI_API_KEY", "").strip()
     )
     if not secret:
         raise RuntimeError("form_link_secret_missing")

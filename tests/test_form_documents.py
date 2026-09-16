@@ -1,4 +1,5 @@
 import unittest
+import os
 from unittest.mock import patch
 
 from flask import Flask
@@ -23,6 +24,28 @@ class CitizenFormDocumentTests(unittest.TestCase):
         self.assertEqual(result["form_type"], "ct01")
         self.assertIn("/forms/download/", result["download_url"])
         self.assertTrue(result["download_url"].endswith("/ct01.docx"))
+
+    def test_blank_ct01_uses_instance_bound_database_key_when_form_secret_is_missing(self):
+        with patch.object(forms, "HISTORY_HMAC_SECRET", ""):
+            with patch.dict(os.environ, {"DATABASE_URL": "postgresql://runtime-secret"}, clear=False):
+                result = forms.handle_form_request(
+                    "u1", "Cho tôi in mẫu CT01 trống", history=[]
+                )
+        self.assertTrue(result["ready"])
+        self.assertIn("/forms/download/", result["download_url"])
+
+    def test_blank_ct01_uses_provider_secret_when_legacy_runtime_has_no_history_store(self):
+        with patch.object(forms, "HISTORY_HMAC_SECRET", ""):
+            with patch.dict(
+                os.environ,
+                {"FORM_LINK_SECRET": "", "DATABASE_URL": "", "GROQ_API_KEY": "gsk-runtime-secret"},
+                clear=False,
+            ):
+                result = forms.handle_form_request(
+                    "u1", "Cho tôi in mẫu CT01 trống", history=[]
+                )
+        self.assertTrue(result["ready"])
+        self.assertIn("/forms/download/", result["download_url"])
 
     def test_ct01_collects_only_supplied_fields_and_exports(self):
         history = [{
