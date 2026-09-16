@@ -24,10 +24,11 @@ class GoLiveGateTests(unittest.TestCase):
              patch.object(readiness, "ZALO_WEBHOOK_SIGNATURE_REQUIRED", True), \
              patch.object(readiness, "ZALO_APP_ID", "app"), \
              patch.object(readiness, "ZALO_OA_SECRET_KEY", "secret"), \
+             patch.object(readiness, "ZALO_APP_SECRET_KEY", ""), \
              patch.object(readiness, "ZALO_DIRECT_REPLY_ENABLED", False), \
              patch.object(readiness, "ZALO_OA_ACCESS_TOKEN", ""), \
              patch.object(readiness, "ZALO_OA_REFRESH_TOKEN", ""), \
-             patch.object(readiness, "ZALO_OAUTH_REFRESH_READY", False), \
+             patch.object(readiness, "zalo_refresh_token_available", return_value=False), \
              patch.object(readiness, "history_persistence_ready", return_value=False), \
              patch.object(readiness, "zalo_token_persistence_ready", return_value=False), \
              patch.object(readiness, "zalo_dispatch_persistence_ready", return_value=False):
@@ -54,10 +55,11 @@ class GoLiveGateTests(unittest.TestCase):
              patch.object(readiness, "ZALO_WEBHOOK_SIGNATURE_REQUIRED", True), \
              patch.object(readiness, "ZALO_APP_ID", "app"), \
              patch.object(readiness, "ZALO_OA_SECRET_KEY", "secret"), \
+             patch.object(readiness, "ZALO_APP_SECRET_KEY", "app-secret"), \
              patch.object(readiness, "ZALO_DIRECT_REPLY_ENABLED", True), \
              patch.object(readiness, "ZALO_OA_ACCESS_TOKEN", "access"), \
              patch.object(readiness, "ZALO_OA_REFRESH_TOKEN", "refresh"), \
-             patch.object(readiness, "ZALO_OAUTH_REFRESH_READY", True), \
+             patch.object(readiness, "zalo_refresh_token_available", return_value=True), \
              patch.object(readiness, "history_persistence_ready", return_value=True), \
              patch.object(readiness, "zalo_token_persistence_ready", return_value=True), \
              patch.object(readiness, "zalo_dispatch_persistence_ready", return_value=True):
@@ -67,6 +69,22 @@ class GoLiveGateTests(unittest.TestCase):
         self.assertTrue(body["ready_for_official_operation"])
         self.assertEqual(body["blockers"], [])
         self.assertTrue(all(body["checks"].values()))
+
+    def test_readiness_never_claims_end_to_end_when_token_store_is_unavailable(self):
+        client = self._client()
+        with patch.object(readiness, "ZALO_WEBHOOK_ENABLED", True), \
+             patch.object(readiness, "ZALO_APP_ID", "app"), \
+             patch.object(readiness, "ZALO_OA_SECRET_KEY", "webhook-secret"), \
+             patch.object(readiness, "ZALO_APP_SECRET_KEY", "oauth-secret"), \
+             patch.object(readiness, "ZALO_DIRECT_REPLY_ENABLED", True), \
+             patch.object(readiness, "ZALO_OA_ACCESS_TOKEN", "access"), \
+             patch.object(readiness, "ZALO_OA_REFRESH_TOKEN", "refresh"), \
+             patch.object(readiness, "zalo_refresh_token_available", return_value=True), \
+             patch.object(readiness, "zalo_token_persistence_ready", return_value=False), \
+             patch.object(readiness, "zalo_dispatch_persistence_ready", return_value=True):
+            body = client.get("/health/readiness").get_json()
+        self.assertTrue(body["zalo_direct_reply_ready"])
+        self.assertFalse(body["zalo_end_to_end_reply_ready"])
 
 
 if __name__ == "__main__":

@@ -15,13 +15,16 @@ from config import (
     ZALO_OA_SECRET_KEY,
     ZALO_OA_ACCESS_TOKEN,
     ZALO_OA_REFRESH_TOKEN,
-    ZALO_OAUTH_REFRESH_READY,
+    ZALO_APP_SECRET_KEY,
     ZALO_DIRECT_REPLY_ENABLED,
     ZALO_REPLY_MODE,
 )
 from core.history import persistence_ready as history_persistence_ready
 from core.zalo_jobs import operational_ready as zalo_dispatch_persistence_ready
-from core.zalo_token_store import operational_ready as zalo_token_persistence_ready
+from core.zalo_token_store import (
+    operational_ready as zalo_token_persistence_ready,
+    refresh_token_available as zalo_refresh_token_available,
+)
 
 
 blueprint = Blueprint("ai_core_readiness", __name__)
@@ -31,7 +34,10 @@ def _state():
     signature_secret_ready = bool(ZALO_OA_SECRET_KEY)
     signature_config_complete = bool(ZALO_APP_ID and ZALO_OA_SECRET_KEY)
     provider_ready = bool(GROQ_API_KEY or OPENAI_API_KEY)
-    direct_reply_ready = bool(ZALO_OA_ACCESS_TOKEN or ZALO_OAUTH_REFRESH_READY)
+    oauth_credentials_ready = bool(ZALO_APP_ID and ZALO_APP_SECRET_KEY)
+    durable_refresh_token_ready = bool(zalo_refresh_token_available(ZALO_OA_REFRESH_TOKEN))
+    oauth_refresh_ready = bool(oauth_credentials_ready and durable_refresh_token_ready)
+    direct_reply_ready = bool(ZALO_OA_ACCESS_TOKEN or oauth_refresh_ready)
     token_persistence = bool(zalo_token_persistence_ready())
     dispatch_persistence = bool(zalo_dispatch_persistence_ready())
     history_persistence = bool(history_persistence_ready())
@@ -40,6 +46,7 @@ def _state():
         and signature_secret_ready
         and ZALO_DIRECT_REPLY_ENABLED
         and direct_reply_ready
+        and token_persistence
         and dispatch_persistence
     )
     return {
@@ -60,8 +67,9 @@ def _state():
         "zalo_direct_reply_enabled": bool(ZALO_DIRECT_REPLY_ENABLED),
         "zalo_direct_reply_ready": direct_reply_ready,
         "zalo_access_token_present": bool(ZALO_OA_ACCESS_TOKEN),
-        "zalo_refresh_token_present": bool(ZALO_OA_REFRESH_TOKEN),
-        "zalo_oauth_refresh_ready": bool(ZALO_OAUTH_REFRESH_READY),
+        "zalo_refresh_token_present": durable_refresh_token_ready,
+        "zalo_oauth_credentials_ready": oauth_credentials_ready,
+        "zalo_oauth_refresh_ready": oauth_refresh_ready,
         "zalo_token_persistence_ready": token_persistence,
         "zalo_dispatch_persistence_ready": dispatch_persistence,
         "zalo_end_to_end_reply_ready": end_to_end_reply_ready,

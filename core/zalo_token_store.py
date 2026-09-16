@@ -101,6 +101,16 @@ def load_refresh_token(fallback=""):
         return fallback
 
 
+def refresh_token_available(fallback=""):
+    """Report token availability without returning a credential to callers."""
+    try:
+        return bool(load_refresh_token(fallback))
+    except Exception:
+        # Health endpoints must fail closed when Postgres or decryption is
+        # unavailable, while never exposing the underlying integration secret.
+        return False
+
+
 def save_refresh_token(token):
     token = str(token or "").strip()
     if not token or not _ensure_schema():

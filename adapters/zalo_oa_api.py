@@ -111,7 +111,6 @@ class ZaloOAClient:
             access_token = str(body.get("access_token") or "").strip()
             if not access_token:
                 raise ZaloOAReplyError("OA token refresh did not return an access token")
-            self.access_token = access_token
             rotated_refresh = str(body.get("refresh_token") or "").strip()
             if rotated_refresh:
                 if self.persist_refresh_token is not None:
@@ -123,8 +122,14 @@ class ZaloOAClient:
                         raise ZaloOAReplyError("OA rotated refresh token could not be persisted") from exc
                     if not persisted:
                         raise ZaloOAReplyError("OA rotated refresh token could not be persisted")
+            # Treat the OAuth response as one state transition.  If Zalo has
+            # rotated the refresh token, it must be durable before either
+            # credential becomes active in this process; otherwise a restart
+            # could retain only stale credentials.
+            self.access_token = access_token
+            if rotated_refresh:
                 self.refresh_token = rotated_refresh
-            return self.access_token
+            return access_token
 
     def _post_message(self, user_id, text, timeout):
         return self.session.post(

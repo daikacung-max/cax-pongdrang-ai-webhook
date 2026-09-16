@@ -72,6 +72,20 @@ class ZaloTokenRefreshTests(unittest.TestCase):
         )
         with self.assertRaises(ZaloOAReplyError):
             client.send_text("u", "x")
+        self.assertEqual(client.access_token, "")
+        self.assertEqual(client.refresh_token, "old-refresh")
+
+    def test_refresh_without_rotation_updates_only_access_token(self):
+        session = _Session([
+            _Response(200, {"access_token": "new-access"}),
+            _Response(200, {"error": 0}),
+        ])
+        client = ZaloOAClient(
+            "old-access", refresh_token="old-refresh", app_id="app", app_secret="secret",
+            session=session,
+        )
+        client._refresh_access_token()
+        self.assertEqual(client.access_token, "new-access")
         self.assertEqual(client.refresh_token, "old-refresh")
 
     def test_refreshes_and_retries_once_on_expired_access_token(self):
