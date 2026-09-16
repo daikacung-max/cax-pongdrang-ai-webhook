@@ -2,6 +2,7 @@ import threading
 import time
 import unittest
 import hashlib
+import json
 import app_core
 from unittest.mock import patch
 
@@ -123,6 +124,31 @@ class ZaloAdapterTests(unittest.TestCase):
                     headers={"X-ZEvent-Signature": "forged"},
                 )
         self.assertEqual(response.status_code, 401)
+
+    def test_signed_zalo_webhook_accepts_compact_json_signature(self):
+        payload = {
+            "app_id": "test-app",
+            "timestamp": "123",
+            "event_name": "user_send_text",
+            "sender": {"id": "user-1"},
+            "message": {"msg_id": "m-compact", "text": "Xin chào"},
+        }
+        compact_body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        delivered_body = json.dumps(payload, ensure_ascii=False, indent=2)
+        signature = hashlib.sha256(
+            f"test-app{compact_body}123test-secret".encode("utf-8")
+        ).hexdigest()
+        with patch("app.ZALO_WEBHOOK_SIGNATURE_REQUIRED", True), \
+             patch("app.ZALO_APP_ID", "test-app"), \
+             patch("app.ZALO_OA_SECRET_KEY", "test-secret"):
+            with app.test_client() as client:
+                response = client.post(
+                    "/zalo/webhook",
+                    data=delivered_body,
+                    content_type="application/json",
+                    headers={"X-ZEvent-Signature": signature},
+                )
+        self.assertEqual(response.status_code, 200)
 
     def test_empty_webhook_probe_is_acknowledged_without_bypassing_signed_events(self):
         with patch.object(app_core, "ZALO_WEBHOOK_ENABLED", True), \

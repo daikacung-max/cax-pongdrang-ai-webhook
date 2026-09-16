@@ -1,6 +1,7 @@
 """Stable WSGI entrypoint for CAX PƠNG DRANG AI CORE."""
 
 import hashlib
+import json
 import hmac
 import os
 import secrets
@@ -157,12 +158,33 @@ def _official_zalo_signature(data, raw_body):
         _app_core.app.logger.warning("zalo_webhook signature_reject reason=missing_signed_fields")
         return False
 
-    signed_value = f"{incoming_app_id}{raw_body}{timestamp}{secret}".encode("utf-8")
-    expected = hashlib.sha256(signed_value).hexdigest()
-    valid = hmac.compare_digest(supplied.lower(), expected)
+    # Zalo events are JSON.  Some webhook producers serialize that JSON in a
+    # compact form before signing, while intermediaries can preserve otherwise
+    # equivalent whitespace in the received body.  Accept only the received
+    # bytes or the equivalent compact JSON serialization.  Both checks still
+    # require knowledge of the OA secret.
+    payloads = [("raw", raw_body)]
+    try:
+        compact_body = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError):
+        compact_body = ""
+    if compact_body and compact_body != raw_body:
+        payloads.append(("compact_json", compact_body))
+
+    signature_variant = ""
+    for variant, payload in payloads:
+        signed_value = f"{incoming_app_id}{payload}{timestamp}{secret}".encode("utf-8")
+        expected = hashlib.sha256(signed_value).hexdigest()
+        if hmac.compare_digest(supplied.lower(), expected):
+            signature_variant = variant
+            break
+    valid = bool(signature_variant)
     if not valid:
         _app_core.app.logger.warning("zalo_webhook signature_reject reason=digest_mismatch")
         return False
+
+    if signature_variant != "raw":
+        _app_core.app.logger.info("zalo_webhook signature_valid variant=%s", signature_variant)
 
     configured_app_id = str(_app_core.ZALO_APP_ID or "").strip()
     if configured_app_id and not hmac.compare_digest(incoming_app_id, configured_app_id):
