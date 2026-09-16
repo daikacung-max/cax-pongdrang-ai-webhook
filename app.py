@@ -181,6 +181,14 @@ def _hardened_zalo_webhook():
         return _original_zalo_webhook()
 
     raw_body = _app_core.request.get_data(cache=True, as_text=True)
+    # Zalo Developers verifies a webhook URL with an empty POST before it
+    # begins delivering signed OA events.  There is no user payload to trust
+    # or process in that probe, so acknowledge it immediately while keeping
+    # signature verification mandatory for every non-empty webhook event.
+    if not raw_body.strip():
+        _app_core._log_zalo_webhook("verification_probe", "")
+        return _app_core.jsonify({"success": True, "status": "verification_probe"}), 200
+
     data = _app_core.request.get_json(silent=True) or {}
     event_name = str(data.get("event_name") or "").strip()
 

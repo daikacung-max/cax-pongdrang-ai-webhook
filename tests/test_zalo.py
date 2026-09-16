@@ -2,6 +2,7 @@ import threading
 import time
 import unittest
 import hashlib
+import app_core
 from unittest.mock import patch
 
 from adapters.zalo import PendingZaloMessages
@@ -122,6 +123,15 @@ class ZaloAdapterTests(unittest.TestCase):
                     headers={"X-ZEvent-Signature": "forged"},
                 )
         self.assertEqual(response.status_code, 401)
+
+    def test_empty_webhook_probe_is_acknowledged_without_bypassing_signed_events(self):
+        with patch.object(app_core, "ZALO_WEBHOOK_ENABLED", True), \
+             patch.object(app_core, "ZALO_WEBHOOK_SIGNATURE_REQUIRED", True):
+            with app.test_client() as client:
+                response = client.post("/zalo/webhook", data="", content_type="application/json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["status"], "verification_probe")
 
 
 if __name__ == "__main__":
