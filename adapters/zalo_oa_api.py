@@ -1,5 +1,6 @@
 """Fail-closed Zalo OA customer-service client with durable-capable token refresh."""
 
+import re
 import threading
 import requests
 
@@ -67,6 +68,19 @@ class ZaloOAClient:
     endpoint = "https://openapi.zalo.me/v3.0/oa/message/cs"
     token_endpoint = "https://oauth.zaloapp.com/v4/oa/access_token"
     INVALID_ACCESS_TOKEN_ERRORS = {-124, "-124"}
+
+    @staticmethod
+    def _provider_error_reason(error):
+        """Return an auditable error category without exposing provider text.
+
+        Zalo's numeric ``error`` code is safe operational metadata.  Any
+        unrecognised value intentionally collapses to a generic category so a
+        provider message cannot enter application logs.
+        """
+        value = str(error).strip()
+        if re.fullmatch(r"-?\d{1,8}", value):
+            return f"reply_api_error_{value}"
+        return "reply_api_error"
 
     def __init__(
         self,
@@ -225,7 +239,10 @@ class ZaloOAClient:
             body = self._json_body(response)
 
         if body.get("error", 0) not in (0, "0", None):
-            raise ZaloOAReplyError("OA reply API returned an error", "reply_api_error")
+            raise ZaloOAReplyError(
+                "OA reply API returned an error",
+                self._provider_error_reason(body.get("error")),
+            )
         return True
 
     def send_text(self, user_id, text, timeout=2.0):

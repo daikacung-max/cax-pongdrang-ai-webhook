@@ -36,6 +36,26 @@ class ZaloOAApiTests(unittest.TestCase):
         with self.assertRaises(ZaloOAReplyError):
             ZaloOAClient("").send_text("synthetic-user", "Xin chào")
 
+    def test_numeric_provider_error_is_safe_to_classify(self):
+        class RejectedResponse:
+            status_code = 200
+
+            @staticmethod
+            def json():
+                return {"error": -201, "message": "provider-only detail"}
+
+        class RejectedSession:
+            @staticmethod
+            def post(*_args, **_kwargs):
+                return RejectedResponse()
+
+        with self.assertRaises(ZaloOAReplyError) as raised:
+            ZaloOAClient("synthetic-access-token", session=RejectedSession()).send_text(
+                "synthetic-user", "Xin chào"
+            )
+
+        self.assertEqual(raised.exception.reason, "reply_api_error_-201")
+
 
 if __name__ == "__main__":
     unittest.main()
