@@ -45,6 +45,18 @@ def _dynamic_answer_is_weak(question, answer, legal_units):
     q = norm(question)
     a = norm(answer)
 
+    # A current administrative procedure must not be replaced by an older
+    # conversation topic.  This is especially important on OA, where a person
+    # can switch from an identity-card question to temporary residence in one
+    # short, typo-prone message.  A bare clarification about căn cước contains
+    # no unsafe legal claim, so source verification alone would otherwise let
+    # it pass even when the retrieved source is explicitly about tạm trú.
+    if "tam tru" in q and any(
+        str(unit.get("document_id") or "").startswith(("RESIDENCE_", "TTHC_TEMP_RESIDENCE_"))
+        for unit in legal_units
+    ) and "tam tru" not in a:
+        return True
+
     if any(str(x.get("article") or "") == "134" for x in legal_units):
         # Dữ kiện mới ở chuỗi hành hung phải được nhắc đúng; nếu không, dùng câu
         # fallback đã bám nguồn thay vì hỏi lại một thông tin vừa được người dân nêu.

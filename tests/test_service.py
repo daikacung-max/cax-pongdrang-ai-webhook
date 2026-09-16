@@ -28,6 +28,24 @@ class DynamicServiceTests(unittest.TestCase):
         self.assertEqual(result["_telemetry"]["fallback_reason"], "weak_answer")
         self.assertIn("5%", result["answer"])
 
+    def test_temporary_residence_current_topic_cannot_fall_back_to_stale_identity_topic(self):
+        user_id = "service-test-" + uuid.uuid4().hex
+        with patch(
+            "core.service.answer_dynamic_text",
+            return_value=(
+                "Chào anh/chị, anh/chị muốn đăng ký thẻ căn cước mới, "
+                "đổi thẻ hiện có, hay điều chỉnh thông tin trên thẻ?"
+            ),
+        ):
+            result = core.chat(user_id, "Tôi đăg ký tạm trú", dynamic=True)
+
+        self.assertEqual(result["_telemetry"]["fallback_reason"], "weak_answer")
+        self.assertIn("tạm trú", result["answer"].lower())
+        self.assertTrue(any(
+            unit_id.startswith("RESIDENCE_CURRENT_2026:temporary")
+            for unit_id in result["meta"]["retrieved_unit_ids"]
+        ))
+
     def test_full_core_provider_error_returns_grounded_fallback(self):
         user_id = "service-test-" + uuid.uuid4().hex
         with patch("core.service.generate_answer", side_effect=LLMError("provider rejected")):
