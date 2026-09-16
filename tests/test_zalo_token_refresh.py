@@ -114,6 +114,17 @@ class ZaloTokenRefreshTests(unittest.TestCase):
         self.assertEqual(client.access_token, "old-access")
         self.assertEqual(client.refresh_token, "old-refresh")
 
+    def test_refresh_rejection_has_a_safe_operational_reason(self):
+        client = ZaloOAClient(
+            "", refresh_token="refresh-1", app_id="app-1", app_secret="secret-1",
+            session=_Session([_Response(401, {})]),
+        )
+
+        with self.assertRaises(ZaloOAReplyError) as raised:
+            client.send_text("user-1", "Xin chào")
+
+        self.assertEqual(raised.exception.reason, "token_refresh_rejected")
+
     def test_refreshes_and_retries_once_on_expired_access_token(self):
         session = _Session([
             _Response(401, {}),

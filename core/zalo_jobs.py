@@ -276,9 +276,15 @@ def start_worker(reply_func, logger=None, poll_seconds=0.5):
                     reply_func(job["user_id"], job["text"])
                     _complete(job["id"])
                 except Exception as exc:
-                    _retry(job["id"], job["attempts"], type(exc).__name__)
+                    error_type = type(exc).__name__
+                    error_reason = str(getattr(exc, "reason", "unknown"))[:80]
+                    _retry(job["id"], job["attempts"], error_type)
                     if logger:
-                        logger.error("zalo_dispatch failed type=%s", type(exc).__name__)
+                        logger.error(
+                            "zalo_dispatch failed type=%s reason=%s",
+                            error_type,
+                            error_reason,
+                        )
             except Exception as exc:
                 if logger:
                     logger.error("zalo_dispatch loop_error type=%s", type(exc).__name__)
