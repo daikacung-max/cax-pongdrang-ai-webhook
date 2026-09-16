@@ -4,7 +4,7 @@ import unittest
 import hashlib
 import json
 import app_core
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 from adapters.zalo import PendingZaloMessages
 from app import app, split_zalo_messages
@@ -73,6 +73,50 @@ class ZaloAdapterTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         pop.assert_called_once_with(user_id="user-1")
+
+    def test_dynamic_question_query_uses_ai_without_webhook_pending_message(self):
+        with patch("app.ZALO_WEBHOOK_ENABLED", True), \
+             patch("app.pending.pop") as pop, \
+             patch("app.core.chat", return_value={
+                 "answer": "Anh/chị có thể đăng ký tạm trú trên VNeID.",
+                 "_telemetry": {},
+             }) as chat:
+            with app.test_client() as client:
+                response = client.get(
+                    "/zalo/ai?uid=chatbot-user-1&q=T%C3%B4i%20c%E1%BA%A7n%20%C4%91%C4%83ng%20k%C3%BD%20t%E1%BA%A1m%20tr%C3%BA"
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("đăng ký tạm trú", response.get_json()["content"]["messages"][0]["text"])
+        chat.assert_called_once_with(
+            "chatbot-user-1", "Tôi cần đăng ký tạm trú", dynamic=True, trace_id=ANY
+        )
+        pop.assert_not_called()
+
+    def test_dynamic_question_json_input_uses_ai_without_webhook_pending_message(self):
+        with patch("app.ZALO_WEBHOOK_ENABLED", True), \
+             patch("app.pending.pop") as pop, \
+             patch("app.core.chat", return_value={"answer": "Đã tiếp nhận câu hỏi.", "_telemetry": {}}) as chat:
+            with app.test_client() as client:
+                response = client.post("/zalo/ai", json={
+                    "user": {"id": "chatbot-user-2"},
+                    "question": {"value": "Tôi muốn làm căn cước"},
+                })
+
+        self.assertEqual(response.status_code, 200)
+        chat.assert_called_once_with(
+            "chatbot-user-2", "Tôi muốn làm căn cước", dynamic=True, trace_id=ANY
+        )
+        pop.assert_not_called()
+
+    def test_dynamic_ignores_unexpanded_question_placeholder(self):
+        with patch("app.ZALO_WEBHOOK_ENABLED", True), patch("app.pending.pop", return_value=None) as pop:
+            with app.test_client() as client:
+                response = client.get("/zalo/ai?uid=chatbot-user-3&q=((citizen_question))")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Nhập liệu", response.get_json()["content"]["messages"][0]["text"])
+        pop.assert_called_once_with(user_id="chatbot-user-3")
 
     def test_health_and_article_134(self):
         with app.test_client() as client:

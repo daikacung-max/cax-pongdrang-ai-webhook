@@ -197,18 +197,18 @@ def _valid_zalo_webhook_signature(data, raw_body):
     return hmac.compare_digest(supplied.lower(), expected)
 
 
-def _zalo_dynamic_uid():
-    """Read only a user identifier from common Dynamic-action envelopes.
+def _zalo_dynamic_payload():
+    """Return a mapping only when the Dynamic request contains a JSON object."""
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
 
-    Dynamic must never consume an unscoped pending message: that could pair one
-    person's question with another person's reply.  We deliberately do not
-    accept message text here; the signed webhook remains the sole message
-    source.
-    """
-    data = request.get_json(silent=True) or {}
-    sender = data.get("sender") or {}
-    user = data.get("user") or {}
-    nested = data.get("data") or {}
+
+def _zalo_dynamic_uid(data=None):
+    """Read a user identifier from common Zalo Chatbot Dynamic envelopes."""
+    data = data if isinstance(data, dict) else _zalo_dynamic_payload()
+    sender = data.get("sender") if isinstance(data.get("sender"), dict) else {}
+    user = data.get("user") if isinstance(data.get("user"), dict) else {}
+    nested = data.get("data") if isinstance(data.get("data"), dict) else {}
     candidates = (
         request.args.get("uid"),
         request.args.get("user_id"),
@@ -224,6 +224,50 @@ def _zalo_dynamic_uid():
         value = str(value or "").strip()
         if value:
             return value
+    return ""
+
+
+def _zalo_dynamic_text(data=None):
+    """Read text supplied by a Zalo Chatbot Question step.
+
+    The built-in Chatbot can invoke a Dynamic API without OA OpenAPI access.
+    The configured Question step can pass the user's reply in the ``q`` URL
+    parameter or in the Dynamic request body. Keep this adapter independent
+    from that UI detail while accepting only a bounded, explicitly named value.
+    This is separate from the signed OA webhook path, which remains the source
+    of direct-reply events when that product capability is enabled.
+    """
+    data = data if isinstance(data, dict) else _zalo_dynamic_payload()
+    nested = data.get("data") or {}
+    message = data.get("message") or {}
+    question = data.get("question") or {}
+    candidates = (
+        request.args.get("q"),
+        request.args.get("question"),
+        request.args.get("text"),
+        request.args.get("message"),
+        data.get("q"),
+        data.get("question"),
+        data.get("text"),
+        data.get("input"),
+        nested.get("q") if isinstance(nested, dict) else None,
+        nested.get("question") if isinstance(nested, dict) else None,
+        nested.get("text") if isinstance(nested, dict) else None,
+        nested.get("input") if isinstance(nested, dict) else None,
+        message.get("text") if isinstance(message, dict) else None,
+        question.get("text") if isinstance(question, dict) else None,
+        question.get("value") if isinstance(question, dict) else None,
+    )
+    for value in candidates:
+        if isinstance(value, dict):
+            value = value.get("text") or value.get("value") or value.get("content")
+        text = str(value or "").strip()
+        # An unexpanded Chatbot variable must never be mistaken for a citizen's
+        # question. It indicates an incomplete flow configuration.
+        if text.startswith("((") and text.endswith("))"):
+            continue
+        if text:
+            return text[:1500]
     return ""
 
 
@@ -403,7 +447,9 @@ def zalo_dynamic():
         return dynamic_response("Trợ lý AI đang ở chế độ pilot nội bộ, chưa nhận tin nhắn Zalo công khai.")
     request_started = time.perf_counter()
     trace_id = new_trace_id()
-    uid = _zalo_dynamic_uid()
+    dynamic_data = _zalo_dynamic_payload()
+    uid = _zalo_dynamic_uid(dynamic_data)
+    dynamic_text = _zalo_dynamic_text(dynamic_data)
     if not uid:
         log_zalo_latency(app.logger, {
             "trace_id": trace_id,
@@ -416,9 +462,17 @@ def zalo_dynamic():
         return dynamic_response(
             "Phiên trò chuyện chưa được liên kết. Anh/chị vui lòng gửi lại tin nhắn qua OA."
         )
-    pending_started = time.perf_counter()
-    item = pending.pop(user_id=uid)
-    pending_wait_ms = round((time.perf_counter() - pending_started) * 1000, 2)
+
+    # Free Zalo Chatbot Dynamic can pass the answer collected by its Question
+    # step straight to this endpoint. Prefer that scoped input; retain the
+    # pending signed-webhook path for OA API direct-reply deployments.
+    if dynamic_text:
+        item = {"user_id": uid, "text": dynamic_text}
+        pending_wait_ms = 0.0
+    else:
+        pending_started = time.perf_counter()
+        item = pending.pop(user_id=uid)
+        pending_wait_ms = round((time.perf_counter() - pending_started) * 1000, 2)
     if not item:
         log_zalo_latency(app.logger, {
             "trace_id": trace_id,
@@ -428,7 +482,9 @@ def zalo_dynamic():
             "model_used": DYNAMIC_ANSWER_MODEL,
             "retrieved_unit_count": 0,
         })
-        return dynamic_response("Anh/chị vui lòng nhập câu hỏi cần hỗ trợ.")
+        return dynamic_response(
+            "Anh/chị hãy nhập câu hỏi vào bước 'Nhập liệu' để Trợ lý AI hỗ trợ."
+        )
     try:
         result = core.chat(item["user_id"], item["text"], dynamic=True, trace_id=trace_id)
         telemetry = result.pop("_telemetry", {})
