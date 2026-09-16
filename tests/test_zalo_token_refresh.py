@@ -88,6 +88,32 @@ class ZaloTokenRefreshTests(unittest.TestCase):
         self.assertEqual(client.access_token, "new-access")
         self.assertEqual(client.refresh_token, "old-refresh")
 
+    def test_authorization_code_bootstrap_persists_refresh_before_runtime_state(self):
+        saved = []
+        session = _Session([
+            _Response(200, {"access_token": "new-access", "refresh_token": "new-refresh"}),
+        ])
+        client = ZaloOAClient(
+            "old-access", refresh_token="old-refresh", app_id="app", app_secret="secret",
+            session=session, persist_refresh_token=lambda value: saved.append(value) or True,
+        )
+        self.assertEqual(client.bootstrap_from_authorization_code("one-time-code"), "new-access")
+        self.assertEqual(saved, ["new-refresh"])
+        self.assertEqual(client.access_token, "new-access")
+        self.assertEqual(client.refresh_token, "new-refresh")
+        self.assertEqual(session.calls[0][1]["data"]["grant_type"], "authorization_code")
+
+    def test_authorization_code_bootstrap_fails_closed_without_refresh_token(self):
+        session = _Session([_Response(200, {"access_token": "new-access"})])
+        client = ZaloOAClient(
+            "old-access", refresh_token="old-refresh", app_id="app", app_secret="secret",
+            session=session,
+        )
+        with self.assertRaises(ZaloOAReplyError):
+            client.bootstrap_from_authorization_code("one-time-code")
+        self.assertEqual(client.access_token, "old-access")
+        self.assertEqual(client.refresh_token, "old-refresh")
+
     def test_refreshes_and_retries_once_on_expired_access_token(self):
         session = _Session([
             _Response(401, {}),

@@ -108,28 +108,57 @@ class ZaloOAClient:
                 body = response.json()
             except Exception as exc:
                 raise ZaloOAReplyError("OA token refresh returned invalid JSON") from exc
-            access_token = str(body.get("access_token") or "").strip()
-            if not access_token:
-                raise ZaloOAReplyError("OA token refresh did not return an access token")
-            rotated_refresh = str(body.get("refresh_token") or "").strip()
-            if rotated_refresh:
-                if self.persist_refresh_token is not None:
-                    try:
-                        persisted = bool(self.persist_refresh_token(rotated_refresh))
-                    except Exception as exc:
-                        # Once Zalo has rotated the token, silently losing the new
-                        # value can strand production after restart. Fail closed.
-                        raise ZaloOAReplyError("OA rotated refresh token could not be persisted") from exc
-                    if not persisted:
-                        raise ZaloOAReplyError("OA rotated refresh token could not be persisted")
-            # Treat the OAuth response as one state transition.  If Zalo has
-            # rotated the refresh token, it must be durable before either
-            # credential becomes active in this process; otherwise a restart
-            # could retain only stale credentials.
-            self.access_token = access_token
-            if rotated_refresh:
-                self.refresh_token = rotated_refresh
-            return access_token
+            return self._accept_token_response(body, require_refresh=False)
+
+    def _accept_token_response(self, body, require_refresh):
+        """Durably apply an OAuth response without exposing token values."""
+        access_token = str((body or {}).get("access_token") or "").strip()
+        refresh_token = str((body or {}).get("refresh_token") or "").strip()
+        if not access_token:
+            raise ZaloOAReplyError("OA token response did not return an access token")
+        if require_refresh and not refresh_token:
+            raise ZaloOAReplyError("OA authorization did not return a refresh token")
+        if refresh_token and self.persist_refresh_token is not None:
+            try:
+                persisted = bool(self.persist_refresh_token(refresh_token))
+            except Exception as exc:
+                raise ZaloOAReplyError("OA rotated refresh token could not be persisted") from exc
+            if not persisted:
+                raise ZaloOAReplyError("OA rotated refresh token could not be persisted")
+        # Treat the OAuth response as one state transition.  If Zalo has
+        # rotated the refresh token, it must be durable before either
+        # credential becomes active in this process; otherwise a restart
+        # could retain only stale credentials.
+        self.access_token = access_token
+        if refresh_token:
+            self.refresh_token = refresh_token
+        return access_token
+
+    def bootstrap_from_authorization_code(self, code, timeout=5.0):
+        """Exchange a one-time OA authorization code for durable OAuth state."""
+        code = str(code or "").strip()
+        if not code or not self.app_id or not self.app_secret:
+            raise ZaloOAReplyError("OA authorization code exchange is not configured")
+        response = self.session.post(
+            self.token_endpoint,
+            headers={
+                "secret_key": self.app_secret,
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            data={
+                "code": code,
+                "app_id": self.app_id,
+                "grant_type": "authorization_code",
+            },
+            timeout=timeout,
+        )
+        if response.status_code != 200:
+            raise ZaloOAReplyError("OA authorization-code exchange was rejected")
+        try:
+            body = response.json()
+        except Exception as exc:
+            raise ZaloOAReplyError("OA authorization-code exchange returned invalid JSON") from exc
+        return self._accept_token_response(body, require_refresh=True)
 
     def _post_message(self, user_id, text, timeout):
         return self.session.post(

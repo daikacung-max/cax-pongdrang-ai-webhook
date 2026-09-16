@@ -3,8 +3,12 @@
 import hashlib
 import hmac
 import os
+import secrets
 import sys
+import time
+from urllib.parse import urlencode
 
+from flask import redirect
 import app_core as _app_core
 import core.service as _service_module
 from adapters.vbee_tts import blueprint as vbee_blueprint
@@ -20,6 +24,7 @@ from config import (
     ZALO_APP_SECRET_KEY,
     ZALO_OA_ACCESS_TOKEN,
     ZALO_OA_REFRESH_TOKEN,
+    ZALO_OAUTH_CALLBACK_URL,
 )
 from core import db as _form_db
 from core.artifact_planner import enrich_plan as enrich_artifact_plan
@@ -240,6 +245,60 @@ _app_core.zalo_oa_client = ZaloOAClient(
     app_secret=ZALO_APP_SECRET_KEY,
     persist_refresh_token=save_refresh_token if _durable_token_store else None,
 )
+
+
+_OAUTH_STATE_TTL_SECONDS = 600
+
+
+def _oauth_state(timestamp=None, nonce=None):
+    """Make a short-lived signed state without keeping OAuth state in memory."""
+    timestamp = int(timestamp or time.time())
+    nonce = str(nonce or secrets.token_urlsafe(18))
+    payload = f"{timestamp}.{nonce}"
+    signature = hmac.new(
+        ZALO_APP_SECRET_KEY.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+    return f"{payload}.{signature}"
+
+
+def _valid_oauth_state(value):
+    try:
+        timestamp, nonce, supplied = str(value or "").split(".", 2)
+        issued_at = int(timestamp)
+    except (TypeError, ValueError):
+        return False
+    if not nonce or abs(time.time() - issued_at) > _OAUTH_STATE_TTL_SECONDS:
+        return False
+    expected = _oauth_state(timestamp=issued_at, nonce=nonce).rsplit(".", 1)[1]
+    return hmac.compare_digest(str(supplied), expected)
+
+
+@_app_core.app.get("/zalo/oauth/start")
+def zalo_oauth_start():
+    """Begin OA authorization without placing tokens in URLs or logs."""
+    if not (ZALO_APP_ID and ZALO_APP_SECRET_KEY and ZALO_OAUTH_CALLBACK_URL):
+        return _app_core.jsonify({"success": False, "reason": "oauth_not_configured"}), 503
+    query = urlencode({
+        "app_id": ZALO_APP_ID,
+        "redirect_uri": ZALO_OAUTH_CALLBACK_URL,
+        "state": _oauth_state(),
+    })
+    return redirect(f"https://oauth.zaloapp.com/v4/oa/permission?{query}")
+
+
+@_app_core.app.get("/zalo/oauth/callback")
+def zalo_oauth_callback():
+    """Exchange a Zalo OA authorization code and persist only encrypted state."""
+    code = str(_app_core.request.args.get("code") or "").strip()
+    state = str(_app_core.request.args.get("state") or "").strip()
+    if not code or not _valid_oauth_state(state):
+        return _app_core.jsonify({"success": False, "reason": "oauth_callback_rejected"}), 400
+    try:
+        _app_core.zalo_oa_client.bootstrap_from_authorization_code(code)
+    except Exception as exc:
+        _app_core.app.logger.warning("zalo_oauth bootstrap_failed type=%s", type(exc).__name__)
+        return _app_core.jsonify({"success": False, "reason": "oauth_exchange_failed"}), 502
+    return _app_core.jsonify({"success": True, "status": "oauth_authorized"}), 200
 
 
 def _resilient_direct_zalo_reply(user_id, text, trace_id):

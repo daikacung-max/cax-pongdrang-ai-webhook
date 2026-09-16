@@ -16,6 +16,7 @@ from config import (
     ZALO_OA_ACCESS_TOKEN,
     ZALO_OA_REFRESH_TOKEN,
     ZALO_APP_SECRET_KEY,
+    ZALO_OAUTH_CALLBACK_URL,
     ZALO_DIRECT_REPLY_ENABLED,
     ZALO_REPLY_MODE,
 )
@@ -35,6 +36,7 @@ def _state():
     signature_config_complete = bool(ZALO_APP_ID and ZALO_OA_SECRET_KEY)
     provider_ready = bool(GROQ_API_KEY or OPENAI_API_KEY)
     oauth_credentials_ready = bool(ZALO_APP_ID and ZALO_APP_SECRET_KEY)
+    oauth_callback_ready = bool(ZALO_OAUTH_CALLBACK_URL)
     durable_refresh_token_ready = bool(zalo_refresh_token_available(ZALO_OA_REFRESH_TOKEN))
     oauth_refresh_ready = bool(oauth_credentials_ready and durable_refresh_token_ready)
     direct_reply_ready = bool(ZALO_OA_ACCESS_TOKEN or oauth_refresh_ready)
@@ -69,6 +71,7 @@ def _state():
         "zalo_access_token_present": bool(ZALO_OA_ACCESS_TOKEN),
         "zalo_refresh_token_present": durable_refresh_token_ready,
         "zalo_oauth_credentials_ready": oauth_credentials_ready,
+        "zalo_oauth_callback_ready": oauth_callback_ready,
         "zalo_oauth_refresh_ready": oauth_refresh_ready,
         "zalo_token_persistence_ready": token_persistence,
         "zalo_dispatch_persistence_ready": dispatch_persistence,
@@ -94,6 +97,7 @@ def go_live():
         "zalo_signature": state["zalo_signature_required"] and state["zalo_signature_ready"],
         "zalo_direct_reply": state["zalo_direct_reply_enabled"] and state["zalo_direct_reply_ready"],
         "zalo_oauth_refresh": state["zalo_oauth_refresh_ready"],
+        "zalo_oauth_callback": state["zalo_oauth_callback_ready"],
         "zalo_refresh_persistence": state["zalo_token_persistence_ready"],
         "zalo_durable_dispatch": state["zalo_dispatch_persistence_ready"],
         "public_demo_disabled": not state["demo_console_enabled"],

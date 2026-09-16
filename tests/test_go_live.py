@@ -25,6 +25,7 @@ class GoLiveGateTests(unittest.TestCase):
              patch.object(readiness, "ZALO_APP_ID", "app"), \
              patch.object(readiness, "ZALO_OA_SECRET_KEY", "secret"), \
              patch.object(readiness, "ZALO_APP_SECRET_KEY", ""), \
+             patch.object(readiness, "ZALO_OAUTH_CALLBACK_URL", ""), \
              patch.object(readiness, "ZALO_DIRECT_REPLY_ENABLED", False), \
              patch.object(readiness, "ZALO_OA_ACCESS_TOKEN", ""), \
              patch.object(readiness, "ZALO_OA_REFRESH_TOKEN", ""), \
@@ -56,6 +57,7 @@ class GoLiveGateTests(unittest.TestCase):
              patch.object(readiness, "ZALO_APP_ID", "app"), \
              patch.object(readiness, "ZALO_OA_SECRET_KEY", "secret"), \
              patch.object(readiness, "ZALO_APP_SECRET_KEY", "app-secret"), \
+             patch.object(readiness, "ZALO_OAUTH_CALLBACK_URL", "https://example.test/zalo/oauth/callback"), \
              patch.object(readiness, "ZALO_DIRECT_REPLY_ENABLED", True), \
              patch.object(readiness, "ZALO_OA_ACCESS_TOKEN", "access"), \
              patch.object(readiness, "ZALO_OA_REFRESH_TOKEN", "refresh"), \
