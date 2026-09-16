@@ -6,6 +6,7 @@ provider timeout can never resurrect superseded guidance.
 """
 
 import re
+import unicodedata
 
 from core.verifier import grounded_dynamic_fallback as legacy_grounded_fallback, norm
 
@@ -20,6 +21,7 @@ def _has_unit(units, unit_id):
 
 def _citizen_norm(question):
     q = norm(question)
+    q = "".join(c for c in unicodedata.normalize("NFD", q) if unicodedata.category(c) != "Mn")
     q = q.replace("dang ki", "dang ky")
     q = q.replace("lam lai can cuoc", "cap lai can cuoc")
     q = q.replace("lam lai cccd", "cap lai cccd")
@@ -101,7 +103,24 @@ def grounded_dynamic_fallback(question, retrieved_units):
             )
 
     if _has(retrieved_units, "VEHICLE_CURRENT_2026"):
+        if "sang ten" in q and _has(retrieved_units, "VEHICLE_TRANSFER_LOCAL_2026"):
+            return (
+                "Sang tên xe thực hiện tại Công an cấp xã được phân cấp đăng ký xe, nên cần xác nhận điểm tiếp nhận cụ thể tại địa phương. "
+                "Chủ xe đang đứng tên làm thủ tục thu hồi trước, sau đó người nhận chuyển nhượng đăng ký sang tên; hồ sơ gồm giấy khai đăng ký xe, giấy tờ của chủ xe, chứng từ chuyển quyền sở hữu, chứng từ lệ phí trước bạ và chứng nhận thu hồi. "
+                "Hai bước cấp chứng nhận không quá 02 ngày làm việc khi hồ sơ hợp lệ. Anh/chị là người đang đứng tên xe hay người nhận chuyển nhượng?"
+            )
         first_registration = any(x in q for x in ["mua xe moi", "lan dau", "xe may moi", "xe moi"])
+        # The current first-registration route may be selected from a form or
+        # document question (for example, "ĐKX10 dùng khi nào?"). In that
+        # case the retrieved first-registration unit is the authoritative
+        # intent signal even when the question does not repeat "xe mới".
+        first_registration = first_registration or (
+            (
+                _has_unit(retrieved_units, "VEHICLE_CURRENT_2026:first_domestic_online")
+                or _has_unit(retrieved_units, "VEHICLE_REGISTRATION_2026:first_registration_documents")
+            )
+            and any(x in q for x in ["dkx10", "giay khai dang ky xe"])
+        )
         if first_registration:
             form_note = (
                 "Giấy khai đăng ký xe mẫu ĐKX10 là thành phần hồ sơ đăng ký lần đầu theo nguồn thủ tục hiện hành. "

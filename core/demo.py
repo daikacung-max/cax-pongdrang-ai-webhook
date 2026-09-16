@@ -11,6 +11,25 @@ from core.current_fallback import grounded_dynamic_fallback
 
 def _no_source_answer(intake, question=""):
     question_norm = str(question or "").casefold()
+
+    if question_norm.strip() in {"xin chào", "chào", "hello", "hi"}:
+        return "Xin chào! Tôi là Trợ lý AI của Công an xã Pơng Drang, tỉnh Đắk Lắk. Anh/chị cần tôi hỗ trợ nội dung gì?"
+
+    # Keep deterministic demo routing ahead of the generic clarification
+    # helper. These branches carry the demo's established UX contract.
+    if intake.get("procedure_code") == "lost_document":
+        return (
+            "Tôi đã ghi nhận anh/chị bị mất thẻ Căn cước, giấy tờ hoặc tài sản. "
+            "Kho dữ liệu demo chưa có nguồn thủ tục cấp lại đã được kiểm chứng cho đúng trường hợp, "
+            "nên tôi chưa thể khẳng định giấy tờ, thời hạn hoặc điểm tiếp nhận."
+        )
+    if intake.get("procedure_code") == "unclassified" and ("đăng ký" in question_norm or "dang ky" in question_norm):
+        return (
+            "Anh/chị muốn đăng ký nội dung nào: tạm trú, thường trú, xe máy mới, "
+            "sang tên xe hay VNeID? Mỗi trường hợp có giấy tờ khác nhau; anh/chị cho biết "
+            "đúng nội dung cần đăng ký để tôi hướng dẫn chính xác."
+        )
+
     topical_reply = clarification_for_unverified_topic(question)
     if topical_reply:
         return topical_reply
@@ -24,12 +43,6 @@ def _no_source_answer(intake, question=""):
         return (
             "Anh/chị cần tôi hỗ trợ nội dung nào: căn cước, VNeID, cư trú, đăng ký xe, "
             "trình báo hoặc tố giác?"
-        )
-    if intake.get("procedure_code") == "lost_document":
-        return (
-            "Tôi đã ghi nhận anh/chị bị mất thẻ Căn cước, giấy tờ hoặc tài sản. "
-            "Kho dữ liệu demo chưa có nguồn thủ tục cấp lại đã được kiểm chứng cho đúng trường hợp, "
-            "nên tôi chưa thể khẳng định giấy tờ, thời hạn hoặc điểm tiếp nhận."
         )
     if intake.get("procedure_code") == "crime_report":
         return (

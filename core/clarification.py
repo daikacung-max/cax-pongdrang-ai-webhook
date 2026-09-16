@@ -38,7 +38,7 @@ TOPIC_CLARIFICATIONS = (
     (("ly lich tu phap", "phieu tu phap"),
      "Tôi có thể hỗ trợ xác định đúng việc cần làm. Anh/chị đang muốn xin Phiếu lý lịch tư pháp, tra cứu tình trạng hồ sơ hay hỏi nơi thực hiện?"),
     (("khieu nai", "to cao", "don thu", "phan anh kien nghi"),
-     "Anh/chị có thể trình bày ngắn gọn sự việc, người/cơ quan liên quan, thời gian, địa điểm và điều anh/chị đề nghị giải quyết. Nếu muốn, tôi có thể giúp sắp xếp nội dung thành đơn phản ánh, khiếu nại hoặc tố cáo theo thông tin anh/chị cung cấp mà không tự thêm tình tiết."),
+     "Anh/chị có thể trình bày ngắn gọn sự việc, người/cơ quan liên quan, thời gian, địa điểm và điều anh/chị đề nghị giải quyết để xác định đây là khiếu nại, tố cáo hoặc phản ánh. Nếu liên quan cá nhân, cơ quan hay cán bộ, tôi có thể giúp sắp xếp nội dung theo thông tin anh/chị cung cấp mà không tự thêm tình tiết."),
     (("toa an", "vu an dan su", "khoi kien", "ban an"),
      "Tôi có thể giúp anh/chị xác định nhóm việc và chuẩn bị câu hỏi/hồ sơ theo tình huống. Anh/chị đang gặp tranh chấp dân sự, hôn nhân gia đình, thi hành bản án hay vấn đề khác?"),
     (("thi hanh an", "cuong che thi hanh"),
@@ -54,7 +54,7 @@ TOPIC_CLARIFICATIONS = (
     (("thua ke", "di chuc", "chia tai san"),
      "Anh/chị cho biết có di chúc hay không, tài sản nào đang cần giải quyết và hiện có tranh chấp giữa những người liên quan không. Tôi sẽ giúp sắp xếp tình huống và các bước cần kiểm tra tiếp."),
     (("no tien", "hop dong", "vay tien", "mua ban"),
-     "Anh/chị nên giữ hợp đồng, tin nhắn, chứng từ chuyển tiền và các thỏa thuận liên quan. Cho tôi biết đây là khoản vay, mua bán hay việc giao tài sản, tôi sẽ giúp anh/chị tách rõ nghĩa vụ, chứng cứ và hướng xử lý tiếp theo."),
+     "Đây là nhóm việc về nợ, hợp đồng hoặc giao dịch dân sự. Anh/chị nên giữ hợp đồng, tin nhắn, chứng từ chuyển tiền và các thỏa thuận liên quan. Cho tôi biết đây là khoản vay, mua bán hay việc giao tài sản, tôi sẽ giúp anh/chị tách rõ nghĩa vụ, chứng cứ và hướng xử lý tiếp theo."),
     (("lao dong", "luong", "bao hiem xa hoi", "bhxh"),
      "Anh/chị cho biết vấn đề nằm ở hợp đồng, tiền lương, nghỉ việc, bảo hiểm xã hội hay chế độ khác. Tôi sẽ giúp xác định thông tin và tài liệu cần kiểm tra trước khi thực hiện bước tiếp theo."),
     (("thue", "ma so thue", "hoa don"),
@@ -68,7 +68,7 @@ TOPIC_CLARIFICATIONS = (
     (("o nhiem", "moi truong", "tieng on"),
      "Anh/chị nên ghi nhận thời gian, địa điểm, hình ảnh/video nếu có và mức độ ảnh hưởng thực tế. Nếu sự việc đang diễn ra và ảnh hưởng đến khu dân cư, anh/chị có thể phản ánh ngay cho cơ quan chức năng tại địa phương."),
     (("xay dung", "giay phep xay dung", "cong trinh"),
-     "Anh/chị cho biết đang hỏi về giấy phép, trật tự xây dựng, lấn chiếm hay tranh chấp công trình. Tôi sẽ giúp xác định đúng nhóm việc và thông tin cần chuẩn bị."),
+     "Anh/chị đang hỏi về xây dựng: cho biết đang hỏi về giấy phép, trật tự xây dựng, lấn chiếm hay tranh chấp công trình. Tôi sẽ giúp xác định đúng nhóm việc và thông tin cần chuẩn bị."),
     (("phong chay", "chua chay", "pccc"),
      "Nếu đang có cháy, khói hoặc nguy cơ trực tiếp, ưu tiên rời khu vực nguy hiểm và gọi lực lượng cứu hỏa/cơ quan chức năng ngay. Nếu anh/chị đang hỏi về điều kiện PCCC của cơ sở hoặc nhà ở, cho tôi biết loại hình để tôi hướng dẫn theo đúng tình huống."),
     (("co bac", "danh bac", "ca do", "ca cuoc"),
@@ -80,6 +80,11 @@ TOPIC_CLARIFICATIONS = (
      _public_safety_reply(
          "violence",
          "Nếu có nguy cơ bị tiếp tục hành hung hoặc có trẻ em/người yếu thế đang gặp nguy hiểm, ưu tiên rời khỏi nơi nguy hiểm và tìm người hỗ trợ ngay. Giữ lại ảnh thương tích, tin nhắn, video và thông tin người chứng kiến nếu có."
+     )),
+    (("de doa", "bi de doa", "de doa toi"),
+     _public_safety_reply(
+         "threat",
+         "Sự việc xảy ra khi nào và ở đâu? Anh/chị không nên tự đối đầu nếu có nguy cơ mất an toàn; hãy giữ lại tin nhắn, cuộc gọi hoặc hình ảnh liên quan nếu có."
      )),
     (("mat nguoi", "that lac nguoi", "nguoi than mat tich"),
      "Anh/chị nên chuẩn bị ảnh gần nhất, thông tin nhận dạng, số điện thoại, phương tiện, quần áo, thời điểm và nơi cuối cùng còn liên lạc. Có thể báo ngay cho Công an nơi gần nhất để được hỗ trợ xác minh; nếu cho tôi các mốc trên, tôi có thể giúp soạn nội dung trình báo ngắn gọn."),

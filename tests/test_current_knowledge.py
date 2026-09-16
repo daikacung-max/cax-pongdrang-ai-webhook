@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 from core import db
 from core.current_knowledge import ensure_current_knowledge
+from core.current_fallback import grounded_dynamic_fallback
+from core.planner import plan
 from core.retrieval import retrieve
 from core.verifier import verify_dynamic_text
 
@@ -94,6 +96,16 @@ class CurrentKnowledgeTests(unittest.TestCase):
         self.assertIn("cấp tỉnh", lower_blob)
         self.assertIn("cấp xã", lower_blob)
         self.assertNotIn("công an cấp huyện", lower_blob)
+
+    def test_vehicle_form_question_keeps_first_registration_deadline(self):
+        ensure_current_knowledge()
+        question = "Giấy khai đăng ký xe ĐKX10 dùng khi nào cho bản thân tôi?"
+        units = retrieve(plan(question, [], dynamic=True), question)
+        answer = grounded_dynamic_fallback(question, units)
+        self.assertIn("ĐKX10", answer)
+        self.assertIn("02 ngày làm việc", answer)
+        self.assertIn("cấp xã", answer)
+        self.assertIn("cấp tỉnh", answer)
 
     def test_procedural_huyen_hallucination_is_rejected(self):
         ensure_current_knowledge()

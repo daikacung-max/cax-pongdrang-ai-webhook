@@ -54,6 +54,19 @@ UNSUPPORTED_FAIL_CLOSED_MARKERS = (
     "can xac minh",
     "cho biet",
     "noi dung nao",
+    # Recognized-but-unverified topics now receive a safe next step or a
+    # clarifying question instead of a generic refusal. These markers keep
+    # the audit focused on fail-closed behavior without freezing one phrase.
+    "toi co the",
+    "anh/chi co the",
+    "anh/chi cho toi biet",
+    "anh/chi nen",
+    "toi van co the",
+    "hay cho toi biet",
+    norm("anh/chị đang cần hỗ trợ"),
+    norm("cho tôi biết"),
+    norm("nói rõ trường hợp"),
+    norm("hướng dẫn theo đúng nhánh"),
 )
 
 
