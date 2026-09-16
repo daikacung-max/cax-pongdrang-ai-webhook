@@ -1,0 +1,30 @@
+name: Render Keepalive
+
+on:
+  schedule:
+    # Render's free web service can spin down after inactivity.  Zalo Chatbot
+    # Dynamic API has a two-second response window, so wake it before a
+    # citizen's message needs an answer.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Keep the public health endpoint warm
+        run: |
+          set -euo pipefail
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --max-time 20 \
+            --retry 2 \
+            --retry-delay 5 \
+            --user-agent "cax-pongdrang-render-keepalive" \
+            https://cax-pongdrang-ai.onrender.com/health > /dev/null
