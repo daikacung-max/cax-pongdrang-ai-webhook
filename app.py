@@ -15,6 +15,7 @@ from adapters.forms import blueprint as citizen_forms_blueprint
 from adapters.zalo_oa_api import ZaloOAClient
 from config import (
     LOCAL_BIND_HOST,
+    PERSISTENCE_REQUIRED,
     ZALO_APP_ID,
     ZALO_APP_SECRET_KEY,
     ZALO_OA_ACCESS_TOKEN,
@@ -29,17 +30,18 @@ from core.llm import LLMError, LLMTimeout
 from core.notebook_current_sources import ensure_notebook_current_sources
 from core.notebook_retrieval import retrieve as notebook_retrieve
 from core.privacy import delete_zalo_subject_data
+from core.history import persistence_ready as history_persistence_ready
 from core.production_security import register_production_security
 from core.source_guard import merge_verification
 from core.zalo_jobs import (
     delete_for_user as delete_zalo_jobs_for_user,
     enqueue as enqueue_zalo_reply,
-    persistence_ready as zalo_dispatch_persistence_ready,
+    operational_ready as zalo_dispatch_persistence_ready,
     start_worker as start_zalo_worker,
 )
 from core.zalo_token_store import (
     load_refresh_token,
-    persistence_ready as zalo_token_persistence_ready,
+    operational_ready as zalo_token_persistence_ready,
     save_refresh_token,
 )
 
@@ -225,6 +227,11 @@ if _original_zalo_webhook is not None:
     _app_core.app.view_functions["zalo_webhook"] = _hardened_zalo_webhook
 
 _durable_token_store = zalo_token_persistence_ready()
+_durable_dispatch_store = zalo_dispatch_persistence_ready()
+if PERSISTENCE_REQUIRED and not (
+    history_persistence_ready() and _durable_token_store and _durable_dispatch_store
+):
+    raise RuntimeError("Production persistence is required but Postgres or encryption is unavailable")
 _runtime_refresh_token = load_refresh_token(ZALO_OA_REFRESH_TOKEN)
 _app_core.zalo_oa_client = ZaloOAClient(
     ZALO_OA_ACCESS_TOKEN,
@@ -256,7 +263,7 @@ def _resilient_direct_zalo_reply(user_id, text, trace_id):
 
 _app_core._direct_zalo_reply = _resilient_direct_zalo_reply
 
-if _app_core.ZALO_DIRECT_REPLY_ENABLED and zalo_dispatch_persistence_ready():
+if _app_core.ZALO_DIRECT_REPLY_ENABLED and _durable_dispatch_store:
     start_zalo_worker(
         lambda user_id, text: _resilient_direct_zalo_reply(
             user_id, text, _app_core.new_trace_id()

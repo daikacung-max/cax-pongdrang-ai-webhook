@@ -35,6 +35,29 @@ def backend_name():
     return "postgres" if DATABASE_URL else "sqlite"
 
 
+def persistence_configured():
+    """Whether production-grade history has both required configuration values."""
+    return bool(DATABASE_URL and HISTORY_HMAC_SECRET)
+
+
+def persistence_ready():
+    """Verify that the configured Postgres store is actually reachable.
+
+    This intentionally does not treat a configured URL as readiness.  A broken
+    database must make the official-production gate fail closed instead of
+    quietly sending conversations to an ephemeral local file.
+    """
+    if not persistence_configured():
+        return False
+    try:
+        with _postgres_pool().connection() as con:
+            with con.cursor() as cur:
+                cur.execute("SELECT 1")
+                return cur.fetchone()[0] == 1
+    except Exception:
+        return False
+
+
 def _postgres_pool():
     global _pool
     if _pool is None:

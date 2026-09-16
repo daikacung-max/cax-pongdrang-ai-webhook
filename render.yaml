@@ -14,12 +14,16 @@ services:
         sync: false
       - key: DATABASE_URL
         fromDatabase:
-          name: cax-pongdrang-ai-history
+          name: cax-pongdrang-ai-db
           property: connectionString
       - key: HISTORY_HMAC_SECRET
         generateValue: true
+      - key: ZALO_TOKEN_ENCRYPTION_KEY
+        generateValue: true
       - key: FORM_LINK_SECRET
         generateValue: true
+      - key: PERSISTENCE_REQUIRED
+        value: "true"
       - key: OFFICER_API_TOKEN
         sync: false
       - key: PRODUCTION_MODE
@@ -56,8 +60,8 @@ services:
         value: "20"
 
 databases:
-  - name: cax-pongdrang-ai-history
-    databaseName: cax_pongdrang_ai
-    user: cax_pongdrang_ai
+  - name: cax-pongdrang-ai-db
+    databaseName: cax_pongdrang_ai_db
+    user: cax_pongdrang_ai_db_user
     region: singapore
     plan: basic-256mb

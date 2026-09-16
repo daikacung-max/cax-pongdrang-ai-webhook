@@ -48,7 +48,7 @@ Biến cấu hình quan trọng:
 - `ZALO_APP_SECRET_KEY`: App secret riêng cho OAuth v4.
 - `ZALO_OA_ACCESS_TOKEN`: access token seed nếu có.
 - `ZALO_OA_REFRESH_TOKEN`: refresh token seed.
-- `ZALO_TOKEN_ENCRYPTION_KEY`: Fernet key riêng để mã hóa refresh token và payload hàng đợi trong Postgres.
+- `ZALO_TOKEN_ENCRYPTION_KEY`: Fernet key hoặc secret ngẫu nhiên tối thiểu 32 ký tự riêng để mã hóa refresh token và payload hàng đợi trong Postgres. Render có thể tạo secret này; mã nguồn dẫn xuất Fernet key trong RAM, không ghi key ra disk/log.
 - `ZALO_REPLY_MODE=auto|direct|dynamic`
 
 OA client dùng header `access_token`; refresh qua OAuth v4. Runtime xử lý cả HTTP `401/403` và OA JSON `error=-124`, retry tối đa một lần sau refresh. Refresh token mới chỉ được đưa vào runtime sau khi ghi bền thành công; nếu persistence lỗi thì fail-closed.
@@ -61,9 +61,9 @@ Trong chế độ Direct Reply chính thức:
 2. `user_send_text` được mã hóa và ghi vào bảng `zalo_reply_jobs`;
 3. chỉ sau khi ghi thành công mới ACK `200`;
 4. worker lấy job bằng row lock, giải mã trong RAM, chạy AI và gửi OA;
-5. gửi thành công thì xóa job ngay;
-6. lỗi tạm thời retry có giới hạn; không retry vô tận;
-7. nhiều worker/instance vẫn tránh lấy cùng một job nhờ `FOR UPDATE SKIP LOCKED`.
+5. gửi thành công thì xóa ciphertext, giữ trạng thái `completed` và event key trong thời hạn ngắn để chống nhận trùng webhook;
+6. worker restart khi đang xử lý sẽ hết lease và job quay về `pending`; lỗi tạm thời retry exponential backoff có giới hạn, sau đó là `dead`;
+7. nhiều worker/instance vẫn tránh lấy cùng một job nhờ `FOR UPDATE SKIP LOCKED` và lease trên chính row đó.
 
 Không ghi UID, nội dung tin nhắn hay token vào log.
 

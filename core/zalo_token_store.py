@@ -6,22 +6,47 @@ secrets because Render's filesystem is not a durable secret store.
 """
 
 from datetime import datetime, timezone
+import base64
+import hashlib
 import os
 
 from config import DATABASE_URL
 from core.history import _postgres_pool
 
 
-_KEY = os.getenv("ZALO_TOKEN_ENCRYPTION_KEY", "").strip()
 _NAME = "zalo_oa_refresh_token"
 
 
+def _key():
+    # Read on use so a process receives its configured key at startup without
+    # ever writing it to disk or logs. It also makes key validation testable.
+    return os.getenv("ZALO_TOKEN_ENCRYPTION_KEY", "").strip()
+
+
+def _fernet_key():
+    """Accept a Fernet key or derive one from a high-entropy Render secret.
+
+    Render's generated secrets are not necessarily Fernet's base64 wire format.
+    Deriving a 32-byte Fernet key from a 32+ character secret keeps the secret
+    in Render while preserving authenticated encryption at rest.
+    """
+    key = _key().encode("ascii")
+    try:
+        from cryptography.fernet import Fernet
+        Fernet(key)
+        return key
+    except Exception:
+        if len(key) < 32:
+            raise ValueError("ZALO_TOKEN_ENCRYPTION_KEY must be a Fernet key or a 32+ character secret")
+        return base64.urlsafe_b64encode(hashlib.sha256(key).digest())
+
+
 def persistence_ready():
-    if not DATABASE_URL or not _KEY:
+    if not DATABASE_URL or not _key():
         return False
     try:
         from cryptography.fernet import Fernet
-        Fernet(_KEY.encode("ascii"))
+        Fernet(_fernet_key())
         return True
     except Exception:
         return False
@@ -31,7 +56,7 @@ def _fernet():
     if not persistence_ready():
         raise RuntimeError("Zalo token persistence is not configured")
     from cryptography.fernet import Fernet
-    return Fernet(_KEY.encode("ascii"))
+    return Fernet(_fernet_key())
 
 
 def _ensure_schema():
@@ -47,6 +72,14 @@ def _ensure_schema():
                 )
             """)
     return True
+
+
+def operational_ready():
+    """Check configuration, encryption and the actual managed-Postgres table."""
+    try:
+        return bool(_ensure_schema())
+    except Exception:
+        return False
 
 
 def load_refresh_token(fallback=""):

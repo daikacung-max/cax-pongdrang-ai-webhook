@@ -85,6 +85,12 @@ HISTORY_HMAC_SECRET = os.getenv("HISTORY_HMAC_SECRET", "").strip()
 HISTORY_RETENTION_DAYS = int(os.getenv("HISTORY_RETENTION_DAYS", "30"))
 HISTORY_MAX_MESSAGES = int(os.getenv("HISTORY_MAX_MESSAGES", "40"))
 HISTORY_POOL_MAX_SIZE = int(os.getenv("HISTORY_POOL_MAX_SIZE", "5"))
+PERSISTENCE_REQUIRED = os.getenv(
+    "PERSISTENCE_REQUIRED", "true" if PRODUCTION_MODE else "false"
+).lower() in ("1", "true", "yes", "on")
+ZALO_JOB_LEASE_SECONDS = int(os.getenv("ZALO_JOB_LEASE_SECONDS", "90"))
+ZALO_JOB_MAX_ATTEMPTS = int(os.getenv("ZALO_JOB_MAX_ATTEMPTS", "3"))
+ZALO_JOB_RETENTION_DAYS = int(os.getenv("ZALO_JOB_RETENTION_DAYS", "7"))
 
 OFFICER_API_TOKEN = os.getenv("OFFICER_API_TOKEN", "").strip()
 ENABLE_INTAKE_CASES = os.getenv("ENABLE_INTAKE_CASES", "true").lower() in ("1", "true", "yes", "on")

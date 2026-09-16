@@ -7,6 +7,7 @@ from config import (
     HISTORY_HMAC_SECRET,
     OPENAI_API_KEY,
     MODEL_ROUTING_MODE,
+    PERSISTENCE_REQUIRED,
     PRODUCTION_MODE,
     ZALO_WEBHOOK_ENABLED,
     ZALO_WEBHOOK_SIGNATURE_REQUIRED,
@@ -18,8 +19,9 @@ from config import (
     ZALO_DIRECT_REPLY_ENABLED,
     ZALO_REPLY_MODE,
 )
-from core.zalo_jobs import persistence_ready as zalo_dispatch_persistence_ready
-from core.zalo_token_store import persistence_ready as zalo_token_persistence_ready
+from core.history import persistence_ready as history_persistence_ready
+from core.zalo_jobs import operational_ready as zalo_dispatch_persistence_ready
+from core.zalo_token_store import operational_ready as zalo_token_persistence_ready
 
 
 blueprint = Blueprint("ai_core_readiness", __name__)
@@ -32,7 +34,7 @@ def _state():
     direct_reply_ready = bool(ZALO_OA_ACCESS_TOKEN or ZALO_OAUTH_REFRESH_READY)
     token_persistence = bool(zalo_token_persistence_ready())
     dispatch_persistence = bool(zalo_dispatch_persistence_ready())
-    history_persistence = bool(DATABASE_URL and HISTORY_HMAC_SECRET)
+    history_persistence = bool(history_persistence_ready())
     end_to_end_reply_ready = bool(
         ZALO_WEBHOOK_ENABLED
         and signature_secret_ready
@@ -46,6 +48,7 @@ def _state():
         "groq_provider_ready": bool(GROQ_API_KEY),
         "openai_provider_ready": bool(OPENAI_API_KEY),
         "provider_ready": provider_ready,
+        "persistence_required": bool(PERSISTENCE_REQUIRED),
         "history_persistence_ready": history_persistence,
         "demo_console_enabled": bool(ENABLE_DEMO_CONSOLE),
         "zalo_webhook_enabled": bool(ZALO_WEBHOOK_ENABLED),
