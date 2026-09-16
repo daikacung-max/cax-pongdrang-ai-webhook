@@ -20,6 +20,25 @@ class SourceGuardTests(unittest.TestCase):
         answer = "Anh/chị có thể đến Công an xã để làm định danh điện tử mức độ 02, xuất trình căn cước còn hiệu lực và cung cấp số điện thoại chính chủ."
         self.assertEqual(source_grounding_errors(answer, self.vneid_units), [])
 
+    def test_allows_only_explicitly_grounded_identity_aliases(self):
+        units = [{
+            **self.vneid_units[0],
+            "text": (
+                "Công dân xuất trình thẻ căn cước công dân hoặc thẻ căn cước còn hiệu lực "
+                "và cung cấp địa chỉ thư điện tử nếu có."
+            ),
+        }]
+        answer = "Anh/chị xuất trình CCCD còn hiệu lực và cung cấp email nếu có."
+        self.assertEqual(source_grounding_errors(answer, units), [])
+
+    def test_keeps_identity_aliases_closed_when_source_does_not_name_them(self):
+        units = [{
+            **self.vneid_units[0],
+            "text": "Công dân xuất trình thẻ căn cước còn hiệu lực.",
+        }]
+        errors = source_grounding_errors("Anh/chị xuất trình CCCD.", units)
+        self.assertIn("unsupported_procedural_detail:cccd", errors)
+
     def test_rejects_invented_physical_address(self):
         answer = "Anh/chị đến Công an xã tại địa chỉ: Số 12, đường A để làm thủ tục."
         self.assertIn("unsupported_physical_address", source_grounding_errors(answer, self.vneid_units))

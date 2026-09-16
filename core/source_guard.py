@@ -18,6 +18,23 @@ def _source_blob(units):
     ))
 
 
+def _grounded_detail_aliases(source):
+    """Return only citizen-friendly aliases backed by an explicit source term.
+
+    The guard deliberately rejects invented administrative details.  It should
+    not, however, reject a common spelling of the *same* item where the source
+    already names that item in full (for example ``CCCD`` for a thẻ căn cước
+    công dân).  Keeping this mapping small and one-way avoids turning it into
+    a general-knowledge bypass for the source boundary.
+    """
+    aliases = set()
+    if "the can cuoc cong dan" in source:
+        aliases.add("cccd")
+    if "dia chi thu dien tu" in source:
+        aliases.add("email")
+    return aliases
+
+
 def source_grounding_errors(answer, units):
     """Bắt chi tiết thủ tục do model tự thêm nhưng không có trong source.
 
@@ -30,6 +47,7 @@ def source_grounding_errors(answer, units):
     raw = str(answer or "")
     a = _norm(raw)
     source = _source_blob(units)
+    grounded_aliases = _grounded_detail_aliases(source)
     errors = []
 
     # Không để ID nội bộ kiểu VNEID_2026:level2 lộ vào câu trả lời người dân.
@@ -58,7 +76,7 @@ def source_grounding_errors(answer, units):
         "dich vu buu chinh", "buu chinh cong ich",
     )
     for phrase in high_risk_details:
-        if phrase in a and phrase not in source:
+        if phrase in a and phrase not in source and phrase not in grounded_aliases:
             errors.append("unsupported_procedural_detail:" + phrase)
 
     # Mã thủ tục dạng 1.012575, 1.004194... phải xuất hiện nguyên vẹn trong
