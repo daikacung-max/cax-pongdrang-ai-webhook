@@ -3,6 +3,7 @@ from config import (
     HOTLINE,
     ANSWER_MODEL,
     DYNAMIC_ANSWER_MODEL,
+    DYNAMIC_PROVIDER_FALLBACK_MODEL,
     CORE_REASONING_EFFORT,
     GROQ_CORE_REASONING_EFFORT,
     DYNAMIC_REASONING_EFFORT,
@@ -12,7 +13,7 @@ from config import (
     DYNAMIC_HISTORY_MESSAGES,
     DYNAMIC_HISTORY_MAX_CHARS,
 )
-from core.llm import chat_structured, chat_text
+from core.llm import LLMError, chat_structured, chat_text
 
 
 ANSWER_SCHEMA = {
@@ -183,12 +184,32 @@ Không hiển thị ID nguồn nội bộ cho người dân. Nếu chưa đủ c
     messages.extend(_bounded_history(history, max_messages=DYNAMIC_HISTORY_MESSAGES, max_chars=DYNAMIC_HISTORY_MAX_CHARS))
     messages.append({"role": "user", "content": question})
 
-    return chat_text(
-        model=model or DYNAMIC_ANSWER_MODEL,
-        messages=messages,
-        reasoning_effort=DYNAMIC_REASONING_EFFORT,
-        timeout=DYNAMIC_TIMEOUT_SECONDS,
-        temperature=0.05 if legal_context else 0.35,
-        max_completion_tokens=220,
-        safety_identifier=safety_identifier,
-    )
+    primary_model = model or DYNAMIC_ANSWER_MODEL
+    request = {
+        "messages": messages,
+        "timeout": DYNAMIC_TIMEOUT_SECONDS,
+        "temperature": 0.05 if legal_context else 0.35,
+        "max_completion_tokens": 220,
+        "safety_identifier": safety_identifier,
+    }
+    try:
+        return chat_text(
+            model=primary_model,
+            reasoning_effort=DYNAMIC_REASONING_EFFORT,
+            **request,
+        )
+    except LLMError:
+        # Chỉ dự phòng từ OpenAI sang Groq khi OpenAI không gọi được. Khi cả hai
+        # provider đều khả dụng, hành vi ưu tiên OpenAI không thay đổi.
+        fallback_model = DYNAMIC_PROVIDER_FALLBACK_MODEL
+        if not (
+            fallback_model
+            and primary_model.startswith("gpt-5.6")
+            and fallback_model != primary_model
+        ):
+            raise
+        return chat_text(
+            model=fallback_model,
+            reasoning_effort=GROQ_CORE_REASONING_EFFORT,
+            **request,
+        )

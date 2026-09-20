@@ -14,6 +14,10 @@ MODEL_ROUTING_MODE = os.getenv("MODEL_ROUTING_MODE", "auto").strip().lower()
 _AUTO_DYNAMIC_MODEL = "gpt-5.6-luna" if OPENAI_API_KEY else "openai/gpt-oss-20b"
 _AUTO_ANSWER_MODEL = "gpt-5.6-terra" if OPENAI_API_KEY else "openai/gpt-oss-120b"
 _AUTO_PLANNER_MODEL = "gpt-5.6-luna" if OPENAI_API_KEY else "openai/gpt-oss-20b"
+DYNAMIC_PROVIDER_FALLBACK_MODEL = os.getenv(
+    "DYNAMIC_PROVIDER_FALLBACK_MODEL",
+    "openai/gpt-oss-20b" if GROQ_API_KEY else "",
+).strip()
 
 if MODEL_ROUTING_MODE == "manual":
     ANSWER_MODEL = os.getenv("ANSWER_MODEL", _AUTO_ANSWER_MODEL).strip() or _AUTO_ANSWER_MODEL

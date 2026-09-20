@@ -1,7 +1,8 @@
 import unittest
 from unittest.mock import patch
 
-from core import llm
+from core import answerer, llm
+from core.llm import LLMError
 from core.providers.router import provider_name_for_model
 
 
@@ -55,6 +56,29 @@ class ProviderTests(unittest.TestCase):
         text_call.assert_called_once()
         self.assertEqual(text_call.call_args.kwargs["max_completion_tokens"], 1600)
         self.assertEqual(text_call.call_args.kwargs["reasoning_effort"], "low")
+
+    def test_dynamic_retries_groq_only_after_openai_provider_error(self):
+        with patch("core.answerer.DYNAMIC_ANSWER_MODEL", "gpt-5.6-luna"), \
+             patch("core.answerer.DYNAMIC_PROVIDER_FALLBACK_MODEL", "openai/gpt-oss-20b"), \
+             patch(
+                 "core.answerer.chat_text",
+                 side_effect=[LLMError("openai HTTP 401"), "Xin chào anh/chị."],
+             ) as text_call:
+            response = answerer.answer_dynamic_text("Bạn có khả năng gì?", [])
+
+        self.assertEqual(response, "Xin chào anh/chị.")
+        self.assertEqual(text_call.call_count, 2)
+        self.assertEqual(text_call.call_args_list[0].kwargs["model"], "gpt-5.6-luna")
+        self.assertEqual(text_call.call_args_list[1].kwargs["model"], "openai/gpt-oss-20b")
+        self.assertEqual(text_call.call_args_list[1].kwargs["reasoning_effort"], "low")
+
+    def test_dynamic_does_not_retry_when_primary_is_already_groq(self):
+        with patch("core.answerer.DYNAMIC_PROVIDER_FALLBACK_MODEL", "openai/gpt-oss-20b"), \
+             patch("core.answerer.chat_text", side_effect=LLMError("groq HTTP 401")) as text_call:
+            with self.assertRaises(LLMError):
+                answerer.answer_dynamic_text("Bạn có khả năng gì?", [], model="openai/gpt-oss-20b")
+
+        text_call.assert_called_once()
 
 
 if __name__ == "__main__":
