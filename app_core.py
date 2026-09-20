@@ -136,6 +136,14 @@ def dynamic_response(text):
     }), 200
 
 
+def _safe_provider_error_code(exc):
+    """Trích xuất mã lỗi provider để vận hành, không log nội dung lỗi thô."""
+    if isinstance(exc, LLMTimeout):
+        return "timeout"
+    match = re.search(r"\bHTTP\s+([45]\d{2})\b", str(exc))
+    return f"http_{match.group(1)}" if match else "provider_error"
+
+
 def _log_zalo_webhook(status, event_name):
     """Chỉ ghi trạng thái kỹ thuật, tuyệt đối không ghi tin nhắn hoặc định danh."""
     app.logger.info("zalo_webhook status=%s event=%s", status, event_name)
@@ -499,6 +507,7 @@ def zalo_dynamic():
             "pending_wait_ms": pending_wait_ms,
             "total_ms": round((time.perf_counter() - request_started) * 1000, 2),
             "fallback_reason": "llm_timeout" if isinstance(exc, LLMTimeout) else "llm_error",
+            "provider_error": _safe_provider_error_code(exc),
             "model_used": DYNAMIC_ANSWER_MODEL,
             "retrieved_unit_count": 0,
         })

@@ -138,6 +138,16 @@ class ZaloAdapterTests(unittest.TestCase):
         self.assertEqual(body["meta"]["path"], "api_boundary_grounded_fallback")
         self.assertIn("anh/chị", body["answer"].lower())
 
+    def test_dynamic_provider_error_logs_only_sanitized_status(self):
+        with patch("app.core.chat", side_effect=LLMError("openai HTTP 429: private body")), \
+             patch("app.log_zalo_latency") as log_latency:
+            with app.test_client() as client:
+                response = client.get("/zalo/ai?uid=synthetic-user&q=Bạn%20có%20khả%20năng%20gì%3F")
+
+        self.assertEqual(response.status_code, 200)
+        payload = log_latency.call_args.args[1]
+        self.assertEqual(payload["provider_error"], "http_429")
+
     def test_signed_zalo_webhook_accepts_official_formula(self):
         body = (
             '{"app_id":"test-app","sender":{"id":"user-1"},'

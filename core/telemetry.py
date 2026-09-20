@@ -1,4 +1,5 @@
 import json
+import re
 import time
 import uuid
 from contextlib import contextmanager
@@ -72,4 +73,11 @@ def log_zalo_latency(logger, payload):
         "model_used": str(payload.get("model_used") or "")[:80],
         "retrieved_unit_count": int(payload.get("retrieved_unit_count") or 0),
     })
+    # Chỉ cho phép mã lỗi đã chuẩn hoá đi vào telemetry. Không ghi thông điệp
+    # thô của provider vì nó có thể chứa prompt hoặc dữ liệu người dùng.
+    provider_error = str(payload.get("provider_error") or "")
+    safe["provider_error"] = (
+        provider_error if re.fullmatch(r"(?:http_[45]\d{2}|timeout|provider_error)", provider_error)
+        else None
+    )
     logger.info(json.dumps(safe, ensure_ascii=False, separators=(",", ":")))
