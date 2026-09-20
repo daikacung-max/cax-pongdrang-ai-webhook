@@ -57,7 +57,7 @@ def chat_structured(model, messages, schema_name, schema, reasoning_effort="low"
 
 def chat_text(model, messages, reasoning_effort="low", timeout=1.6,
               temperature=0.12, max_completion_tokens=280,
-              safety_identifier=None):
+              safety_identifier=None, service_tier=None):
     """Một lần gọi model cho Zalo Dynamic, không dùng JSON schema."""
     payload = {
         "model": model,
@@ -66,6 +66,8 @@ def chat_text(model, messages, reasoning_effort="low", timeout=1.6,
     }
     if _is_gpt56(model):
         payload["reasoning_effort"] = reasoning_effort
+        if service_tier:
+            payload["service_tier"] = str(service_tier)
     else:
         payload["temperature"] = temperature
     if str(model).startswith("openai/gpt-oss"):

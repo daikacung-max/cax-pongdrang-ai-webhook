@@ -53,6 +53,26 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(provider.payload["safety_identifier"], "h1_test")
         self.assertNotIn("temperature", provider.payload)
 
+    def test_gpt56_text_payload_can_use_fast_service_tier(self):
+        provider = FakeProvider()
+        with patch("core.llm.provider_for_model", return_value=provider):
+            llm.chat_text(
+                "gpt-5.6-luna",
+                [{"role": "user", "content": "Chào"}],
+                service_tier="fast",
+            )
+        self.assertEqual(provider.payload["service_tier"], "fast")
+
+    def test_groq_text_payload_never_receives_openai_service_tier(self):
+        provider = FakeProvider()
+        with patch("core.llm.provider_for_model", return_value=provider):
+            llm.chat_text(
+                "openai/gpt-oss-20b",
+                [{"role": "user", "content": "Chào"}],
+                service_tier="fast",
+            )
+        self.assertNotIn("service_tier", provider.payload)
+
     def test_gpt_oss_payload_omits_optional_reasoning_format(self):
         provider = FakeProvider()
         with patch("core.llm.provider_for_model", return_value=provider):

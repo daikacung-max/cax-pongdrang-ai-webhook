@@ -52,6 +52,9 @@ CORE_TIMEOUT_SECONDS = float(os.getenv("CORE_TIMEOUT_SECONDS", "12"))
 # provider could answer, which turned ordinary questions into safe fallbacks.
 DYNAMIC_TIMEOUT_SECONDS = float(os.getenv("DYNAMIC_TIMEOUT_SECONDS", "8"))
 DYNAMIC_MAX_COMPLETION_TOKENS = int(os.getenv("DYNAMIC_MAX_COMPLETION_TOKENS", "140"))
+# Fast mode is intentionally limited to citizen-facing realtime turns. Batch,
+# form-generation, and full-core requests keep the standard service tier.
+DYNAMIC_OPENAI_SERVICE_TIER = os.getenv("DYNAMIC_OPENAI_SERVICE_TIER", "fast").strip().lower()
 MAX_ZALO_MESSAGES = int(os.getenv("MAX_ZALO_MESSAGES", "4"))
 TARGET_ZALO_CHARS = int(os.getenv("TARGET_ZALO_CHARS", "650"))
 MAX_ZALO_TOTAL_CHARS = int(os.getenv("MAX_ZALO_TOTAL_CHARS", "2400"))

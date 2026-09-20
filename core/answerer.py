@@ -10,6 +10,7 @@ from config import (
     CORE_TIMEOUT_SECONDS,
     DYNAMIC_TIMEOUT_SECONDS,
     DYNAMIC_MAX_COMPLETION_TOKENS,
+    DYNAMIC_OPENAI_SERVICE_TIER,
     MAX_HISTORY_MESSAGES,
     DYNAMIC_HISTORY_MESSAGES,
     DYNAMIC_HISTORY_MAX_CHARS,
@@ -203,6 +204,7 @@ Không hiển thị ID nguồn nội bộ cho người dân. Nếu chưa đủ c
         "temperature": 0.05 if legal_context else 0.35,
         "max_completion_tokens": DYNAMIC_MAX_COMPLETION_TOKENS,
         "safety_identifier": safety_identifier,
+        "service_tier": DYNAMIC_OPENAI_SERVICE_TIER,
     }
     try:
         return chat_text(
