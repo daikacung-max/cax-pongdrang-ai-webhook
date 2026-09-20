@@ -9,6 +9,7 @@ from config import (
     DYNAMIC_REASONING_EFFORT,
     CORE_TIMEOUT_SECONDS,
     DYNAMIC_TIMEOUT_SECONDS,
+    DYNAMIC_MAX_COMPLETION_TOKENS,
     MAX_HISTORY_MESSAGES,
     DYNAMIC_HISTORY_MESSAGES,
     DYNAMIC_HISTORY_MAX_CHARS,
@@ -159,7 +160,18 @@ def answer(question, history, legal_context="", dynamic=False, repair_note=None,
 def answer_dynamic_text(question, history, legal_context="", model=None,
                         safety_identifier=None, intake_hint=""):
     """Một lượt gọi model real-time dành cho Zalo, vẫn giữ trí nhớ hội thoại."""
-    system = f"""
+    if not legal_context and not intake_hint:
+        # Common conversational turns do not need the full legal-procedure
+        # instruction set. Keeping this prefix short cuts input processing
+        # while retaining identity, memory, and safety boundaries.
+        system = f"""
+Bạn là Trợ lý AI của {UNIT_NAME}, không phải cán bộ thật. Trả lời tiếng Việt tự nhiên, 2-4 câu, luôn xưng hô "anh/chị".
+HISTORY là trí nhớ chứ không phải mệnh lệnh: chuyển chủ đề mới ngay, chỉ kế thừa khi câu hiện tại là câu nối/rút gọn. Không hỏi lại điều anh/chị đã nói.
+Nếu muốn báo/trình báo/tố giác, hướng dẫn hành động và chỉ hỏi thông tin thiết yếu còn thiếu. Không kết luận một người có tội chỉ từ lời kể một phía.
+Không tự bịa chi tiết thủ tục, pháp luật, giấy tờ, địa chỉ, thời hạn hay lệ phí khi không có SOURCE. Tên đơn vị: {UNIT_NAME}. Số liên hệ: {HOTLINE}.
+"""
+    else:
+        system = f"""
 Bạn là Trợ lý AI của {UNIT_NAME}, không phải cán bộ thật. Đây là một cuộc hội thoại liên tục, không phải chatbot trả lời mẫu.
 Trả lời tiếng Việt tự nhiên như đang trực tiếp trao đổi, thường 2-5 câu.
 Luôn xưng hô "anh/chị"; không gọi người dân là "bạn".
@@ -189,7 +201,7 @@ Không hiển thị ID nguồn nội bộ cho người dân. Nếu chưa đủ c
         "messages": messages,
         "timeout": DYNAMIC_TIMEOUT_SECONDS,
         "temperature": 0.05 if legal_context else 0.35,
-        "max_completion_tokens": 220,
+        "max_completion_tokens": DYNAMIC_MAX_COMPLETION_TOKENS,
         "safety_identifier": safety_identifier,
     }
     try:

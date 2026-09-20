@@ -51,6 +51,7 @@ CORE_TIMEOUT_SECONDS = float(os.getenv("CORE_TIMEOUT_SECONDS", "12"))
 # One second caused legitimate OpenAI/Groq responses to be aborted before the
 # provider could answer, which turned ordinary questions into safe fallbacks.
 DYNAMIC_TIMEOUT_SECONDS = float(os.getenv("DYNAMIC_TIMEOUT_SECONDS", "8"))
+DYNAMIC_MAX_COMPLETION_TOKENS = int(os.getenv("DYNAMIC_MAX_COMPLETION_TOKENS", "140"))
 MAX_ZALO_MESSAGES = int(os.getenv("MAX_ZALO_MESSAGES", "4"))
 TARGET_ZALO_CHARS = int(os.getenv("TARGET_ZALO_CHARS", "650"))
 MAX_ZALO_TOTAL_CHARS = int(os.getenv("MAX_ZALO_TOTAL_CHARS", "2400"))

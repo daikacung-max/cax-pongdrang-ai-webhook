@@ -24,6 +24,16 @@ class ProviderTests(unittest.TestCase):
     def test_dynamic_timeout_has_room_for_a_real_provider_round_trip(self):
         self.assertGreaterEqual(answerer.DYNAMIC_TIMEOUT_SECONDS, 5)
 
+    def test_dynamic_response_is_bounded_for_realtime_chat(self):
+        with patch("core.answerer.chat_text", return_value="Xin chào anh/chị.") as text_call:
+            answerer.answer_dynamic_text("Bạn có khả năng gì?", [])
+
+        self.assertEqual(
+            text_call.call_args.kwargs["max_completion_tokens"],
+            answerer.DYNAMIC_MAX_COMPLETION_TOKENS,
+        )
+        self.assertLessEqual(answerer.DYNAMIC_MAX_COMPLETION_TOKENS, 160)
+
     def test_model_router(self):
         self.assertEqual(provider_name_for_model("openai/gpt-oss-20b"), "groq")
         self.assertEqual(provider_name_for_model("gpt-5.6-luna"), "openai")
