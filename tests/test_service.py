@@ -78,6 +78,31 @@ class DynamicServiceTests(unittest.TestCase):
         )
         self.assertNotIn("AI Core chưa xử lý", result["answer"])
 
+    def test_dynamic_uncovered_legal_question_uses_flexible_model_answer(self):
+        user_id = "service-test-" + uuid.uuid4().hex
+        no_source_plan = {
+            "is_legal": True,
+            "search_queries": ["tranh chấp hợp đồng dân sự"],
+            "explicit_references": [],
+            "needs_clarification": False,
+            "clarification_question": None,
+            "complexity": "simple",
+            "complexity_reasons": [],
+        }
+        answer_text = (
+            "Với tranh chấp hợp đồng, anh/chị nên giữ hợp đồng, tin nhắn và chứng từ liên quan; "
+            "trước hết có thể đề nghị bên kia xác nhận phương án giải quyết bằng văn bản."
+        )
+        with patch("core.service.plan", return_value=no_source_plan), \
+             patch("core.service.retrieve", return_value=[]), \
+             patch("core.service.answer_dynamic_text", return_value=answer_text) as model:
+            result = core.chat(user_id, "Tôi bị tranh chấp hợp đồng dân sự", dynamic=True)
+
+        model.assert_called_once()
+        self.assertEqual(result["answer"], answer_text)
+        self.assertEqual(result["meta"]["path"], "single_call_or_grounded_fallback")
+        self.assertIsNone(result["_telemetry"]["fallback_reason"])
+
     def test_full_core_provider_status_is_sanitized(self):
         user_id = "service-test-" + uuid.uuid4().hex
         with patch("core.service.generate_answer", side_effect=LLMError("groq HTTP 400: private body")):

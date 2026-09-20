@@ -358,6 +358,46 @@ def ensure_current_knowledge():
         },
     ])
 
+    # Các văn bản nền được đăng ký để audit và định tuyến. Chúng không chứa
+    # tóm tắt Điều/khoản nên không cho phép model suy diễn mức phạt, thời hạn
+    # hoặc thủ tục riêng; các chi tiết đó chỉ được thêm sau khi nạp toàn văn đã
+    # kiểm chứng. Nhờ vậy AI có thể trả lời linh hoạt câu hỏi phổ thông nhưng
+    # vẫn không trình bày một chi tiết pháp lý chưa được đối chiếu.
+    for doc_id, title, number, issuer, source_path in (
+        (
+            "CIVIL_CODE_REFERENCE_2015",
+            "Bộ luật Dân sự - nguồn tham chiếu pháp luật dân sự",
+            "91/2015/QH13",
+            "Quốc hội",
+            "https://vanban.chinhphu.vn/",
+        ),
+        (
+            "LAND_LAW_REFERENCE_2024",
+            "Luật Đất đai - nguồn tham chiếu",
+            "31/2024/QH15",
+            "Quốc hội",
+            "https://vanban.chinhphu.vn/?classid=1&docid=211189&orggroupid=1&pageid=27160",
+        ),
+        (
+            "CRIMINAL_CODE_REFERENCE_2025",
+            "Bộ luật Hình sự - văn bản hợp nhất đang được AI Core nạp toàn văn",
+            "135/VBHN-VPQH",
+            "Văn phòng Quốc hội",
+            "https://vanban.chinhphu.vn/?classid=2629&docid=215260&pageid=27160",
+        ),
+    ):
+        _doc(doc_id, title, number, issuer, source_path, authority_levels=["xa", "tinh"])
+        db.replace_document_units(doc_id, [{
+            "id": doc_id + ":registry",
+            "unit_type": "source_registry",
+            "title": title,
+            "text": (
+                "Đây là nguồn pháp luật nền trong danh mục cập nhật của AI Core. "
+                "Khi câu hỏi cần số Điều, điều kiện, mức phạt, thời hạn hoặc thủ tục cụ thể, "
+                "phải đối chiếu toàn văn và văn bản hướng dẫn đang có hiệu lực trước khi khẳng định."
+            ),
+        }])
+
     # Nguồn tương lai: đăng ký để audit nhưng DB active-date gate không cho retrieval
     # trước 26/09/2026.
     _doc(

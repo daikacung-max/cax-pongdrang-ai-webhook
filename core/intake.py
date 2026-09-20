@@ -10,6 +10,8 @@ không được kế thừa trạng thái tiếp nhận của chủ đề cũ.
 import re
 import unicodedata
 
+from core.team_routing import team_for_queue
+
 
 def _norm(text):
     text = unicodedata.normalize("NFD", str(text or "").lower())
@@ -200,7 +202,8 @@ def assess(question, history):
         return {
             "procedure_code": "unclassified", "source_ready": False,
             "conversation_mode": "advice_only", "handoff_status": "not_requested",
-            "handoff_queue": None, "missing_field_ids": [], "next_question": None,
+            "handoff_queue": None, "handling_team": None,
+            "missing_field_ids": [], "next_question": None,
         }
 
     classification_text = current if current_matches else combined
@@ -219,6 +222,7 @@ def assess(question, history):
         conversation_mode, handoff_status = "intake_requested", "needs_information"
     else:
         conversation_mode, handoff_status = "intake_requested", "ready_for_officer"
+    queue = chosen["queue"]
     return {
         "procedure_code": chosen["code"],
         "procedure_name": chosen["name"],
@@ -227,7 +231,8 @@ def assess(question, history):
         ),
         "conversation_mode": conversation_mode,
         "handoff_status": handoff_status,
-        "handoff_queue": chosen["queue"],
+        "handoff_queue": queue,
+        "handling_team": team_for_queue(queue),
         "missing_field_ids": [field[0] for field in missing],
         "next_question": missing[0][1] if intake_requested and missing else None,
     }

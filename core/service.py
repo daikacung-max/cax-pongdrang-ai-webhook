@@ -12,6 +12,7 @@ from core import cases
 from core.answerer import answer as generate_answer, answer_dynamic_text
 from core.history import conversation_key
 from core.intake import assess as assess_intake, prompt_hint as intake_prompt_hint
+from core.team_routing import routing_prompt_hint
 from core.llm import LLMError, LLMTimeout
 from core.planner import plan
 from core.providers import provider_name_for_model
@@ -136,7 +137,10 @@ class AICore:
         with timer.stage("history_ms"):
             history = db.get_history(user_id, limit=MAX_HISTORY_MESSAGES)
         intake = assess_intake(question, history)
-        intake_hint = intake_prompt_hint(intake)
+        intake_hint = "\n".join(part for part in (
+            intake_prompt_hint(intake),
+            routing_prompt_hint(intake),
+        ) if part)
         with timer.stage("planner_ms"):
             search_plan = plan(
                 question,
@@ -156,7 +160,7 @@ class AICore:
 
         fallback_question = _safe_question_for_fallback(question)
 
-        if search_plan.get("is_legal") and not legal_units:
+        if search_plan.get("is_legal") and not legal_units and not dynamic:
             fallback_reason = "no_source"
             with timer.stage("finalize_ms"):
                 final_answer = finalize(grounded_dynamic_fallback(fallback_question, []))
@@ -164,7 +168,7 @@ class AICore:
             meta = {
                 "legal": True, "retrieved_unit_ids": [], "verified": False,
                 "repaired": False, "verification_errors": ["no_verified_source"],
-                "dynamic": bool(dynamic), "path": "legal_no_source_fail_closed",
+                "dynamic": False, "path": "legal_no_source_fail_closed",
                 "intake": intake,
                 "handoff": handoff,
                 **_model_meta(model_used),
@@ -203,14 +207,10 @@ class AICore:
                     verification_errors = check["errors"] + (["weak_answer"] if weak else [])
             except LLMTimeout:
                 fallback_reason = "llm_timeout"
-                if not legal_units:
-                    raise
                 raw_answer = grounded_dynamic_fallback(fallback_question, legal_units)
                 verification_errors = ["dynamic_fallback:LLMTimeout"]
             except Exception as exc:
                 fallback_reason = "llm_error"
-                if not legal_units:
-                    raise
                 raw_answer = grounded_dynamic_fallback(fallback_question, legal_units)
                 verification_errors = [f"dynamic_fallback:{type(exc).__name__}"]
 

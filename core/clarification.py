@@ -129,7 +129,8 @@ def clarification_for_unverified_topic(question):
     if topic_key is not None:
         return TOPIC_CLARIFICATIONS[topic_key][1]
     return (
-        "Tôi vẫn có thể hỗ trợ anh/chị xử lý bước tiếp theo. Hãy cho tôi biết mục tiêu chính của anh/chị là "
-        "muốn làm một thủ tục, hỏi quy định, hay phản ánh/trình báo một sự việc. Nếu là sự việc đang xảy ra và có nguy cơ mất an toàn, "
-        f"anh/chị nên ưu tiên bảo đảm an toàn và liên hệ {UNIT_NAME} qua số trực ban {HOTLINE}; tôi có thể giúp anh/chị sắp xếp nội dung cần báo ngay sau đó."
+        "Tôi có thể hỗ trợ anh/chị tách vấn đề, giải thích hướng xử lý chung và chuẩn bị nội dung cần làm tiếp. "
+        "Anh/chị cho biết mục tiêu chính là làm thủ tục, hỏi quy định hay phản ánh/trình báo một sự việc. "
+        "Nếu sự việc đang xảy ra và có nguy cơ mất an toàn, hãy ưu tiên bảo đảm an toàn và liên hệ "
+        f"{UNIT_NAME} qua số trực ban {HOTLINE}; tôi có thể giúp anh/chị sắp xếp nội dung cần báo ngay sau đó."
     )
