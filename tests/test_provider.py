@@ -21,6 +21,9 @@ class FakeProvider:
 
 
 class ProviderTests(unittest.TestCase):
+    def test_dynamic_timeout_has_room_for_a_real_provider_round_trip(self):
+        self.assertGreaterEqual(answerer.DYNAMIC_TIMEOUT_SECONDS, 5)
+
     def test_model_router(self):
         self.assertEqual(provider_name_for_model("openai/gpt-oss-20b"), "groq")
         self.assertEqual(provider_name_for_model("gpt-5.6-luna"), "openai")

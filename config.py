@@ -47,7 +47,10 @@ DYNAMIC_REASONING_EFFORT = os.getenv(
     "none" if str(DYNAMIC_ANSWER_MODEL).startswith("gpt-5.6") else "low",
 )
 CORE_TIMEOUT_SECONDS = float(os.getenv("CORE_TIMEOUT_SECONDS", "12"))
-DYNAMIC_TIMEOUT_SECONDS = float(os.getenv("DYNAMIC_TIMEOUT_SECONDS", "1.05"))
+# A dynamic conversation needs enough time for a real provider round trip.
+# One second caused legitimate OpenAI/Groq responses to be aborted before the
+# provider could answer, which turned ordinary questions into safe fallbacks.
+DYNAMIC_TIMEOUT_SECONDS = float(os.getenv("DYNAMIC_TIMEOUT_SECONDS", "8"))
 MAX_ZALO_MESSAGES = int(os.getenv("MAX_ZALO_MESSAGES", "4"))
 TARGET_ZALO_CHARS = int(os.getenv("TARGET_ZALO_CHARS", "650"))
 MAX_ZALO_TOTAL_CHARS = int(os.getenv("MAX_ZALO_TOTAL_CHARS", "2400"))
