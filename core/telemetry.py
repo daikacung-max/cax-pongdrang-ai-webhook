@@ -22,6 +22,7 @@ FALLBACK_REASONS = {
     "llm_error",
     "verification_failed",
     "weak_answer",
+    "empty_answer",
 }
 
 

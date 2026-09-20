@@ -193,18 +193,26 @@ class AICore:
                         model=model_used,
                         safety_identifier=safety_identifier,
                         intake_hint=intake_hint,
-                    )
+                )
                 raw_answer = normalize_citizen_address(raw_answer)
                 models_used.append(model_used)
-                with timer.stage("verify_ms"):
-                    check = verify_dynamic_text(raw_answer, legal_units, question=question)
-                    weak = _dynamic_answer_is_weak(question, raw_answer, legal_units)
-                if check["ok"] and not weak:
-                    verified = True
-                else:
-                    fallback_reason = "weak_answer" if weak else "verification_failed"
+                # A provider can return a syntactically valid response with no
+                # text. The Dynamic API must never forward an empty Zalo
+                # message, especially for flexible no-source conversations.
+                if not str(raw_answer or "").strip():
+                    fallback_reason = "empty_answer"
                     raw_answer = grounded_dynamic_fallback(fallback_question, legal_units)
-                    verification_errors = check["errors"] + (["weak_answer"] if weak else [])
+                    verification_errors = ["dynamic_fallback:empty_answer"]
+                else:
+                    with timer.stage("verify_ms"):
+                        check = verify_dynamic_text(raw_answer, legal_units, question=question)
+                        weak = _dynamic_answer_is_weak(question, raw_answer, legal_units)
+                    if check["ok"] and not weak:
+                        verified = True
+                    else:
+                        fallback_reason = "weak_answer" if weak else "verification_failed"
+                        raw_answer = grounded_dynamic_fallback(fallback_question, legal_units)
+                        verification_errors = check["errors"] + (["weak_answer"] if weak else [])
             except LLMTimeout:
                 fallback_reason = "llm_timeout"
                 raw_answer = grounded_dynamic_fallback(fallback_question, legal_units)
