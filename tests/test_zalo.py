@@ -74,6 +74,18 @@ class ZaloAdapterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         pop.assert_called_once_with(user_id="user-1")
 
+    def test_dynamic_ignores_unexpanded_uid_template_and_uses_sender_envelope(self):
+        with patch("app.ZALO_WEBHOOK_ENABLED", True), \
+             patch("app.pending.pop", return_value=None) as pop:
+            with app.test_client() as client:
+                response = client.post(
+                    "/zalo/ai?uid=((user_id))",
+                    json={"sender": {"id": "real-zalo-user"}},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        pop.assert_called_once_with(user_id="real-zalo-user")
+
     def test_dynamic_question_query_uses_ai_without_webhook_pending_message(self):
         with patch("app.ZALO_WEBHOOK_ENABLED", True), \
              patch("app.pending.pop") as pop, \

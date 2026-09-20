@@ -230,6 +230,10 @@ def _zalo_dynamic_uid(data=None):
     )
     for value in candidates:
         value = str(value or "").strip()
+        # A literal Chatbot template token is not an identity.  Ignore it so
+        # a real sender ID carried by a later header or JSON field can win.
+        if value.startswith("((") and value.endswith("))"):
+            continue
         if value:
             return value
     return ""
