@@ -65,7 +65,11 @@ class ZaloOAClient:
     and local development may keep the default in-memory behaviour.
     """
 
-    endpoint = "https://openapi.zalo.me/v3.0/oa/message/cs"
+    # Government-service OAs are supported on the free OA OpenAPI v2 message
+    # endpoint.  The request body below already follows the v2 text-message
+    # contract, so keeping it here avoids changing any AI, webhook, or queue
+    # behaviour while using the API version enabled for this OA category.
+    endpoint = "https://openapi.zalo.me/v2.0/oa/message"
     token_endpoint = "https://oauth.zaloapp.com/v4/oa/access_token"
     INVALID_ACCESS_TOKEN_ERRORS = {-124, "-124"}
 

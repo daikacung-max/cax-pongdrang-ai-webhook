@@ -28,6 +28,7 @@ class ZaloOAApiTests(unittest.TestCase):
         client = ZaloOAClient("synthetic-access-token", session=session)
 
         self.assertTrue(client.send_text("synthetic-user", "Xin chào"))
+        self.assertEqual(session.url, "https://openapi.zalo.me/v2.0/oa/message")
         self.assertEqual(session.kwargs["headers"]["access_token"], "synthetic-access-token")
         self.assertEqual(session.kwargs["json"]["recipient"]["user_id"], "synthetic-user")
         self.assertEqual(session.kwargs["json"]["message"]["text"], "Xin chào")
