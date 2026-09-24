@@ -24,6 +24,7 @@ class CitizenFormDocumentTests(unittest.TestCase):
         self.assertEqual(result["form_type"], "ct01")
         self.assertIn("/forms/download/", result["download_url"])
         self.assertTrue(result["download_url"].endswith("/ct01.docx"))
+        self.assertLess(len(result["download_url"]), 200)
 
     def test_blank_ct01_uses_instance_bound_database_key_when_form_secret_is_missing(self):
         with patch.object(forms, "HISTORY_HMAC_SECRET", ""):
@@ -59,7 +60,7 @@ Nơi ở hiện tại: xã Pơng Drang, tỉnh Đắk Lắk
 Nội dung đề nghị: đăng ký tạm trú"""
         with patch.object(forms, "HISTORY_HMAC_SECRET", "test-secret"):
             result = forms.handle_form_request("u1", question, history=history)
-            payload = forms.decode_payload(result["download_url"].split("/forms/download/", 1)[1].split("/", 1)[0])
+            payload = forms.decode_download_token(result["download_url"].split("/forms/download/", 1)[1].split("/", 1)[0])
             content, name = forms.render_docx(payload)
         self.assertTrue(result["ready"])
         self.assertGreater(len(content), 1000)
@@ -77,7 +78,7 @@ Nội dung đề nghị: đăng ký tạm trú"""
                 ),
                 history=[],
             )
-            payload = forms.decode_payload(result["download_url"].split("/forms/download/", 1)[1].split("/", 1)[0])
+            payload = forms.decode_download_token(result["download_url"].split("/forms/download/", 1)[1].split("/", 1)[0])
             content, name = forms.render_docx(payload)
         self.assertTrue(result["ready"])
         self.assertEqual(payload["fields"]["full_name"], "Trần Văn B")
@@ -86,6 +87,7 @@ Nội dung đề nghị: đăng ký tạm trú"""
         self.assertEqual(payload["fields"]["address"], "")
         self.assertEqual(name, "Don-trinh-bao.docx")
         self.assertGreater(len(content), 1000)
+        self.assertLess(len(result["download_url"]), 200)
 
     def test_report_flow_requests_only_the_incident_when_no_facts_were_given(self):
         result = forms.handle_form_request("u2", "Giúp tôi tạo file Word đơn trình báo", history=[])
@@ -104,6 +106,22 @@ Nội dung đề nghị: đăng ký tạm trú"""
         self.assertIn("application/vnd.openxmlformats", response.content_type)
         self.assertIn("no-store", response.headers.get("Cache-Control", ""))
         self.assertGreater(len(response.data), 1000)
+
+    def test_short_report_link_resolves_its_encrypted_server_payload(self):
+        app = Flask(__name__)
+        app.register_blueprint(forms_blueprint)
+        with patch.object(forms, "HISTORY_HMAC_SECRET", "test-secret"):
+            result = forms.handle_form_request(
+                "short-link-user",
+                "Tạo file Word đơn trình báo: Tôi bị mất điện thoại tại chợ và còn hóa đơn mua máy.",
+                history=[],
+            )
+            token = result["download_url"].split("/forms/download/", 1)[1].split("/", 1)[0]
+            response = app.test_client().get(f"/forms/download/{token}/don-trinh-bao.docx")
+        self.assertTrue(result["ready"])
+        self.assertLess(len(result["download_url"]), 200)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/vnd.openxmlformats", response.content_type)
 
 
 if __name__ == "__main__":

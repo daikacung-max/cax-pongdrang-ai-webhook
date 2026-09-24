@@ -110,6 +110,15 @@ def init_schema():
                     )
                 """)
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_messages_user_key ON messages(user_key, id DESC)")
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS form_downloads (
+                        token TEXT PRIMARY KEY,
+                        user_key TEXT NOT NULL,
+                        payload_token TEXT NOT NULL,
+                        expires_at TIMESTAMPTZ NOT NULL
+                    )
+                """)
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_form_downloads_expiry ON form_downloads(expires_at)")
         return
 
     with _sqlite() as con:
@@ -131,6 +140,15 @@ def init_schema():
             )
         """)
         con.execute("CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id, id DESC)")
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS form_downloads (
+                token TEXT PRIMARY KEY,
+                user_key TEXT NOT NULL,
+                payload_token TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            )
+        """)
+        con.execute("CREATE INDEX IF NOT EXISTS idx_form_downloads_expiry ON form_downloads(expires_at)")
 
 
 def add_message(user_id, role, content, meta=None):

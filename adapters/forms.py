@@ -4,7 +4,7 @@ from io import BytesIO
 
 from flask import Blueprint, jsonify, send_file
 
-from core.form_documents import decode_payload, render_docx
+from core.form_documents import decode_download_token, render_docx
 
 
 blueprint = Blueprint("citizen_forms", __name__)
@@ -13,7 +13,7 @@ blueprint = Blueprint("citizen_forms", __name__)
 @blueprint.get("/forms/download/<path:token>/<filename>")
 def download_form(token, filename):
     try:
-        payload = decode_payload(token)
+        payload = decode_download_token(token)
         content, safe_name = render_docx(payload)
     except Exception:
         return jsonify({"error": "Liên kết biểu mẫu không hợp lệ hoặc đã hết hạn."}), 404

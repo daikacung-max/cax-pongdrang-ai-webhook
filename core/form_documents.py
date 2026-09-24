@@ -16,7 +16,8 @@ import hashlib
 import json
 import os
 import re
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from urllib.parse import quote, unquote
 
@@ -25,7 +26,8 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
 
-from config import HISTORY_HMAC_SECRET, UNIT_NAME
+from config import DATABASE_URL, HISTORY_HMAC_SECRET, UNIT_NAME
+from core import history
 
 
 PUBLIC_BASE_URL = os.getenv(
@@ -82,6 +84,63 @@ def decode_payload(token: str) -> dict:
         return json.loads(raw.decode("utf-8"))
     except (InvalidToken, ValueError, UnicodeError, json.JSONDecodeError) as exc:
         raise ValueError("invalid_or_expired_form_link") from exc
+
+
+_SHORT_LINK_PREFIX = "f_"
+
+
+def _store_short_payload(user_id: str, payload: dict) -> str:
+    """Store an encrypted form payload behind a compact Zalo-safe URL token."""
+    history.init_schema()
+    token = _SHORT_LINK_PREFIX + secrets.token_urlsafe(12)
+    encrypted_payload = encode_payload(payload)
+    key = history.conversation_key(user_id)
+    expires_at = history.utc_now() + timedelta(seconds=FORM_LINK_TTL_SECONDS)
+
+    if DATABASE_URL:
+        with history._postgres_pool().connection() as con:
+            with con.cursor() as cur:
+                cur.execute("DELETE FROM form_downloads WHERE expires_at < %s", (history.utc_now(),))
+                cur.execute(
+                    "INSERT INTO form_downloads(token, user_key, payload_token, expires_at) VALUES (%s, %s, %s, %s)",
+                    (token, key, encrypted_payload, expires_at),
+                )
+        return token
+
+    with history._sqlite() as con:
+        now_text = history.utc_now().isoformat()
+        con.execute("DELETE FROM form_downloads WHERE expires_at < ?", (now_text,))
+        con.execute(
+            "INSERT INTO form_downloads(token, user_key, payload_token, expires_at) VALUES (?, ?, ?, ?)",
+            (token, key, encrypted_payload, expires_at.isoformat()),
+        )
+    return token
+
+
+def decode_download_token(token: str) -> dict:
+    """Resolve compact server-side links while accepting issued legacy links."""
+    token = unquote(str(token or "").strip())
+    if not token.startswith(_SHORT_LINK_PREFIX):
+        return decode_payload(token)
+
+    history.init_schema()
+    if DATABASE_URL:
+        with history._postgres_pool().connection() as con:
+            with con.cursor() as cur:
+                cur.execute("SELECT payload_token, expires_at FROM form_downloads WHERE token=%s", (token,))
+                row = cur.fetchone()
+                if not row or row[1] < history.utc_now():
+                    cur.execute("DELETE FROM form_downloads WHERE token=%s", (token,))
+                    raise ValueError("invalid_or_expired_form_link")
+                encrypted_payload = row[0]
+    else:
+        with history._sqlite() as con:
+            row = con.execute("SELECT payload_token, expires_at FROM form_downloads WHERE token=?", (token,)).fetchone()
+            if not row or str(row["expires_at"]) < history.utc_now().isoformat():
+                con.execute("DELETE FROM form_downloads WHERE token=?", (token,))
+                raise ValueError("invalid_or_expired_form_link")
+            encrypted_payload = row["payload_token"]
+    return decode_payload(encrypted_payload)
 
 
 def _field(lines: list[str], aliases: tuple[str, ...]) -> str:
@@ -262,8 +321,12 @@ def _natural_incident_content(text: str) -> str:
     )
     for line in reversed(lines):
         normalized = _norm(line)
-        if not normalized or ":" in line:
+        if not normalized:
             continue
+        if ":" in line:
+            label = line.split(":", 1)[0]
+            if _norm(label) in _FORM_FIELD_LABELS:
+                continue
         if any(cue in normalized for cue in cues):
             # Remove only the drafting request, preserving the factual words
             # supplied after it in the same natural-language sentence.
@@ -337,8 +400,8 @@ def _blank_requested(question: str) -> bool:
     )
 
 
-def _download_url(form_type: str, fields: dict) -> str:
-    token = encode_payload({"form_type": form_type, "fields": fields})
+def _download_url(form_type: str, fields: dict, user_id: str) -> str:
+    token = _store_short_payload(user_id, {"form_type": form_type, "fields": fields})
     filename = "ct01" if form_type == "ct01" else "don-trinh-bao"
     return f"{PUBLIC_BASE_URL}/forms/download/{quote(token, safe='')}/{filename}.docx"
 
@@ -373,7 +436,7 @@ def handle_form_request(user_id: str, question: str, history=None):
                     "missing": missing,
                 }
         if _blank_requested(question):
-            url = _download_url("ct01", {})
+            url = _download_url("ct01", {}, user_id)
             return {
                 "answer": (
                     "Tôi đã tạo bản CT01 trống để anh/chị tải về, in và tự điền: " + url +
@@ -397,7 +460,7 @@ def handle_form_request(user_id: str, question: str, history=None):
                 "ready": False,
                 "missing": missing,
             }
-        url = _download_url("ct01", fields)
+        url = _download_url("ct01", fields, user_id)
         return {
             "answer": (
                 "Đã đủ dữ liệu tối thiểu để lập bản CT01 hỗ trợ điền. Anh/chị tải file Word tại: " + url +
@@ -409,14 +472,14 @@ def handle_form_request(user_id: str, question: str, history=None):
         }
 
     fields = _report_fields(combined)
-    if _is_form_capability_question(question):
-        missing = _missing(fields, tuple(REPORT_LABELS))
+    if _is_form_capability_question(question) and not fields.get("incident_content"):
+        missing = _missing(fields, REPORT_DRAFT_REQUIRED)
         if missing:
             labels = ", ".join(REPORT_LABELS[k] for k in missing)
             return {
                 "answer": (
-                    "Có. Sau khi anh/chị cung cấp đủ nội dung cần thiết, tôi sẽ tạo file Word Đơn trình báo để tải về, đọc lại và ký. "
-                    "Hiện còn thiếu: " + labels + ". Anh/chị có thể gửi từng mục hoặc nhiều dòng cùng lúc."
+                    "Có. Tôi có thể tạo file Word Đơn trình báo từ nội dung anh/chị kể. "
+                    "Hiện còn thiếu: " + labels + ". Anh/chị có thể kể tự nhiên hoặc gửi từng mục/một lúc nhiều dòng."
                 ),
                 "form_type": "report",
                 "ready": False,
@@ -442,7 +505,7 @@ def handle_form_request(user_id: str, question: str, history=None):
             "ready": False,
             "missing": missing,
         }
-    url = _download_url("report", fields)
+    url = _download_url("report", fields, user_id)
     return {
         "answer": (
             "Tôi đã soạn bản Đơn trình báo Word từ đúng các thông tin anh/chị cung cấp. Tải file tại: " + url +

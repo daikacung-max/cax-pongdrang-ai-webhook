@@ -26,6 +26,7 @@ def delete_user_data(user_id):
                 conversations = cur.rowcount or 0
                 cur.execute("DELETE FROM intake_cases WHERE user_key=%s", (key,))
                 cases = cur.rowcount or 0
+                cur.execute("DELETE FROM form_downloads WHERE user_key=%s", (key,))
         return {"messages": messages, "conversations": conversations, "cases": cases}
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -37,6 +38,11 @@ def delete_user_data(user_id):
         conversations = cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
         cur = con.execute("DELETE FROM intake_cases WHERE user_key=?", (key,))
         cases = cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+        try:
+            con.execute("DELETE FROM form_downloads WHERE user_key=?", (key,))
+        except sqlite3.OperationalError as exc:
+            if "no such table" not in str(exc).lower():
+                raise
         con.commit()
     finally:
         con.close()
