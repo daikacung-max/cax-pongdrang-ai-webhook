@@ -28,6 +28,22 @@ class DynamicServiceTests(unittest.TestCase):
         self.assertEqual(result["_telemetry"]["fallback_reason"], "weak_answer")
         self.assertIn("5%", result["answer"])
 
+    def test_assault_followup_preserves_prior_injury_and_new_stick_detail(self):
+        history = [
+            {"role": "user", "content": "Tôi bị đánh 7%."},
+            {"role": "assistant", "content": "Tôi đã ghi nhận tỷ lệ thương tích."},
+        ]
+        with patch("core.service.db.get_history", return_value=history), patch(
+            "core.service.answer_dynamic_text",
+            return_value="Anh/chị có thể trình báo trực tiếp để được hướng dẫn.",
+        ):
+            result = core.chat("service-test-stick-" + uuid.uuid4().hex, "Dùng gậy đánh", dynamic=True)
+
+        self.assertEqual(result["_telemetry"]["fallback_reason"], "weak_answer")
+        self.assertIn("7%", result["answer"])
+        self.assertIn("gậy", result["answer"].lower())
+        self.assertIn("chưa thể tự khẳng định", result["answer"].lower())
+
     def test_temporary_residence_current_topic_cannot_fall_back_to_stale_identity_topic(self):
         user_id = "service-test-" + uuid.uuid4().hex
         with patch(

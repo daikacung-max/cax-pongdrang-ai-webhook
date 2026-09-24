@@ -416,7 +416,7 @@ def grounded_dynamic_fallback(question, retrieved_units):
     top = retrieved_units[0]
     article = str(top.get("article") or "").strip()
     title = str(top.get("title") or "").strip()
-    if article == "134" and any(x in q for x in ["5%", "%", "duoi 11", "dao", "hung khi"]):
+    if article == "134" and any(x in q for x in ["5%", "%", "duoi 11", "dao", "hung khi", "gay"]):
         injury = re.search(r"\b\d+(?:[.,]\d+)?%", str(question or ""))
         acknowledgement = (
             f"Anh/chị cho biết tỷ lệ thương tích là {injury.group(0)}. "
@@ -429,6 +429,8 @@ def grounded_dynamic_fallback(question, retrieved_units):
         )
         if "dao" in q or "hung khi" in q:
             text += " Việc dùng dao là dữ kiện quan trọng; cần làm rõ đặc điểm con dao, cách sử dụng và việc có thuộc trường hợp vũ khí hoặc hung khí nguy hiểm hay không."
+        elif "gay" in q:
+            text += " Việc người kia dùng gậy là dữ kiện quan trọng; cần ghi rõ loại gậy, cách sử dụng và vùng cơ thể bị tác động. Chưa thể tự khẳng định đây có phải hung khí nguy hiểm hay không nếu chưa có các tình tiết đó."
         return text + " Việc xử lý cụ thể còn phụ thuộc kết quả xác minh và chứng cứ liên quan."
 
     if _has_identity_under14_source(retrieved_units):

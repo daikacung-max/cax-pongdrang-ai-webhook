@@ -14,7 +14,7 @@ from core.history import conversation_key
 from core.intake import assess as assess_intake, prompt_hint as intake_prompt_hint
 from core.team_routing import routing_prompt_hint
 from core.llm import LLMError, LLMTimeout
-from core.planner import plan
+from core.planner import _contextual_question, plan
 from core.providers import provider_name_for_model
 from core.retrieval import format_context, retrieve
 from core.telemetry import StageTimer
@@ -69,6 +69,8 @@ def _dynamic_answer_is_weak(question, answer, legal_units):
         if "%" in q and "%" not in a:
             return True
         if "dao" in q and "dao" not in a:
+            return True
+        if "gay" in q and "gay" not in a:
             return True
         if any(x in q for x in ["camera", "video", "clip", "ghi hinh"]) and not any(
             x in a for x in ["camera", "video", "clip", "ghi hinh"]
@@ -136,6 +138,10 @@ class AICore:
 
         with timer.stage("history_ms"):
             history = db.get_history(user_id, limit=MAX_HISTORY_MESSAGES)
+        # Keep a short factual follow-up tied to relevant prior turns for
+        # retrieval and quality checks. For example, "dùng gậy đánh" must not
+        # be judged in isolation from a preceding "thương tích 7%".
+        conversation_question = _contextual_question(question, history)
         intake = assess_intake(question, history)
         intake_hint = "\n".join(part for part in (
             intake_prompt_hint(intake),
@@ -153,12 +159,12 @@ class AICore:
         legal_context = ""
         with timer.stage("retrieval_ms"):
             if search_plan.get("is_legal"):
-                legal_units = retrieve(search_plan, question)
+                legal_units = retrieve(search_plan, conversation_question)
                 if dynamic:
                     legal_units = legal_units[:max(1, min(DYNAMIC_LEGAL_TOP_K, 2))]
                 legal_context = format_context(legal_units)
 
-        fallback_question = _safe_question_for_fallback(question)
+        fallback_question = _safe_question_for_fallback(conversation_question)
 
         if search_plan.get("is_legal") and not legal_units and not dynamic:
             fallback_reason = "no_source"
@@ -205,8 +211,8 @@ class AICore:
                     verification_errors = ["dynamic_fallback:empty_answer"]
                 else:
                     with timer.stage("verify_ms"):
-                        check = verify_dynamic_text(raw_answer, legal_units, question=question)
-                        weak = _dynamic_answer_is_weak(question, raw_answer, legal_units)
+                        check = verify_dynamic_text(raw_answer, legal_units, question=conversation_question)
+                        weak = _dynamic_answer_is_weak(conversation_question, raw_answer, legal_units)
                     if check["ok"] and not weak:
                         verified = True
                     else:
@@ -260,7 +266,7 @@ class AICore:
             )
         models_used.append(model_used)
         with timer.stage("verify_ms"):
-            verification = verify(draft, legal_units, question=question)
+            verification = verify(draft, legal_units, question=conversation_question)
 
         repaired = False
         if not verification["ok"] and legal_context:
@@ -280,7 +286,7 @@ class AICore:
                 )
             models_used.append(model_used)
             with timer.stage("verify_ms"):
-                verification = verify(draft, legal_units, question=question)
+                verification = verify(draft, legal_units, question=conversation_question)
 
         if (
             not verification["ok"] and legal_context and ENABLE_MODEL_ESCALATION
@@ -302,7 +308,7 @@ class AICore:
                 )
             models_used.append(model_used)
             with timer.stage("verify_ms"):
-                verification = verify(draft, legal_units, question=question)
+                verification = verify(draft, legal_units, question=conversation_question)
 
         if verification["ok"]:
             raw_answer = draft["answer"]
