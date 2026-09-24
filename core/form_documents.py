@@ -154,7 +154,7 @@ def _looks_like_form_field_reply(question: str) -> bool:
 def _is_form_capability_question(question: str) -> bool:
     n = _norm(question)
     asks_file = any(x in n for x in (
-        "xuat file", "tao file", "tai file", "file word", "file docx", "co file khong",
+        "xuat file", "tao file", "tai file", "file word", "file world", "file docx", "co file khong",
         "co xuat duoc file", "xuat duoc khong", "in duoc khong",
     ))
     return asks_file and any(x in n for x in ("co", "duoc", "khong", "the nao", "lam sao"))
@@ -164,14 +164,25 @@ def _explicit_form_type(question: str) -> str:
     n = _norm(question)
     explicit_action = any(x in n for x in (
         "mau", "bieu mau", "in giup", "in cho", "dien mau", "xuat file",
-        "tai file", "soan don", "don trinh bao", "viet don", "lap don",
+        "tai file", "soan don", "don trinh bao", "viet don", "lap don", "lam don", "tao don",
     ))
     if not explicit_action:
         return ""
     if any(x in n for x in (
         "don trinh bao", "don to giac", "soan don trinh bao", "viet don trinh bao",
-        "lap don trinh bao",
+        "lap don trinh bao", "lam don trinh bao", "tao don trinh bao",
     )):
+        return "report"
+    # A citizen often describes the incident and asks simply "giúp tôi làm
+    # đơn".  Treat that as a report only when the same turn contains a clear
+    # incident cue; ordinary civil requests must remain on the normal AI path.
+    report_cues = (
+        "bi trom", "mat tai san", "bi lua", "lua dao", "bi danh", "hanh hung",
+        "bi de doa", "danh bac", "ca do", "ma tuy", "gay roi", "pha hoai",
+    )
+    if any(x in n for x in ("soan don", "viet don", "lap don", "lam don", "tao don")) and any(
+        cue in n for cue in report_cues
+    ):
         return "report"
     if any(x in n for x in (
         "ct01", "cu tru", "thuong tru", "tam tru", "thay doi thong tin cu tru",
@@ -226,9 +237,49 @@ def _ct01_fields(text: str) -> dict:
     }
 
 
+def _natural_value(text: str, patterns: tuple[str, ...]) -> str:
+    """Return an explicitly volunteered value from conversational prose.
+
+    This is deliberately conservative: it recognizes a value only after a
+    citizen-facing cue (for example, ``tôi tên là``).  It never asks a model to
+    invent missing identity information.
+    """
+    for pattern in patterns:
+        match = re.search(pattern, str(text or ""), flags=re.IGNORECASE | re.MULTILINE)
+        if match:
+            value = re.sub(r"\s+", " ", match.group(1)).strip(" ,.;:-")
+            if value:
+                return value
+    return ""
+
+
+def _natural_incident_content(text: str) -> str:
+    """Keep the citizen's own incident narrative when it is in free prose."""
+    lines = [re.sub(r"\s+", " ", line).strip() for line in str(text or "").splitlines()]
+    cues = (
+        "bi trom", "mat", "bi lua", "lua dao", "bi danh", "hanh hung", "de doa",
+        "danh bac", "ca do", "ma tuy", "gay roi", "pha hoai", "chuyen khoan",
+    )
+    for line in reversed(lines):
+        normalized = _norm(line)
+        if not normalized or ":" in line:
+            continue
+        if any(cue in normalized for cue in cues):
+            # Remove only the drafting request, preserving the factual words
+            # supplied after it in the same natural-language sentence.
+            value = re.sub(
+                r"^\s*(?:toi\s+(?:muon|can)\s+)?(?:giup\s+toi\s+)?(?:soan|viet|lap|lam|tao)\s+don\s+(?:trinh\s+bao|to\s+giac)\s*(?:cho\s+toi)?\s*[:,.-]?\s*",
+                "",
+                line,
+                flags=re.IGNORECASE,
+            ).strip()
+            return value or line
+    return ""
+
+
 def _report_fields(text: str) -> dict:
     lines = [x.strip() for x in str(text or "").splitlines() if x.strip()]
-    return {
+    fields = {
         "full_name": _field(lines, ("Họ tên", "Họ và tên")),
         "dob": _field(lines, ("Ngày sinh", "Ngày tháng năm sinh")),
         "personal_id": _field(lines, ("CCCD", "Số CCCD", "Số định danh cá nhân")),
@@ -240,6 +291,22 @@ def _report_fields(text: str) -> dict:
         "evidence": _field(lines, ("Tài liệu chứng cứ", "Chứng cứ", "Tài liệu kèm theo")),
         "request_content": _field(lines, ("Đề nghị", "Yêu cầu", "Nội dung đề nghị")),
     }
+    # Permit a natural conversation such as "Tôi tên là ...; hôm qua tôi bị
+    # lừa chuyển khoản ...".  Labelled fields above take precedence.
+    fields["full_name"] = fields["full_name"] or _natural_value(
+        text, (r"\b(?:tôi\s+tên(?:\s+là)?|tên\s+tôi\s+là|họ\s+tên\s+tôi\s+là)\s+([^,.;\n]{2,80})",)
+    )
+    fields["personal_id"] = fields["personal_id"] or _natural_value(
+        text, (r"\b(?:cccd|căn\s+cước|số\s+định\s+danh(?:\s+cá\s+nhân)?)\s*(?:là)?\s*[:#-]?\s*(\d{9,12})",)
+    )
+    fields["phone"] = fields["phone"] or _natural_value(
+        text, (r"\b(?:số\s+điện\s+thoại|điện\s+thoại|sđt)\s*(?:là)?\s*[:#-]?\s*((?:\+84|0)\d{9,10})",)
+    )
+    fields["address"] = fields["address"] or _natural_value(
+        text, (r"\b(?:địa\s+chỉ(?:\s+của\s+tôi)?|tôi\s+(?:đang\s+)?ở)\s*(?:là|tại)?\s*[:,-]?\s*([^\n.;]{4,160})",)
+    )
+    fields["incident_content"] = fields["incident_content"] or _natural_incident_content(text)
+    return fields
 
 
 def _missing(fields: dict, required: tuple[str, ...]) -> list[str]:
@@ -260,6 +327,7 @@ REPORT_LABELS = {
     "incident_content": "Nội dung sự việc",
     "request_content": "Đề nghị",
 }
+REPORT_DRAFT_REQUIRED = ("incident_content",)
 
 
 def _blank_requested(question: str) -> bool:
@@ -355,16 +423,19 @@ def handle_form_request(user_id: str, question: str, history=None):
                 "missing": missing,
             }
 
-    required = tuple(REPORT_LABELS)
-    missing = _missing(fields, required)
+    # A Word draft can be useful before the citizen has every identity/detail
+    # field.  Require only their own account of the incident; the remaining
+    # fields stay blank in the document rather than being guessed by AI.
+    missing = _missing(fields, REPORT_DRAFT_REQUIRED)
     if missing:
         labels = "\n".join(f"- {REPORT_LABELS[k]}:" for k in missing)
         return {
             "answer": (
                 "Tôi đang hỗ trợ soạn Đơn trình báo gửi " + UNIT_NAME + ". "
                 "Tôi chỉ dùng dữ liệu anh/chị cung cấp, không tự suy đoán diễn biến vụ việc.\n"
-                "Anh/chị có thể gửi một hoặc nhiều mục sau:\n" + labels +
-                "\nNếu có, có thể bổ sung: Ngày sinh, Số điện thoại, Thời gian xảy ra, Địa điểm xảy ra, Tài liệu chứng cứ. "
+                "Anh/chị hãy kể ngắn gọn sự việc đã xảy ra (ai, việc gì, khi nào/nơi nào nếu nhớ). "
+                "Có thể nhắn tự nhiên, không cần theo mẫu, hoặc gửi:\n" + labels +
+                "\nNếu có, có thể bổ sung: Họ tên, CCCD, địa chỉ, số điện thoại, thời gian, địa điểm, tài liệu chứng cứ và đề nghị của anh/chị. "
                 "Nếu muốn chuyển sang nội dung khác, anh/chị cứ hỏi bình thường; hệ thống sẽ tự rời chế độ soạn đơn."
             ),
             "form_type": "report",
@@ -374,8 +445,9 @@ def handle_form_request(user_id: str, question: str, history=None):
     url = _download_url("report", fields)
     return {
         "answer": (
-            "Tôi đã soạn bản Đơn trình báo từ đúng các thông tin anh/chị cung cấp. Tải file Word tại: " + url +
-            "\nAnh/chị cần đọc lại nội dung, sửa chi tiết nếu cần và ký xác nhận trước khi sử dụng."
+            "Tôi đã soạn bản Đơn trình báo Word từ đúng các thông tin anh/chị cung cấp. Tải file tại: " + url +
+            "\nCác mục anh/chị chưa cung cấp được để trống để tự điền, không phải thông tin do AI suy đoán. "
+            "Anh/chị cần đọc lại nội dung, sửa chi tiết nếu cần và ký xác nhận trước khi sử dụng."
         ),
         "form_type": "report",
         "ready": True,
