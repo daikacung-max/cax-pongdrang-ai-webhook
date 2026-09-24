@@ -11,6 +11,27 @@ from core.service import core
 
 
 class DynamicServiceTests(unittest.TestCase):
+    def test_vneid_followup_answers_identity_card_reissue_instead_of_account_levels(self):
+        user_id = "service-test-vneid-reissue-" + uuid.uuid4().hex
+        with patch(
+            "core.service.answer_dynamic_text",
+            return_value="Anh/chị có thể đề nghị cấp lại thẻ căn cước qua VNeID.",
+        ):
+            first = core.chat(
+                user_id,
+                "Tôi muốn làm lại căn cước thì làm những thủ tục gì",
+                dynamic=True,
+            )
+            self.assertNotEqual(first["meta"].get("path"), "citizen_form_assistant")
+            result = core.chat(user_id, "hướng dẫn tôi nộp hồ sơ vneid", dynamic=True)
+
+        self.assertEqual(result["meta"]["path"], "contextual_citizen_id_vneid_guidance")
+        self.assertIn("Cấp lại thẻ căn cước", result["answer"])
+        self.assertIn("Thủ tục hành chính", result["answer"])
+        self.assertIn("07 ngày làm việc", result["answer"])
+        self.assertNotIn("mức độ 01", result["answer"])
+        self.assertNotIn("mức độ 02", result["answer"])
+
     def test_dynamic_report_form_continuation_generates_word_without_general_ai(self):
         user_id = "service-test-form-" + uuid.uuid4().hex
         synthetic_details = (

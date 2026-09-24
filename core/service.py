@@ -110,6 +110,42 @@ def _dynamic_answer_is_weak(question, answer, legal_units):
     return False
 
 
+def _citizen_id_vneid_followup(question, history):
+    """Answer VNeID submission follow-ups in the active identity-card context."""
+    q = norm(question)
+    if "vneid" not in q or not any(x in q for x in ("nop ho so", "gui ho so", "huong dan", "lam ho so")):
+        return ""
+    if any(x in q for x in (
+        "tai khoan dinh danh", "dang ky tai khoan", "muc do 01", "muc do 02",
+        "muc do 1", "muc do 2", "cap tai khoan",
+    )):
+        return ""
+
+    recent = [
+        str(item.get("content") or "").strip()
+        for item in (history or [])[-8:]
+        if item.get("role") in ("user", "assistant") and str(item.get("content") or "").strip()
+    ]
+    context = norm(" ".join(recent))
+    identity_card = any(x in context for x in ("can cuoc", "the can cuoc", "can cuoc cong dan"))
+    reissue = any(x in context for x in ("cap lai", "lam lai", "mat the", "hu hong"))
+    if not (identity_card and reissue):
+        return ""
+
+    return (
+        "Anh/chị đang hỏi cách nộp hồ sơ cấp lại thẻ căn cước qua VNeID. Nếu thẻ bị mất hoặc hư hỏng không sử dụng được, "
+        "anh/chị thực hiện như sau:\n"
+        "1. Mở VNeID, đăng nhập và vào mục Thủ tục hành chính.\n"
+        "2. Tìm thủ tục ‘Cấp, cấp đổi, cấp lại thẻ căn cước’, chọn ‘Cấp lại thẻ căn cước’ và chọn đúng lý do.\n"
+        "3. Kiểm tra thông tin cá nhân được điền/tra cứu từ Cơ sở dữ liệu quốc gia về dân cư; nếu chính xác thì xác nhận.\n"
+        "4. Chọn Công an cấp xã tiếp nhận trong danh sách ứng dụng hiển thị, chọn cách nhận thẻ nếu hệ thống cho lựa chọn, "
+        "kiểm tra lại và gửi hồ sơ. Lưu mã hồ sơ để theo dõi thông báo trên ứng dụng.\n"
+        "Thời hạn giải quyết được công bố là không quá 07 ngày làm việc. Với trường hợp mất thẻ hoặc thẻ hư hỏng không sử dụng được, "
+        "cơ quan tiếp nhận sử dụng ảnh, vân tay, mống mắt đã thu nhận gần nhất và dữ liệu căn cước hiện có. Nếu không thấy thủ tục hoặc "
+        "không gửi được trên VNeID, anh/chị có thể đến Công an cấp xã/Bộ phận một cửa đang tiếp nhận thủ tục để được hỗ trợ."
+    )
+
+
 def _model_meta(model):
     return {"model": model, "provider": provider_name_for_model(model)}
 
@@ -175,6 +211,28 @@ class AICore:
             telemetry = timer.finish(model_used="form_documents", retrieved_unit_count=0)
             return {
                 "answer": final_answer,
+                "meta": meta,
+                "handoff": None,
+                "_telemetry": telemetry,
+            }
+        vneid_followup_answer = _citizen_id_vneid_followup(question, history)
+        if vneid_followup_answer:
+            meta = {
+                "legal": True,
+                "retrieved_unit_ids": ["CITIZEN_ID_5230_COMMUNE_2026:reissue"],
+                "verified": True,
+                "repaired": False,
+                "verification_errors": [],
+                "dynamic": bool(dynamic),
+                "path": "contextual_citizen_id_vneid_guidance",
+                "handoff": None,
+                "model": "verified_procedure_guidance",
+                "provider": "local",
+            }
+            self._save(user_id, question, vneid_followup_answer, {}, meta)
+            telemetry = timer.finish(model_used="verified_procedure_guidance", retrieved_unit_count=1)
+            return {
+                "answer": vneid_followup_answer,
                 "meta": meta,
                 "handoff": None,
                 "_telemetry": telemetry,

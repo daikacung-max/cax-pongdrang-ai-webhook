@@ -102,6 +102,37 @@ def _contextual_question(question, history):
     current = str(question or "").strip()
     if not current:
         return current
+    # "VNeID" is an explicit term, but short requests about submitting a
+    # VNeID application often continue a prior procedure (for example, a
+    # replacement identity card). Preserve that immediate subject unless the
+    # citizen clearly asks about an electronic-identity account or level.
+    normalized = _norm(current)
+    vneid_submission = "vneid" in normalized and any(x in normalized for x in (
+        "nop ho so", "gui ho so", "thuc hien ho so", "lam ho so", "huong dan",
+    ))
+    explicit_account_topic = any(x in normalized for x in (
+        "tai khoan dinh danh", "dang ky tai khoan", "muc do 01", "muc do 02",
+        "muc do 1", "muc do 2", "cap tai khoan",
+    ))
+    if vneid_submission and not explicit_account_topic:
+        recent_user_turns = [
+            str(item.get("content") or "").strip()
+            for item in history
+            if item.get("role") == "user" and str(item.get("content") or "").strip()
+        ][-2:]
+        recent_assistant_turns = [
+            str(item.get("content") or "").strip()
+            for item in history
+            if item.get("role") == "assistant" and str(item.get("content") or "").strip()
+        ][-2:]
+        recent_context = _norm(" ".join(recent_user_turns + recent_assistant_turns))
+        identity_procedure = any(x in recent_context for x in (
+            "can cuoc", "can cuoc cong dan", "the can cuoc",
+        ))
+        if identity_procedure and any(x in recent_context for x in (
+            "cap lai", "lam lai", "mat the", "hu hong", "cap doi",
+        )):
+            return " | ".join((recent_user_turns + [current])[-max(1, RETRIEVAL_HISTORY_USER_TURNS):])
     # A clear current topic overrides stale history. Only genuinely elliptical
     # follow-ups inherit recent user turns.
     if _has_explicit_current_topic(current) or not _looks_elliptical(current):
@@ -154,3 +185,4 @@ def plan(question, history, dynamic=False, safety_identifier=None):
         return _sanitize_plan(candidate, baseline, contextual)
     except Exception:
         return baseline
+

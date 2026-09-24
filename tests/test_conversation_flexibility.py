@@ -79,6 +79,20 @@ class ConversationFlexibilityTests(unittest.TestCase):
         self.assertIn("đăng ký tạm trú", contextual)
         self.assertIn("ở thuê", contextual)
 
+    def test_vneid_submission_followup_keeps_recent_identity_card_context(self):
+        history = [
+            {"role": "user", "content": "Tôi muốn làm lại căn cước thì làm những thủ tục gì"},
+            {"role": "assistant", "content": "Anh/chị có thể đề nghị cấp lại thẻ căn cước qua VNeID."},
+        ]
+        contextual = _contextual_question("hướng dẫn tôi nộp hồ sơ vneid", history)
+        self.assertIn("làm lại căn cước", contextual)
+        self.assertIn("nộp hồ sơ vneid", contextual)
+
+    def test_explicit_vneid_account_question_starts_new_topic(self):
+        history = [{"role": "user", "content": "Tôi muốn làm lại căn cước"}]
+        contextual = _contextual_question("đăng ký tài khoản VNeID mức độ 2 thế nào", history)
+        self.assertEqual(contextual, "đăng ký tài khoản VNeID mức độ 2 thế nào")
+
     def test_gambling_is_deterministically_legal_topic(self):
         plan = quick_plan("Tôi biết một người cá độ bóng đá")
         self.assertTrue(plan["is_legal"])
@@ -103,3 +117,4 @@ class ConversationFlexibilityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
