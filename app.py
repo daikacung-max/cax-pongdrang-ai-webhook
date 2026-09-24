@@ -17,6 +17,7 @@ from adapters.readiness import blueprint as readiness_blueprint
 from adapters.self_test import blueprint as self_test_blueprint
 from adapters.demo_ai import blueprint as demo_ai_blueprint
 from adapters.forms import blueprint as citizen_forms_blueprint
+from adapters.knowledge_admin import blueprint as knowledge_admin_blueprint
 from adapters.zalo_oa_api import ZaloOAClient
 from config import (
     LOCAL_BIND_HOST,
@@ -370,6 +371,8 @@ if "ai_core_demo_ai" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(demo_ai_blueprint)
 if "citizen_forms" not in _app_core.app.blueprints:
     _app_core.app.register_blueprint(citizen_forms_blueprint)
+if "officer_knowledge" not in _app_core.app.blueprints:
+    _app_core.app.register_blueprint(knowledge_admin_blueprint)
 
 register_production_security(_app_core.app)
 
