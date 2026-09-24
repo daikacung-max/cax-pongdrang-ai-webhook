@@ -9,6 +9,7 @@ from config import (
 )
 from core import db
 from core import cases
+from core import form_documents
 from core.answerer import answer as generate_answer, answer_dynamic_text
 from core.history import conversation_key
 from core.intake import assess as assess_intake, prompt_hint as intake_prompt_hint
@@ -148,6 +149,36 @@ class AICore:
 
         with timer.stage("history_ms"):
             history = db.get_history(user_id, limit=MAX_HISTORY_MESSAGES)
+        # Handle explicit form requests and replies to an active form before
+        # sending the turn to the general AI path. This keeps the form session
+        # attached to the same pseudonymous Zalo user across Dynamic calls.
+        form_result = form_documents.handle_form_request(user_id, question, history=history)
+        if form_result is not None:
+            final_answer = str(form_result.get("answer") or "").strip()
+            form_type = str(form_result.get("form_type") or "")
+            form_ready = bool(form_result.get("ready"))
+            meta = {
+                "legal": False,
+                "retrieved_unit_ids": [],
+                "verified": False,
+                "repaired": False,
+                "verification_errors": [],
+                "dynamic": bool(dynamic),
+                "path": "citizen_form_assistant",
+                "form_type": form_type,
+                "form_ready": form_ready,
+                "handoff": None,
+                "model": "form_documents",
+                "provider": "local",
+            }
+            self._save(user_id, question, final_answer, {}, meta)
+            telemetry = timer.finish(model_used="form_documents", retrieved_unit_count=0)
+            return {
+                "answer": final_answer,
+                "meta": meta,
+                "handoff": None,
+                "_telemetry": telemetry,
+            }
         # Keep a short factual follow-up tied to relevant prior turns for
         # retrieval and quality checks. For example, "dùng gậy đánh" must not
         # be judged in isolation from a preceding "thương tích 7%".
@@ -412,3 +443,4 @@ class AICore:
 
 
 core = AICore()
+
