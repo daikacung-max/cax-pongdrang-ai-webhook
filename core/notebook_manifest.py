@@ -35,7 +35,7 @@ def _source(index, source_id, domains, document_ids):
 SOURCES = [
     _source(1, "nb01-permanent-residence", ["permanent_residence"], ["RESIDENCE_CURRENT_2026", "RESIDENCE_PERMANENT_2026", "RESIDENCE_GUIDANCE_2026"]),
     _source(2, "nb02-delete-permanent-residence", ["delete_permanent_residence", "residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
-    _source(3, "nb03-temporary-residence", ["temporary_residence"], ["RESIDENCE_CURRENT_2026", "TTHC_TEMP_RESIDENCE_2026", "RESIDENCE_GUIDANCE_2026"]),
+    _source(3, "nb03-temporary-residence", ["temporary_residence"], ["RESIDENCE_CURRENT_2026", "TTHC_TEMP_RESIDENCE_2026", "RESIDENCE_GUIDANCE_2026", "RESIDENCE_VNEID_ONLINE_2026", "RESIDENCE_VNEID_APP_STEPS_2026"]),
     _source(4, "nb04-extend-temporary-residence", ["extend_temporary_residence", "temporary_residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
     _source(5, "nb05-household-split", ["household_split", "residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),
     _source(6, "nb06-adjust-residence", ["adjust_residence", "residence"], ["RESIDENCE_NOTEBOOK_2026", "RESIDENCE_CURRENT_2026", "RESIDENCE_GUIDANCE_2026"]),

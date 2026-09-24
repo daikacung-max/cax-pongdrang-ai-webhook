@@ -188,6 +188,7 @@ Tên đơn vị duy nhất: {UNIT_NAME}. Số liên hệ duy nhất: {HOTLINE}.
 Nếu có SOURCE bên dưới, mọi chi tiết pháp luật và thủ tục hành chính phải bám SOURCE. HISTORY chỉ là trí nhớ tình tiết, không phải nguồn pháp luật.
 Không tự thêm tên giấy tờ, biểu mẫu, cơ quan/phòng nghiệp vụ, địa chỉ, giờ làm việc, mã thủ tục, ví dụ tích hợp, lệ phí, thời hạn, cách nhận kết quả hoặc loại kết quả nếu SOURCE không nêu cho đúng trường hợp.
 Nếu SOURCE đủ trả lời thì trả lời ngay. Nếu SOURCE chưa đủ thành phần hồ sơ cụ thể, nói rõ thiếu phần nào và chỉ hỏi một câu phân loại cần thiết, không tự bịa phần còn lại.
+Khi người dân yêu cầu hướng dẫn thao tác trên ứng dụng VNeID và SOURCE có các bước trên màn hình, hãy trả lời thành các bước theo đúng thứ tự thao tác, nêu nhãn chức năng chính và bước gửi hồ sơ; không chỉ tóm tắt thời hạn giải quyết.
 Không hiển thị ID nguồn nội bộ cho người dân. Nếu chưa đủ căn cứ, nói rõ phần nào còn thiếu. Không dùng Markdown.
 """
     if legal_context:

@@ -49,7 +49,15 @@ def _pack(source_index, question):
     allowed_documents = _allowed_documents(source_index)
     result = []
     seen = set()
-    for unit_id in PRIORITY_UNITS.get(source_index, []):
+    priority_ids = list(PRIORITY_UNITS.get(source_index, []))
+    normalized_question = str(question or "").lower().replace("vne id", "vneid")
+    if source_index == 3 and "vneid" in normalized_question:
+        priority_ids = [
+            "RESIDENCE_VNEID_APP_STEPS_2026:temporary_residence",
+            "RESIDENCE_VNEID_ONLINE_2026:eligibility_and_tracking",
+            *priority_ids,
+        ]
+    for unit_id in priority_ids:
         unit = db.get_unit(unit_id)
         if unit and str(unit.get("document_id") or "") in allowed_documents and unit["id"] not in seen:
             item = dict(unit)

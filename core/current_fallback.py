@@ -31,6 +31,16 @@ def _citizen_norm(question):
 def grounded_dynamic_fallback(question, retrieved_units):
     q = _citizen_norm(question)
 
+    if _has(retrieved_units, "RESIDENCE_VNEID_APP_STEPS_2026") and "tam tru" in q:
+        return (
+            "Anh/chị có thể làm trên VNeID theo các bước sau: mở VNeID và đăng nhập, vào Thủ tục hành chính, chọn Đăng ký tạm trú. "
+            "Chọn Tạo mới yêu cầu, rồi chọn đăng ký cho bản thân hoặc khai hộ. Kiểm tra thông tin, chọn lập hộ mới hoặc đăng ký vào hộ đã có; "
+            "chọn cách xác nhận của chủ hộ/chủ sở hữu chỗ ở hợp pháp theo lựa chọn VNeID hiển thị. "
+            "Tiếp theo chọn và điền địa chỉ tạm trú, quan hệ với chủ hộ, thêm thành viên nếu cùng đăng ký; kiểm tra lại hồ sơ. "
+            "Nếu ứng dụng yêu cầu giấy tờ theo trường hợp thì đính kèm bản rõ nét, sau đó nộp lệ phí theo chức năng của ứng dụng và lưu mã hồ sơ để theo dõi. "
+            "Cần tài khoản VNeID mức độ 02; nếu dữ liệu cư trú chưa có hoặc không khớp, anh/chị đến Công an cấp xã nơi đăng ký tạm trú để được cập nhật và nộp hồ sơ trực tiếp."
+        )
+
     if _has(retrieved_units, "CITIZEN_ID_5230_COMMUNE_2026"):
         is_reissue = any(x in q for x in [
             "mat can cuoc", "mat cccd", "cap lai can cuoc", "cap lai cccd",

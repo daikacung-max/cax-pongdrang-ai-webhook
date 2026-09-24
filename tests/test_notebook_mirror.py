@@ -2,6 +2,8 @@ import unittest
 
 from core import db
 from core.notebook_current_sources import ensure_notebook_current_sources
+from core.current_knowledge import ensure_current_knowledge
+from core.current_fallback import grounded_dynamic_fallback
 from core.notebook_manifest import NOTEBOOK_SOURCE_COUNT, SOURCES, used_sources_for_unit_ids
 from core.notebook_retrieval import retrieve
 
@@ -10,6 +12,7 @@ class NotebookMirrorTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         db.init_schema()
+        ensure_current_knowledge()
         ensure_notebook_current_sources()
 
     def test_manifest_has_exact_19_source_titles(self):
@@ -74,6 +77,18 @@ class NotebookMirrorTests(unittest.TestCase):
                 labels = used_sources_for_unit_ids([x["id"] for x in units])
                 self.assertTrue(labels)
                 self.assertEqual(labels[0]["title"], "3. ĐK tạm trú.pdf")
+
+    def test_vneid_temporary_residence_returns_actionable_steps_within_source_three(self):
+        question = "Tôi muốn hướng dẫn thao tác trên ứng dụng VNeID để đăng ký tạm trú"
+        units = retrieve({"search_queries": [question]}, question)
+
+        self.assertEqual(units[0]["id"], "RESIDENCE_VNEID_APP_STEPS_2026:temporary_residence")
+        answer = grounded_dynamic_fallback(question, units)
+        self.assertIn("Thủ tục hành chính", answer)
+        self.assertIn("Tạo mới yêu cầu", answer)
+        self.assertIn("mã hồ sơ", answer)
+        labels = used_sources_for_unit_ids([x["id"] for x in units])
+        self.assertEqual(labels[0]["title"], "3. ĐK tạm trú.pdf")
 
     def test_user_facing_source_label_hides_internal_unit_id(self):
         labels = used_sources_for_unit_ids(["CRIMINAL_RECORD_CURRENT_2026:citizen"])

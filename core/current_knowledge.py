@@ -210,6 +210,54 @@ def ensure_current_knowledge():
         },
     ])
 
+    # Hướng dẫn trực tuyến được tách thành nguồn hỗ trợ riêng: không thay đổi
+    # 19 nguồn Artifact Core, nhưng cho phép AI hướng dẫn thao tác thay vì chỉ
+    # nêu cơ quan/thời hạn xử lý.
+    _doc(
+        "RESIDENCE_VNEID_ONLINE_2026",
+        "Đăng ký tạm trú trực tuyến trên VNeID",
+        "Hỏi đáp Bộ Công an ngày 30/03/2026",
+        "Bộ Công an",
+        "https://bocongan.gov.vn/chinh-sach-phap-luat/chi-tiet-cau-hoi/b24f6aa4-18da-4a8c-b55e-206f48646655",
+        authority_levels=["xa"],
+    )
+    db.replace_document_units("RESIDENCE_VNEID_ONLINE_2026", [
+        {
+            "id": "RESIDENCE_VNEID_ONLINE_2026:eligibility_and_tracking",
+            "unit_type": "guidance",
+            "title": "Điều kiện và theo dõi hồ sơ tạm trú trên VNeID",
+            "text": (
+                "Thủ tục đăng ký tạm trú đã được tích hợp trên VNeID. Công dân có tài khoản định danh điện tử mức độ 02 "
+                "thực hiện kê khai và gửi hồ sơ trên ứng dụng; sau khi nộp hồ sơ trực tuyến, hệ thống cấp mã số hồ sơ để theo dõi, tra cứu tiến độ hoặc nhận yêu cầu bổ sung. "
+                "Nếu thông tin cư trú chưa có hoặc không khớp trong Cơ sở dữ liệu quốc gia về dân cư, công dân liên hệ trực tiếp Công an cấp xã nơi đăng ký tạm trú để nộp hồ sơ và cập nhật, điều chỉnh dữ liệu."
+            ),
+        },
+    ])
+    _doc(
+        "RESIDENCE_VNEID_APP_STEPS_2026",
+        "Các bước đăng ký tạm trú trên ứng dụng VNeID",
+        "Hướng dẫn thao tác do Cục C06 thông tin",
+        "Cục Cảnh sát quản lý hành chính về trật tự xã hội / UBND xã Chiêm Hóa",
+        "https://chiemhoa.gov.vn/tin-tuc-su-kien/chuyen-doi-so/7-buoc-dang-ky-tam-tru-qua-ung-dung-vneid-12410.html",
+        authority_levels=["xa"],
+    )
+    db.replace_document_units("RESIDENCE_VNEID_APP_STEPS_2026", [
+        {
+            "id": "RESIDENCE_VNEID_APP_STEPS_2026:temporary_residence",
+            "unit_type": "guidance",
+            "title": "Các bước thao tác đăng ký tạm trú trên VNeID",
+            "text": (
+                "Trên ứng dụng VNeID: (1) đăng nhập, vào Thủ tục hành chính, chọn Đăng ký tạm trú; "
+                "(2) chọn Tạo mới yêu cầu, rồi chọn đăng ký cho bản thân hoặc khai hộ; "
+                "(3) kiểm tra thông tin và chọn lập hộ mới hoặc đăng ký vào hộ đã có; chọn cách xác nhận đồng ý của chủ hộ/chủ sở hữu chỗ ở hợp pháp/cha mẹ/người giám hộ qua VNeID hoặc Tờ khai thay đổi thông tin cư trú; "
+                "(4) chọn địa chỉ nơi tạm trú và điền địa chỉ chi tiết, quan hệ với chủ hộ; thêm thành viên nếu cùng đăng ký; "
+                "(5) kiểm tra, xác nhận hồ sơ và chọn cách nhận kết quả mà ứng dụng hiển thị; "
+                "(6) đính kèm giấy tờ liên quan nếu ứng dụng yêu cầu theo trường hợp; "
+                "(7) nộp lệ phí theo chức năng của ứng dụng và theo dõi mã hồ sơ sau khi gửi."
+            ),
+        },
+    ])
+
     # ------------------------------------------------------------------
     # C. ĐĂNG KÝ XE - CHUỖI VĂN BẢN HIỆN HÀNH, CẤP TỈNH/CẤP XÃ
     # ------------------------------------------------------------------

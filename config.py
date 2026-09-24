@@ -51,7 +51,10 @@ CORE_TIMEOUT_SECONDS = float(os.getenv("CORE_TIMEOUT_SECONDS", "12"))
 # One second caused legitimate OpenAI/Groq responses to be aborted before the
 # provider could answer, which turned ordinary questions into safe fallbacks.
 DYNAMIC_TIMEOUT_SECONDS = float(os.getenv("DYNAMIC_TIMEOUT_SECONDS", "8"))
-DYNAMIC_MAX_COMPLETION_TOKENS = int(os.getenv("DYNAMIC_MAX_COMPLETION_TOKENS", "140"))
+# Keep real-time OA replies bounded for latency.  Detailed VNeID instructions
+# are available from the source-grounded fallback when a complete walkthrough
+# is needed or the provider is unavailable.
+DYNAMIC_MAX_COMPLETION_TOKENS = int(os.getenv("DYNAMIC_MAX_COMPLETION_TOKENS", "160"))
 # Fast mode is intentionally limited to citizen-facing realtime turns. Batch,
 # form-generation, and full-core requests keep the standard service tier.
 DYNAMIC_OPENAI_SERVICE_TIER = os.getenv("DYNAMIC_OPENAI_SERVICE_TIER", "fast").strip().lower()
