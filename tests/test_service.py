@@ -4,12 +4,41 @@ from unittest.mock import patch
 
 from config import UNIT_ADDRESS, UNIT_NAME
 from core.llm import LLMError
+import core.form_documents as forms
 from core.planner import plan
 from core.retrieval import retrieve
 from core.service import core
 
 
 class DynamicServiceTests(unittest.TestCase):
+    def test_dynamic_report_form_continuation_generates_word_without_general_ai(self):
+        user_id = "service-test-form-" + uuid.uuid4().hex
+        synthetic_details = (
+            "Họ tên: Người Thử Nghiệm\n"
+            "Địa chỉ: xã Pơng Drang (giả lập)\n"
+            "Nội dung sự việc: Đây là tình huống giả lập chỉ để kiểm thử tạo đơn, không phải vụ việc có thật."
+        )
+        with patch.object(forms, "HISTORY_HMAC_SECRET", "synthetic-form-test-secret"), patch(
+            "core.service.answer_dynamic_text",
+            side_effect=AssertionError("form turns must bypass the general answer model"),
+        ):
+            first = core.chat(user_id, "Tôi muốn làm đơn trình báo", dynamic=True)
+            self.assertFalse(first["meta"]["form_ready"])
+            self.assertEqual(first["meta"]["path"], "citizen_form_assistant")
+
+            result = core.chat(user_id, synthetic_details, dynamic=True)
+            self.assertTrue(result["meta"]["form_ready"])
+            token = result["answer"].split("/forms/download/", 1)[1].split("/", 1)[0]
+            payload = forms.decode_download_token(token)
+            content, filename = forms.render_docx(payload)
+
+        self.assertEqual(filename, "Don-trinh-bao.docx")
+        self.assertGreater(len(content), 1000)
+        self.assertEqual(payload["fields"]["full_name"], "Người Thử Nghiệm")
+        self.assertIn("tình huống giả lập", payload["fields"]["incident_content"])
+        self.assertEqual(payload["fields"]["personal_id"], "")
+        self.assertEqual(payload["fields"]["phone"], "")
+
     def test_unsupported_article_fails_closed_after_one_model_call(self):
         user_id = "service-test-" + uuid.uuid4().hex
         with patch("core.service.answer_dynamic_text", return_value="Người kia chắc chắn phạm Điều 148." ) as model:
@@ -231,3 +260,4 @@ class DynamicServiceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
