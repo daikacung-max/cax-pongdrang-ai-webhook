@@ -115,6 +115,43 @@ jobs:
                       payload={"user_id": "synthetic", "message": "xin chao"},
                   )
 
+                  # Official operation must not expose the public demo.  The
+                  # complete Artifact Core, multi-turn, form, and source-guard
+                  # regressions run in the CI test job above; this production
+                  # smoke verifies the live security and Zalo readiness gates.
+                  assert readiness.get("provider_ready") is True, "no LLM provider ready"
+                  if readiness.get("zalo_webhook_enabled"):
+                      assert readiness.get("zalo_signature_secret_ready") is True, "Zalo signature secret missing"
+                      assert readiness.get("zalo_signature_required") is True, "Zalo signature check disabled"
+                  if readiness.get("zalo_direct_reply_enabled"):
+                      assert readiness.get("zalo_direct_reply_ready") is True, "Zalo OA reply credentials missing"
+                  demo_status = expect_http("/demo", 404)
+                  notebook_status = expect_http("/demo/api/notebook-sources", 404)
+                  safe = {
+                      "status": health.get("status"),
+                      "mode": health.get("mode"),
+                      "unit": health.get("unit"),
+                      "hotline": health.get("hotline"),
+                      "demo_console_enabled": health.get("demo_console_enabled"),
+                      "public_demo_closed": demo_status == 404 and notebook_status == 404,
+                      "debug_surface_closed": debug_status == 404,
+                      "public_api_chat_closed": api_chat_status == 404,
+                      "production_mode": readiness.get("production_mode"),
+                      "model_routing_mode": readiness.get("model_routing_mode"),
+                      "provider_ready": readiness.get("provider_ready"),
+                      "zalo_webhook_enabled": readiness.get("zalo_webhook_enabled"),
+                      "zalo_signature_required": readiness.get("zalo_signature_required"),
+                      "zalo_signature_ready": readiness.get("zalo_signature_ready"),
+                      "zalo_direct_reply_enabled": readiness.get("zalo_direct_reply_enabled"),
+                      "zalo_direct_reply_ready": readiness.get("zalo_direct_reply_ready"),
+                      "zalo_oauth_refresh_ready": readiness.get("zalo_oauth_refresh_ready"),
+                      "zalo_end_to_end_reply_ready": readiness.get("zalo_end_to_end_reply_ready"),
+                  }
+                  print(json.dumps(safe, ensure_ascii=False, indent=2))
+                  with open("production-smoke.json", "w", encoding="utf-8") as f:
+                      json.dump(safe, f, ensure_ascii=False, indent=2)
+                  break
+
                   assert "HÀNH CHÍNH CÔNG - CÔNG AN XÃ PƠNG DRANG" in demo_html, "Notebook demo title missing"
                   assert 'id="message"' in demo_html and 'id="send-button"' in demo_html, "chat composer missing"
                   assert "⬇ Tải file Word" in demo_html, "download UI missing"
