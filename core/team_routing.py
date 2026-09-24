@@ -11,7 +11,8 @@ TEAM_BY_QUEUE = {
     "ADMIN_INTAKE": "Tổ Cảnh sát khu vực",
     "CRIME_INTAKE": "Tổ Cảnh sát phòng, chống tội phạm",
     "VEHICLE_REGISTRATION": "Tổ Cảnh sát trật tự",
-    "PUBLIC_ORDER_INTAKE": "Tổ Cảnh sát trật tự",
+    "PUBLIC_ORDER_INTAKE": "Tổ Cảnh sát khu vực",
+    "COMMUNITY_DISPUTE_INTAKE": "Tổ Cảnh sát khu vực",
 }
 
 

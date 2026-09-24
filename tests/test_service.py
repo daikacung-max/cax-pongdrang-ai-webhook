@@ -2,6 +2,7 @@ import unittest
 import uuid
 from unittest.mock import patch
 
+from config import UNIT_ADDRESS, UNIT_NAME
 from core.llm import LLMError
 from core.planner import plan
 from core.retrieval import retrieve
@@ -61,6 +62,55 @@ class DynamicServiceTests(unittest.TestCase):
             unit_id.startswith("RESIDENCE_CURRENT_2026:temporary")
             for unit_id in result["meta"]["retrieved_unit_ids"]
         ))
+
+    def test_vehicle_procedure_always_has_local_office_guidance(self):
+        user_id = "service-test-vehicle-" + uuid.uuid4().hex
+        with patch(
+            "core.service.answer_dynamic_text",
+            return_value=(
+                "Anh/chị cho biết xe là đăng ký lần đầu, sang tên hay cấp đổi giấy tờ xe "
+                "để tôi hướng dẫn đúng trường hợp."
+            ),
+        ):
+            result = core.chat(user_id, "Tôi muốn đăng ký xe máy của tôi thì làm gì, ở đâu?", dynamic=True)
+
+        self.assertIn(UNIT_NAME, result["answer"])
+        self.assertIn(UNIT_ADDRESS, result["answer"])
+        self.assertIn("theo phân cấp", result["answer"].lower())
+
+    def test_criminal_question_does_not_receive_administrative_procedure_location(self):
+        user_id = "service-test-crime-" + uuid.uuid4().hex
+        with patch(
+            "core.service.answer_dynamic_text",
+            return_value="Anh/chị nên giữ lại thông tin, chứng cứ liên quan để trình báo.",
+        ):
+            result = core.chat(user_id, "Tôi bị người khác đánh", dynamic=True)
+
+        self.assertNotIn(UNIT_ADDRESS, result["answer"])
+
+    def test_noise_fine_followup_keeps_karaoke_context_and_community_team(self):
+        history = [
+            {"role": "user", "content": "Hàng xóm hát karaoke ồn ào quá."},
+            {"role": "assistant", "content": "Anh/chị cho biết nơi và thời điểm gây ồn."},
+        ]
+        with patch("core.service.db.get_history", return_value=history), patch(
+            "core.service.answer_dynamic_text",
+            return_value=(
+                "Cần xác minh hành vi, địa điểm và mức độ ảnh hưởng thực tế trước khi "
+                "xác định căn cứ xử lý."
+            ),
+        ):
+            result = core.chat(
+                "service-test-noise-" + uuid.uuid4().hex,
+                "Tôi muốn hỏi mức phạt của người ta",
+                dynamic=True,
+            )
+
+        self.assertTrue(any(
+            unit_id.startswith("NOISE_KARAOKE_282_2025:")
+            for unit_id in result["meta"]["retrieved_unit_ids"]
+        ))
+        self.assertIn("Tổ Cảnh sát khu vực", result["answer"])
 
     def test_playing_cards_for_money_routes_to_gambling_source_and_safe_action(self):
         user_id = "service-test-" + uuid.uuid4().hex

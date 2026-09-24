@@ -3,6 +3,7 @@ import os
 
 BASE_DIR = Path(os.getenv("BASE_DIR", Path(__file__).resolve().parent))
 UNIT_NAME = os.getenv("UNIT_NAME", "Công an xã Pơng Drang, tỉnh Đắk Lắk")
+UNIT_ADDRESS = os.getenv("UNIT_ADDRESS", "thôn 3, xã Pơng Drang, tỉnh Đắk Lắk")
 HOTLINE = os.getenv("HOTLINE", "02623509777")
 PRODUCTION_MODE = os.getenv("PRODUCTION_MODE", "false").lower() in ("1", "true", "yes", "on")
 GROQ_API_KEY = "".join((os.getenv("GROQ_API_KEY") or "").split())

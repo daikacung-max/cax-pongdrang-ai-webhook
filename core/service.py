@@ -41,6 +41,16 @@ def _has_doc_prefix(units, prefix):
     return any(str(x.get("document_id") or "").startswith(prefix) for x in units)
 
 
+def _append_community_team_guidance(answer, intake):
+    """Keep local community matters actionable without inventing a sanction."""
+    if (intake or {}).get("procedure_code") not in {"noise_report", "community_dispute"}:
+        return answer
+    team = str((intake or {}).get("handling_team") or "").strip()
+    if not team or norm(team) in norm(answer):
+        return answer
+    return answer.rstrip() + f" Nội dung này thuộc {team} của Công an xã Pơng Drang để hướng dẫn, tiếp nhận và xử lý theo thẩm quyền."
+
+
 def _dynamic_answer_is_weak(question, answer, legal_units):
     """Chỉ buộc fallback khi model bỏ qua nguồn hoặc đưa hướng dẫn TTHC rủi ro."""
     q = norm(question)
@@ -170,6 +180,7 @@ class AICore:
             fallback_reason = "no_source"
             with timer.stage("finalize_ms"):
                 final_answer = finalize(grounded_dynamic_fallback(fallback_question, []))
+            final_answer = _append_community_team_guidance(final_answer, intake)
             final_answer, handoff = self._record_ready_intake(user_id, intake, final_answer)
             meta = {
                 "legal": True, "retrieved_unit_ids": [], "verified": False,
@@ -229,7 +240,8 @@ class AICore:
                 verification_errors = [f"dynamic_fallback:{type(exc).__name__}"]
 
             with timer.stage("finalize_ms"):
-                final_answer = finalize(raw_answer)
+                final_answer = finalize(raw_answer, procedure_units=legal_units)
+            final_answer = _append_community_team_guidance(final_answer, intake)
             final_answer, handoff = self._record_ready_intake(user_id, intake, final_answer)
             meta = {
                 "legal": bool(search_plan.get("is_legal")),
@@ -319,7 +331,12 @@ class AICore:
             contact_recommended = False
 
         with timer.stage("finalize_ms"):
-            final_answer = finalize(raw_answer, contact_recommended=contact_recommended)
+            final_answer = finalize(
+                raw_answer,
+                contact_recommended=contact_recommended,
+                procedure_units=legal_units,
+            )
+        final_answer = _append_community_team_guidance(final_answer, intake)
         final_answer, handoff = self._record_ready_intake(user_id, intake, final_answer)
         meta = {
             "legal": bool(search_plan.get("is_legal")),
@@ -364,7 +381,11 @@ class AICore:
         """Trả lời từ nguồn khi bất kỳ lượt gọi Full Core nào gặp lỗi."""
         fallback_reason = "llm_timeout" if isinstance(exc, LLMTimeout) else "llm_error"
         with timer.stage("finalize_ms"):
-            final_answer = finalize(grounded_dynamic_fallback(fallback_question, legal_units))
+            final_answer = finalize(
+                grounded_dynamic_fallback(fallback_question, legal_units),
+                procedure_units=legal_units,
+            )
+        final_answer = _append_community_team_guidance(final_answer, intake)
         final_answer, handoff = self._record_ready_intake(user_id, intake, final_answer)
         meta = {
             "legal": bool(search_plan.get("is_legal")),

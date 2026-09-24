@@ -90,6 +90,11 @@ def _looks_elliptical(question):
         "nguoi do", "vu do", "cai do", "the thi", "vay thi", "con cai nay",
         "con viec nay", "gio thi sao", "bao lau", "mat bao lau", "can gi",
         "o thue", "o tro", "o nho", "nha thue", "duoc khong",
+        # These are dependent legal questions even when they contain more than
+        # five words: “mức phạt của người ta” must retain the immediately
+        # preceding karaoke/noise topic instead of becoming an unclassified
+        # question about a hypothetical person.
+        "nguoi ta", "muc phat", "muc xu phat", "xu ly sao", "xu phat sao",
     ))
 
 

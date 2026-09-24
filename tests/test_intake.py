@@ -55,7 +55,7 @@ class IntakeTests(unittest.TestCase):
         self.assertEqual(result["conversation_mode"], "intake_requested")
         self.assertNotIn("severity", result["missing_field_ids"])
         self.assertEqual(result["handoff_status"], "ready_for_officer")
-        self.assertEqual(result["handling_team"], "Tổ Cảnh sát trật tự")
+        self.assertEqual(result["handling_team"], "Tổ Cảnh sát khu vực")
         self.assertIsNone(result["next_question"])
         self.assertEqual(prompt_hint(result), "")
 
@@ -103,6 +103,11 @@ class IntakeTests(unittest.TestCase):
         vehicle = assess("Tôi muốn đăng ký xe máy mới", [])
         self.assertEqual(crime["handling_team"], "Tổ Cảnh sát phòng, chống tội phạm")
         self.assertEqual(vehicle["handling_team"], "Tổ Cảnh sát trật tự")
+
+    def test_community_dispute_routes_to_community_policing_team(self):
+        result = assess("Tôi có mâu thuẫn với hàng xóm", [])
+        self.assertEqual(result["procedure_code"], "community_dispute")
+        self.assertEqual(result["handling_team"], "Tổ Cảnh sát khu vực")
 
 
 if __name__ == "__main__":

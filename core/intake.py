@@ -76,6 +76,12 @@ PROCEDURES = (
         "fields": (("time_place", "việc gây ồn đang xảy ra ở đâu và vào thời điểm nào", ("hom nay", "hom qua", "luc", "gio", "tai", "nha", "thon", "buon")),),
     },
     {
+        "code": "community_dispute", "name": "Mâu thuẫn, xích mích trong khu dân cư",
+        "queue": "COMMUNITY_DISPUTE_INTAKE", "source_ready": False,
+        "keywords": ("mau thuan", "xich mich", "cai nhau", "tranh chap hang xom", "va cham hang xom"),
+        "fields": (("time_place", "mâu thuẫn xảy ra ở đâu và vào thời điểm nào", ("hom nay", "hom qua", "luc", "gio", "tai", "nha", "thon", "buon")),),
+    },
+    {
         "code": "gambling_report", "name": "Thông tin về cá độ, cá cược hoặc đánh bạc",
         "queue": "CRIME_INTAKE", "source_ready": True,
         "keywords": ("ca do", "ca cuoc", "danh bac", "co bac"),
@@ -184,6 +190,8 @@ def _choose(matches, text):
         return by_code["assault_evidence"]
     if any(x in text for x in ("karaoke", "loa keo", "tieng on", "on ao")) and "noise_report" in by_code:
         return by_code["noise_report"]
+    if any(x in text for x in ("mau thuan", "xich mich", "cai nhau", "tranh chap hang xom", "va cham hang xom")) and "community_dispute" in by_code:
+        return by_code["community_dispute"]
     if any(x in text for x in ("ca do", "ca cuoc", "danh bac", "co bac")) and "gambling_report" in by_code:
         return by_code["gambling_report"]
     if any(x in text for x in ("bi trom", "bi de doa", "de doa", "to giac", "trinh bao toi pham", "tin bao toi pham")) and "crime_report" in by_code:

@@ -1,7 +1,7 @@
 import re
 import unicodedata
 
-from config import UNIT_NAME, HOTLINE
+from config import UNIT_ADDRESS, UNIT_NAME, HOTLINE
 from core.clarification import clarification_for_unverified_topic
 
 
@@ -505,10 +505,64 @@ def clean_plain_text(text):
     return text.strip()
 
 
-def finalize(text, contact_recommended=False):
+_LOCAL_PROCEDURE_DOCUMENT_PREFIXES = (
+    "RESIDENCE_",
+    "TTHC_",
+    "CITIZEN_ID_",
+    "VNEID_",
+    "VEHICLE_",
+    "PASSPORT_",
+    "SECURITY_BUSINESS_",
+    "WEAPONS_",
+    "CRIMINAL_RECORD_",
+    "DRIVING_LICENCE_",
+)
+
+
+def needs_local_procedure_guidance(units):
+    """Return true only for sourced public-administration procedure families.
+
+    The local office is an actionable guidance point.  It is deliberately not
+    presented as the statutory receiving authority for every procedure, since
+    some matters (for example a vehicle or passport case) are assigned by law
+    to a different level depending on the citizen's circumstances.
+    """
+    return any(
+        str(unit.get("document_id") or "").startswith(_LOCAL_PROCEDURE_DOCUMENT_PREFIXES)
+        for unit in (units or [])
+    )
+
+
+def _append_local_procedure_guidance(text, units):
+    if not needs_local_procedure_guidance(units):
+        return text
+
+    normalized = norm(text)
+    if "cong an xa pong drang" in normalized and norm(UNIT_ADDRESS) in normalized:
+        return text
+
+    is_vehicle = any(
+        str(unit.get("document_id") or "").startswith("VEHICLE_")
+        for unit in units
+    )
+    if is_vehicle:
+        guidance = (
+            f" Để được kiểm tra đúng nơi tiếp nhận đăng ký xe theo phân cấp và hướng dẫn hồ sơ, "
+            f"anh/chị có thể đến {UNIT_NAME} tại {UNIT_ADDRESS}."
+        )
+    else:
+        guidance = (
+            f" Để được hướng dẫn hồ sơ và kiểm tra nơi tiếp nhận đúng với trường hợp của anh/chị, "
+            f"anh/chị có thể đến {UNIT_NAME} tại {UNIT_ADDRESS}."
+        )
+    return text.rstrip() + guidance
+
+
+def finalize(text, contact_recommended=False, procedure_units=None):
     text = enforce_phone_policy(clean_plain_text(text))
     if contact_recommended and HOTLINE not in text:
         text += f" Người dân có thể liên hệ trực ban {UNIT_NAME} qua số {HOTLINE}."
+    text = _append_local_procedure_guidance(text, procedure_units)
     return clean_plain_text(text)
 
 
