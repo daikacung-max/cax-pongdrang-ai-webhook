@@ -154,8 +154,24 @@ def _field(lines: list[str], aliases: tuple[str, ...]) -> str:
     return ""
 
 
-def _collect_user_text(history, question: str) -> str:
-    chunks = [str(item.get("content") or "") for item in (history or []) if item.get("role") == "user"]
+def _collect_user_text(history, question: str, *, continuing_form: bool = False) -> str:
+    """Collect only facts belonging to the current form session.
+
+    A citizen can discuss several unrelated matters in one chat.  Reusing every
+    earlier user message here can accidentally put facts from an old incident
+    into a newly requested report.  A fresh explicit request therefore starts
+    with the current turn only.  On a continuation, use just the messages sent
+    after the form assistant's most recent prompt.
+    """
+    items = list(history or [])
+    if continuing_form:
+        for index in range(len(items) - 1, -1, -1):
+            if items[index].get("role") == "assistant":
+                items = items[index + 1 :]
+                break
+    else:
+        items = []
+    chunks = [str(item.get("content") or "") for item in items if item.get("role") == "user"]
     chunks.append(str(question or ""))
     return "\n".join(chunks)
 
@@ -390,7 +406,10 @@ REPORT_LABELS = {
     "incident_content": "Nội dung sự việc",
     "request_content": "Đề nghị",
 }
-REPORT_DRAFT_REQUIRED = ("incident_content",)
+# A formal report must identify the reporting citizen and describe the event.
+# Other fields remain optional, but no document is generated from a bare
+# request or from facts inherited from a previous conversation topic.
+REPORT_DRAFT_REQUIRED = ("full_name", "address", "incident_content")
 
 
 def _blank_requested(question: str) -> bool:
@@ -407,7 +426,9 @@ def _download_url(form_type: str, fields: dict, user_id: str) -> str:
 
 
 def handle_form_request(user_id: str, question: str, history=None):
-    form_type = detect_form_type(question, history=history)
+    history = history or []
+    explicit_form_type = _explicit_form_type(question)
+    form_type = explicit_form_type or detect_form_type(question, history=history)
     if not form_type:
         return None
 
@@ -419,7 +440,11 @@ def handle_form_request(user_id: str, question: str, history=None):
             "ready": False,
         }
 
-    combined = _collect_user_text(history or [], question)
+    # An explicit request opens a new form session; it must never inherit facts
+    # from an earlier form or a different legal/TTHC conversation.  Only a
+    # recognised reply to the immediately pending form may continue it.
+    continuing_form = not bool(explicit_form_type) and _active_form(history) == form_type
+    combined = _collect_user_text(history, question, continuing_form=continuing_form)
     if form_type == "ct01":
         fields = _ct01_fields(combined)
         if _is_form_capability_question(question):
@@ -486,9 +511,6 @@ def handle_form_request(user_id: str, question: str, history=None):
                 "missing": missing,
             }
 
-    # A Word draft can be useful before the citizen has every identity/detail
-    # field.  Require only their own account of the incident; the remaining
-    # fields stay blank in the document rather than being guessed by AI.
     missing = _missing(fields, REPORT_DRAFT_REQUIRED)
     if missing:
         labels = "\n".join(f"- {REPORT_LABELS[k]}:" for k in missing)
@@ -496,9 +518,9 @@ def handle_form_request(user_id: str, question: str, history=None):
             "answer": (
                 "Tôi đang hỗ trợ soạn Đơn trình báo gửi " + UNIT_NAME + ". "
                 "Tôi chỉ dùng dữ liệu anh/chị cung cấp, không tự suy đoán diễn biến vụ việc.\n"
-                "Anh/chị hãy kể ngắn gọn sự việc đã xảy ra (ai, việc gì, khi nào/nơi nào nếu nhớ). "
+                "Để lập bản dự thảo, anh/chị vui lòng gửi các mục còn thiếu dưới đây. "
                 "Có thể nhắn tự nhiên, không cần theo mẫu, hoặc gửi:\n" + labels +
-                "\nNếu có, có thể bổ sung: Họ tên, CCCD, địa chỉ, số điện thoại, thời gian, địa điểm, tài liệu chứng cứ và đề nghị của anh/chị. "
+                "\nNếu có, anh/chị có thể bổ sung thêm: CCCD, số điện thoại, thời gian, địa điểm, tài liệu chứng cứ và đề nghị của anh/chị. "
                 "Nếu muốn chuyển sang nội dung khác, anh/chị cứ hỏi bình thường; hệ thống sẽ tự rời chế độ soạn đơn."
             ),
             "form_type": "report",

@@ -68,12 +68,13 @@ Nội dung đề nghị: đăng ký tạm trú"""
         self.assertEqual(payload["fields"]["full_name"], "Nguyễn Văn A")
         self.assertEqual(payload["fields"]["phone"], "")
 
-    def test_report_flow_accepts_free_prose_and_exports_a_draft_without_inventing_fields(self):
+    def test_report_flow_accepts_free_prose_and_exports_after_required_citizen_details(self):
         with patch.object(forms, "HISTORY_HMAC_SECRET", "test-secret"):
             result = forms.handle_form_request(
                 "u2",
                 (
-                    "Tôi muốn làm đơn trình báo. Tôi tên là Trần Văn B, CCCD 123456789012.\n"
+                    "Tôi muốn làm đơn trình báo. Tôi tên là Trần Văn B, CCCD 123456789012. "
+                    "Tôi ở xã Pơng Drang, tỉnh Đắk Lắk.\n"
                     "Hôm qua tôi bị lừa chuyển khoản 5 triệu đồng qua mạng và còn lưu tin nhắn."
                 ),
                 history=[],
@@ -84,16 +85,49 @@ Nội dung đề nghị: đăng ký tạm trú"""
         self.assertEqual(payload["fields"]["full_name"], "Trần Văn B")
         self.assertEqual(payload["fields"]["personal_id"], "123456789012")
         self.assertIn("bị lừa chuyển khoản", payload["fields"]["incident_content"])
-        self.assertEqual(payload["fields"]["address"], "")
+        self.assertIn("xã Pơng Drang", payload["fields"]["address"])
         self.assertEqual(name, "Don-trinh-bao.docx")
         self.assertGreater(len(content), 1000)
         self.assertLess(len(result["download_url"]), 200)
 
-    def test_report_flow_requests_only_the_incident_when_no_facts_were_given(self):
+    def test_report_flow_requests_citizen_details_when_no_facts_were_given(self):
         result = forms.handle_form_request("u2", "Giúp tôi tạo file Word đơn trình báo", history=[])
         self.assertFalse(result["ready"])
-        self.assertEqual(result["missing"], ["incident_content"])
-        self.assertIn("kể ngắn gọn sự việc", result["answer"])
+        self.assertEqual(result["missing"], ["full_name", "address", "incident_content"])
+        self.assertIn("Họ tên", result["answer"])
+
+    def test_fresh_report_request_never_reuses_an_old_incident(self):
+        history = [
+            {"role": "user", "content": "Hôm qua tôi bị lừa chuyển khoản 5 triệu đồng."},
+            {"role": "assistant", "content": "Tôi đã hướng dẫn cách bảo vệ tài khoản.", "meta": {}},
+        ]
+        result = forms.handle_form_request("u3", "Tôi muốn viết đơn trình báo", history=history)
+        self.assertFalse(result["ready"])
+        self.assertNotIn("download_url", result)
+        self.assertEqual(result["missing"], ["full_name", "address", "incident_content"])
+
+    def test_report_continuation_uses_only_details_after_its_prompt(self):
+        history = [
+            {"role": "user", "content": "Chuyện cũ: tôi bị lừa chuyển khoản 5 triệu đồng."},
+            {"role": "assistant", "content": "Tôi đã trả lời một câu hỏi khác.", "meta": {}},
+            {"role": "user", "content": "Tôi muốn viết đơn trình báo", "meta": {}},
+            {
+                "role": "assistant",
+                "content": "Tôi đang hỗ trợ soạn Đơn trình báo. Vui lòng gửi các dòng sau.",
+                "meta": {"path": "citizen_form_assistant", "form_type": "report", "form_ready": False},
+            },
+        ]
+        reply = (
+            "Họ tên: Nguyễn Văn A\nĐịa chỉ: xã Pơng Drang, tỉnh Đắk Lắk\n"
+            "Nội dung sự việc: Tôi bị mất điện thoại tại chợ vào sáng nay."
+        )
+        with patch.object(forms, "HISTORY_HMAC_SECRET", "test-secret"):
+            result = forms.handle_form_request("u4", reply, history=history)
+            token = result["download_url"].split("/forms/download/", 1)[1].split("/", 1)[0]
+            payload = forms.decode_download_token(token)
+        self.assertTrue(result["ready"])
+        self.assertIn("mất điện thoại", payload["fields"]["incident_content"])
+        self.assertNotIn("chuyển khoản 5 triệu", payload["fields"]["incident_content"])
 
     def test_download_endpoint_returns_docx_without_cache(self):
         app = Flask(__name__)
@@ -113,7 +147,12 @@ Nội dung đề nghị: đăng ký tạm trú"""
         with patch.object(forms, "HISTORY_HMAC_SECRET", "test-secret"):
             result = forms.handle_form_request(
                 "short-link-user",
-                "Tạo file Word đơn trình báo: Tôi bị mất điện thoại tại chợ và còn hóa đơn mua máy.",
+                (
+                    "Họ tên: Nguyễn Văn A\n"
+                    "Địa chỉ: xã Pơng Drang, tỉnh Đắk Lắk\n"
+                    "Nội dung sự việc: Tôi bị mất điện thoại tại chợ và còn hóa đơn mua máy.\n"
+                    "Tạo file Word đơn trình báo."
+                ),
                 history=[],
             )
             token = result["download_url"].split("/forms/download/", 1)[1].split("/", 1)[0]
