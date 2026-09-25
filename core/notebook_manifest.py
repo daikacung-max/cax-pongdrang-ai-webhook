@@ -78,6 +78,22 @@ def source_catalog():
 
 def source_for_document(document_id):
     document_id = str(document_id or "")
+    if document_id.startswith("KB_"):
+        try:
+            from core.knowledge_base import get_document
+            item = get_document(document_id)
+            if item:
+                return {
+                    "id": document_id,
+                    "index": int(item["source_index"]),
+                    "title": item["title"],
+                    "domains": [],
+                    "origin": item.get("source_url") or item.get("issuer") or "Tài liệu cán bộ đã duyệt",
+                    "document_ids": [document_id],
+                    "support_document_ids": [document_id],
+                }
+        except Exception:
+            return None
     for source in SOURCES:
         if document_id in source["document_ids"]:
             return dict(source)

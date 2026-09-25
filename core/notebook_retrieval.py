@@ -9,6 +9,7 @@ from config import LEGAL_TOP_K
 from core import db
 from core.artifact_router import source_index_for_question
 from core.notebook_manifest import SOURCES
+from core.knowledge_base import search_approved
 from core.retrieval import retrieve as legacy_retrieve
 
 
@@ -67,6 +68,23 @@ def _pack(source_index, question):
             item["_score"] = 9500 - len(result)
             result.append(item)
             seen.add(item["id"])
+    # Officer-approved material is scoped to the selected Notebook source and
+    # ranked ahead of broad lexical matches. Drafts/archived/expired material
+    # never reaches this retrieval path.
+    if len(result) < LEGAL_TOP_K:
+        try:
+            approved = search_approved(question, source_index, limit=LEGAL_TOP_K - len(result))
+        except Exception:
+            approved = []  # knowledge-store outages must not break citizen chat
+        for unit in approved:
+            if unit["id"] in seen:
+                continue
+            unit["_why"] = "officer_approved_knowledge"
+            unit["_artifact_source_id"] = source["id"]
+            unit["_artifact_source_title"] = source["title"]
+            unit["_score"] = 8000 - len(result)
+            result.append(unit)
+            seen.add(unit["id"])
     if len(result) < LEGAL_TOP_K:
         for unit in db.search_like(question, limit=max(LEGAL_TOP_K * 5, 30)):
             if str(unit.get("document_id") or "") not in allowed_documents:
