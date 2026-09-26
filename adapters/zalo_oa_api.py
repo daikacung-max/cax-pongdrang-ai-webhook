@@ -71,7 +71,10 @@ class ZaloOAClient:
     # behaviour while using the API version enabled for this OA category.
     endpoint = "https://openapi.zalo.me/v2.0/oa/message"
     token_endpoint = "https://oauth.zaloapp.com/v4/oa/access_token"
-    INVALID_ACCESS_TOKEN_ERRORS = {-124, "-124"}
+    # OA OpenAPI can return access-token rejection in a successful HTTP 200
+    # response. In production, error -216 was being retried as a generic send
+    # failure, so the durable queue kept retrying the same expired token.
+    INVALID_ACCESS_TOKEN_ERRORS = {-124, "-124", -216, "-216"}
 
     @staticmethod
     def _provider_error_reason(error):
