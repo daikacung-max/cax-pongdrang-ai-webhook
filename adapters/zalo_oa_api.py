@@ -74,7 +74,9 @@ class ZaloOAClient:
     # OA OpenAPI can return access-token rejection in a successful HTTP 200
     # response. In production, error -216 was being retried as a generic send
     # failure, so the durable queue kept retrying the same expired token.
-    INVALID_ACCESS_TOKEN_ERRORS = {-124, "-124", -216, "-216"}
+    INVALID_ACCESS_TOKEN_ERRORS = {
+        -124, "-124", -216, "-216", -220, "-220",
+    }
 
     @staticmethod
     def _provider_error_reason(error):

@@ -189,6 +189,28 @@ class ZaloTokenRefreshTests(unittest.TestCase):
         self.assertIn("/v4/oa/access_token", session.calls[1][0])
         self.assertEqual(session.calls[-1][1]["headers"]["access_token"], "fresh-access")
 
+    def test_refreshes_when_zalo_returns_error_minus_220(self):
+        session = _Session([
+            _Response(200, {"error": -220, "message": "Access token expired"}),
+            _Response(200, {
+                "access_token": "fresh-access",
+                "refresh_token": "fresh-refresh",
+            }),
+            _Response(200, {"error": 0, "message": "Success"}),
+        ])
+        client = ZaloOAClient(
+            "expired-access",
+            refresh_token="refresh-1",
+            app_id="app-1",
+            app_secret="secret-1",
+            session=session,
+        )
+
+        self.assertTrue(client.send_text("user-1", "Nội dung"))
+        self.assertEqual(len(session.calls), 3)
+        self.assertIn("/v4/oa/access_token", session.calls[1][0])
+        self.assertEqual(session.calls[-1][1]["headers"]["access_token"], "fresh-access")
+
 
 if __name__ == "__main__":
     unittest.main()
